@@ -1,6 +1,6 @@
 //! What the shell hook reports once a command line has finished.
 
-use crate::{CommandLine, ExitStatus};
+use crate::entities::{CommandLine, ExitStatus};
 
 /// A finished command line and what it returned.
 #[derive(Debug, Clone, PartialEq, Eq)]

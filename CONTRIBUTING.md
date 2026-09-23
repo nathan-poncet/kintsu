@@ -21,26 +21,24 @@ CI runs exactly these, on Linux and macOS. Run them locally first:
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
-cargo xtask check
 cargo build --release --locked
 bash -n shell/kintsu.bash && zsh -n shell/kintsu.zsh && fish -n shell/kintsu.fish
 ```
 
 ## Architecture in one minute
 
-Clean Architecture, one crate per ring; see
+Clean Architecture in one crate, the rings are folders; see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-| ring | crate | may depend on (of ours) |
+| ring | folder | may import (of ours) |
 |---|---|---|
-| Entities | `crates/entities` (`kintsu-entities`) | nothing |
-| Use cases + ports | `crates/use_cases` (`kintsu-use-cases`) | entities |
-| Adapters: controllers, gateways, presenters | `crates/adapters` (`kintsu-adapters`) | entities, use cases |
-| Composition root | `apps/kintsu` | all three |
+| Entities | `src/entities/` | nothing |
+| Use cases + ports | `src/use_cases/`, `src/use_cases/ports/` | entities |
+| Adapters: controllers, gateways, presenters | `src/adapters/` | entities, use cases |
+| Composition root | `src/main.rs` | everything |
 
-`cargo xtask check` (also run by `cargo test`) fails the build when a crate
-reaches outward or when an inner ring touches I/O, a runtime, a terminal or
-the clock. Ground rules:
+`tests/dependency_rule.rs` fails the build when an inner ring reaches
+outward or touches I/O, a runtime, a terminal or the clock. Ground rules:
 
 - **The inner rings do no I/O.** Entities and use cases decide; gateways act.
 - **Validate at the edge.** Config becomes typed `Settings` in the adapter;
@@ -69,6 +67,20 @@ TDD is the house style: write the failing test first.
   changes.
 - Anything a user would notice gets a line under `[Unreleased]` in
   [CHANGELOG.md](CHANGELOG.md).
+
+## The website
+
+`docs/index.html`, `docs/styles.css` and `docs/script.js` are the site,
+plain static files next to the design documents, ready for GitHub Pages
+(source: `main`, folder `/docs`) the day it is switched on. Preview it
+locally with:
+
+```sh
+python3 -m http.server -d docs 8000    # then open http://localhost:8000
+```
+
+No build step, no framework, no tracking. The interactive demo is vanilla
+JavaScript and the page still reads without it.
 
 ## Reporting bugs and proposing features
 

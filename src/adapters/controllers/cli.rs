@@ -1,6 +1,6 @@
 //! The `kintsu` command line, turned into something a use case understands.
 
-use kintsu_entities::{CommandLine, CommandLineError, CommandOutcome, ExitStatus, Shell};
+use crate::entities::{CommandLine, CommandLineError, CommandOutcome, ExitStatus, Shell};
 use thiserror::Error;
 
 /// What the user or a hook asked the binary to do.
@@ -27,7 +27,7 @@ pub enum CliError {
     #[error("init needs a shell: zsh, bash or fish")]
     MissingShell,
     /// `init` with a shell Kintsu has no hook for.
-    #[error("unsupported shell `{0}` (zsh, bash or fish)")]
+    #[error("unsupported shell `{shell}` (expected {expected})", shell = .0, expected = supported_shells())]
     UnsupportedShell(String),
     /// `triage` without both `--status` and `--command`.
     #[error("triage needs --status <code> --command <text>")]
@@ -41,6 +41,11 @@ pub enum CliError {
     /// A flag `triage` does not know.
     #[error("unknown flag `{0}`")]
     UnknownFlag(String),
+}
+
+fn supported_shells() -> String {
+    let names: Vec<&str> = Shell::ALL.iter().map(|shell| shell.name()).collect();
+    names.join(", ")
 }
 
 /// Parses the arguments that follow the program name.

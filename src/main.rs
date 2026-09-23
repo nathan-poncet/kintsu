@@ -1,13 +1,18 @@
-//! The `kintsu` binary: composition root only. It wires the controllers,
-//! the use cases and the presenters; no rule lives here.
+//! kintsu: when a command fails, offer to hand it to an AI agent, in the
+//! user's own terminal and shell. `main` is the composition root only: it
+//! wires controllers, use cases and presenters; no rule lives here.
 
 #![forbid(unsafe_code)]
 
+mod adapters;
+mod entities;
+mod use_cases;
+
 use std::process::ExitCode;
 
-use kintsu_adapters::controllers::{Command, parse_args};
-use kintsu_adapters::presenters::{hint, shell_hook};
-use kintsu_use_cases::triage_outcome;
+use adapters::controllers::{Command, parse_args};
+use adapters::presenters::{hint, shell_hook};
+use use_cases::triage_outcome;
 
 const USAGE: &str = "\
 kintsu — when a command fails, hand it to your agent

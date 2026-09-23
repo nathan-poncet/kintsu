@@ -7,17 +7,9 @@ use std::fmt;
 pub struct ExitStatus(i32);
 
 impl ExitStatus {
-    /// The status of a command that succeeded.
-    pub const SUCCESS: Self = Self(0);
-
     /// Wraps a raw status code.
     pub const fn new(code: i32) -> Self {
         Self(code)
-    }
-
-    /// The raw code.
-    pub const fn code(self) -> i32 {
-        self.0
     }
 
     /// Zero.
@@ -30,11 +22,6 @@ impl ExitStatus {
     /// (SIGTSTP, 148).
     pub const fn is_interruption(self) -> bool {
         matches!(self.0, 130 | 141 | 148)
-    }
-
-    /// The shell found no such program (127).
-    pub const fn is_command_not_found(self) -> bool {
-        self.0 == 127
     }
 }
 
@@ -50,7 +37,7 @@ mod tests {
 
     #[test]
     fn zero_is_success_and_nothing_else_is() {
-        assert!(ExitStatus::SUCCESS.is_success());
+        assert!(ExitStatus::new(0).is_success());
         assert!(!ExitStatus::new(1).is_success());
     }
 
@@ -66,11 +53,5 @@ mod tests {
         for code in [1, 2, 126, 127, 128, 137, 255] {
             assert!(!ExitStatus::new(code).is_interruption(), "{code}");
         }
-    }
-
-    #[test]
-    fn one_hundred_twenty_seven_means_command_not_found() {
-        assert!(ExitStatus::new(127).is_command_not_found());
-        assert!(!ExitStatus::new(126).is_command_not_found());
     }
 }

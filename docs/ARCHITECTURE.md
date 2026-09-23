@@ -1,14 +1,20 @@
 # Architecture
 
-Kintsu follows Clean Architecture the way the author's other projects do:
-entities and use cases alone at the centre, an interface-adapters ring
-around them split into controllers, gateways and presenters, and the
-processes at the very edge as composition roots. In Rust the rings are
-crates, so the compiler enforces the Dependency Rule between them, and
-`cargo xtask check` verifies the crate graph and the purity of the inner
-rings on every push.
+Kintsu is one Rust application that follows Clean Architecture the way the
+author's other projects do: entities and use cases alone at the centre, an
+interface-adapters ring around them split into controllers, gateways and
+presenters, and `main.rs` at the very edge as the composition root. The
+rings are folders in a single crate. The Dependency Rule is enforced by
+`tests/dependency_rule.rs`, which reads the sources on every `cargo test`
+and fails when an inner ring reaches outward or touches I/O, a runtime, a
+terminal or the clock.
 
-*Status: the crates exist and hold the day-zero skeleton. Most modules
+One crate on purpose: Kintsu is an application, not a library. A workspace
+would only earn its keep the day adapters must be swapped as separate
+crates, or the day a second deliverable needs Rust; the website does not,
+it is static files under `docs/`.
+
+*Status: the folders exist and hold the day-zero skeleton. Most modules
 below are the target shape, named now so that the first real pieces land
 in the right place. The process model is in [DAEMON.md](DAEMON.md), model
 routing in [MODELS.md](MODELS.md), the bubble in [UI.md](UI.md).*
@@ -17,70 +23,64 @@ routing in [MODELS.md](MODELS.md), the bubble in [UI.md](UI.md).*
 
 ```
 kintsu/
-├── Cargo.toml                    workspace: apps/*, crates/*, tools/*
+├── Cargo.toml                    one package, one binary
 ├── shell/                        kintsu.zsh · kintsu.bash · kintsu.fish   (the hooks, plain assets)
+├── tests/
+│   └── dependency_rule.rs        the rings may only reach inward; the inner two do no I/O
+├── docs/                         the design documents and the website (index.html, styles.css, script.js)
 │
-├── crates/
-│   ├── entities/                 kintsu-entities — enterprise rules, no I/O, depends on nothing of ours
-│   │   └── src/
-│   │       ├── command.rs            CommandLine
-│   │       ├── exit_status.rs        ExitStatus
-│   │       ├── outcome.rs            CommandOutcome
-│   │       ├── triage.rs             TriageDecision · QuietReason
-│   │       ├── shell.rs              Shell
-│   │       └── (planned)             Session · FailureCase · Context (cwd, git, history) · CapturedOutput ·
-│   │                                 Redaction · Rule · Fix · Danger · Task · ModelTier · RoutingPolicy ·
-│   │                                 Bubble · Action · Budget
-│   │
-│   ├── use_cases/                kintsu-use-cases — application rules, depends on the entities only
-│   │   └── src/
-│   │       ├── triage_outcome.rs     the one interactor that exists today
-│   │       ├── (planned)             register_session · record_command_start · triage_outcome · classify_failure ·
-│   │       │                         propose_fix · explain_failure · hand_off_to_agent · ignore_failure ·
-│   │       │                         recall_case · route_task · redact_case · install_shell_hook · diagnose
-│   │       └── ports/                one trait per file, role nouns, each owning its error type
-│   │           └── (planned)         SessionRegistry · CaseStore · Clock · Notifier · OutputSource ·
-│   │                                 ModelGateway · AgentLauncher · SecretStore · ConfigSource ·
-│   │                                 RuleBook · CostLedger · Randomness
-│   │
-│   └── adapters/                 kintsu-adapters — depends on the entities and the use cases
-│       └── src/
-│           ├── controllers/          cli.rs (argv → Command)
-│           │   └── (planned)         socket.rs (daemon frames → use cases) · url_scheme.rs (kintsu:// → use cases)
-│           ├── presenters/           hint.rs · shell_hook.rs
-│           │   └── (planned)         toast.rs · panel/ (ratatui, inline viewport) · ghost_text.rs ·
-│           │                         handoff_brief.rs · plain.rs · json.rs
-│           └── gateways/
-│               └── (planned)         models/{openai_compatible,anthropic,gemini,ollama,cli_agent}.rs ·
-│                                     agents/{claude_code,codex,opencode,aider,gemini_cli,copilot,template}.rs ·
-│                                     output_sources/{tmux,herdr,wezterm,kitty,iterm2,stderr_tee}.rs ·
-│                                     sessions/in_memory.rs · store/sqlite.rs · config/toml.rs ·
-│                                     secrets/{keychain,secret_service,env,command}.rs ·
-│                                     notify/{zle_fd,signal,next_prompt}.rs · clock.rs · rules/builtin.rs
-│
-├── apps/
-│   └── kintsu/                   the binary: the client subcommands and `kintsu daemon`
-│       └── src/
-│           ├── main.rs               composition root, today
-│           └── (planned)             app.rs (one function per subcommand) · daemon.rs (tokio runtime, socket
-│                                     listener, session supervisor) · service.rs (launchd, systemd, URL scheme)
-│
-└── tools/
-    └── xtask/                    `cargo xtask check`: Dependency Rule + purity of the inner rings
+└── src/
+    ├── main.rs                   composition root: wires controllers, use cases, presenters
+    ├── (planned)                 app.rs (one function per subcommand) · daemon.rs (runtime, socket
+    │                             listener, session supervisor) · service.rs (launchd, systemd, URL scheme)
+    │
+    ├── entities/                 enterprise rules, no I/O, depends on nothing else in the crate
+    │   ├── command.rs                CommandLine
+    │   ├── exit_status.rs            ExitStatus
+    │   ├── outcome.rs                CommandOutcome
+    │   ├── triage.rs                 TriageDecision · QuietReason
+    │   ├── shell.rs                  Shell
+    │   └── (planned)                 Session · FailureCase · Context (cwd, git, history) · CapturedOutput ·
+    │                                 Redaction · Rule · Fix · Danger · Task · ModelTier · RoutingPolicy ·
+    │                                 Bubble · Action · Budget
+    │
+    ├── use_cases/                application rules, depends on the entities only
+    │   ├── triage_outcome.rs         the one interactor that exists today
+    │   ├── (planned)                 register_session · record_command_start · classify_failure · propose_fix ·
+    │   │                             explain_failure · hand_off_to_agent · ignore_failure · recall_case ·
+    │   │                             route_task · redact_case · install_shell_hook · diagnose
+    │   └── ports/                    one trait per file, role nouns, each owning its error type
+    │       └── (planned)             SessionRegistry · CaseStore · Clock · Notifier · OutputSource ·
+    │                                 ModelGateway · AgentLauncher · SecretStore · ConfigSource ·
+    │                                 RuleBook · CostLedger · Randomness
+    │
+    └── adapters/                 depends on the entities and the use cases
+        ├── controllers/              cli.rs (argv → Command)
+        │   └── (planned)             socket.rs (daemon frames → use cases) · url_scheme.rs (kintsu:// → use cases)
+        ├── presenters/               hint.rs · shell_hook.rs
+        │   └── (planned)             toast.rs · panel/ (ratatui, inline viewport) · ghost_text.rs ·
+        │                             handoff_brief.rs · plain.rs · json.rs
+        └── gateways/
+            └── (planned)             models/{openai_compatible,anthropic,gemini,ollama,cli_agent}.rs ·
+                                      agents/{claude_code,codex,opencode,aider,gemini_cli,copilot,template}.rs ·
+                                      output_sources/{tmux,herdr,wezterm,kitty,iterm2,stderr_tee}.rs ·
+                                      sessions/in_memory.rs · store/sqlite.rs · config/toml.rs ·
+                                      secrets/{keychain,secret_service,env,command}.rs ·
+                                      notify/{zle_fd,signal,next_prompt}.rs · clock.rs · rules/builtin.rs
 ```
 
 ## The rings
 
-1. **Entities (`kintsu-entities`).** What a command line is, what it
+1. **Entities (`src/entities/`).** What a command line is, what it
    returned, what a failure case contains, what a fix is, how dangerous it
    is, what a task for a model is and which tier may run it. Newtypes over
    primitives, enums over strings and bools, invariants enforced at
-   construction. Allowed dependencies: `thiserror`, later `regex` for the
-   rules and the redaction patterns. Nothing that does I/O, nothing that
-   knows the time.
+   construction. May use `thiserror`, later `regex` for the rules and the
+   redaction patterns. Nothing that does I/O, nothing that knows the time,
+   nothing from `use_cases` or `adapters`.
 
-2. **Use cases (`kintsu-use-cases`).** One interactor per thing a user or
-   a hook can ask for. They orchestrate entities against ports and hold the
+2. **Use cases (`src/use_cases/`).** One interactor per thing a user or a
+   hook can ask for. They orchestrate entities against ports and hold the
    application policy: when to stay quiet, what context to collect, which
    task to route where, what must never run without confirmation.
    - **Ports** live in `use_cases/ports/`: role-noun traits, one per file,
@@ -94,8 +94,8 @@ kintsu/
      use case is tested in microseconds and every gateway is tested against
      the same suite.
 
-3. **Interface adapters (`kintsu-adapters`).** You expected gateways for
-   sure and maybe not the other two. The plan keeps all three, thin:
+3. **Interface adapters (`src/adapters/`).** Gateways for sure; controllers
+   and presenters kept thin, and kept:
    - **Controllers**: translate an input protocol into a use case call and
      nothing else. Three inputs exist: the command line (`cli.rs`), the
      daemon protocol (`socket.rs`, frames from hooks and clients), and the
@@ -115,13 +115,14 @@ kintsu/
      only ring allowed to import `reqwest`, `rusqlite`, `crossterm`,
      `ratatui`, `tokio` types and the OS.
 
-4. **Apps (`apps/kintsu`).** One binary, two roles: the thin client the
-   hooks and the user call, and `kintsu daemon`, the resident process.
-   `app.rs` has one function per subcommand: build the gateways, call a use
-   case, hand the result to a presenter. `daemon.rs` owns the runtime, the
-   socket listener and the session supervisor. `service.rs` writes the
-   launchd plist, the systemd unit and the URL-scheme handler. Nothing here
-   decides anything a test would want to check.
+4. **Composition root (`src/main.rs`, later `app.rs`, `daemon.rs`,
+   `service.rs`).** One binary, two roles: the thin client the hooks and
+   the user call, and `kintsu daemon`, the resident process. `app.rs` has
+   one function per subcommand: build the gateways, call a use case, hand
+   the result to a presenter. `daemon.rs` owns the runtime, the socket
+   listener and the session supervisor. `service.rs` writes the launchd
+   plist, the systemd unit and the URL-scheme handler. Nothing here decides
+   anything a test would want to check.
 
 ## One failure through the rings
 
@@ -137,7 +138,7 @@ kintsu/
                                                                         Clock
                                                                ◀── TriageDecision within the sync budget
                                 presenters::toast ◀─decision──
- prints the toast    ◀─stdout── 
+ prints the toast    ◀─stdout──
  (prompt is back)                                              use_cases::classify_failure (async, if a tiny model exists)
                                                                  ports: OutputSource → CapturedOutput
                                                                         RuleBook / redact_case
@@ -154,29 +155,23 @@ happens after the prompt is back and arrives as a message.
 ## Dependency Rule and CI
 
 ```
-kintsu-entities   ◀── kintsu-use-cases ◀── kintsu-adapters ◀── kintsu (app)   [sink]
-                                                                xtask         [sink, knows none of ours]
+entities  ◀──  use_cases (+ ports)  ◀──  adapters (controllers · presenters · gateways)  ◀──  main.rs
 ```
 
-| crate | may depend on (of ours) | may also use |
+| folder | may import (of ours) | may also use |
 |---|---|---|
-| `kintsu-entities` | nothing | `thiserror`, `regex` |
-| `kintsu-use-cases` | `kintsu-entities` | `thiserror`, `core::future` |
-| `kintsu-adapters` | entities, use cases | anything: HTTP, SQLite, terminals, runtimes |
-| `kintsu` | all three | anything |
-| `xtask` | nothing | `cargo_metadata` |
+| `src/entities` | nothing | `thiserror`, `regex` |
+| `src/use_cases` | `crate::entities` | `thiserror`, `core::future` |
+| `src/adapters` | entities, use cases | anything: HTTP, SQLite, terminals, runtimes |
+| `src/main.rs` and friends | everything | anything |
 
-`tools/xtask` reads `cargo metadata`, checks the graph against that table
-and greps the sources of the two inner crates for anything that smells of
-I/O, a runtime, a terminal or a clock (`std::io`, `std::fs`,
-`std::process`, `std::net`, `std::env`, `std::thread`, `Instant`,
-`SystemTime`, `tokio`, `crossterm`, `ratatui`, `reqwest`, `rusqlite`,
-`println!`…). `cargo test` runs the same checks as tests; CI runs both.
-
-Adding a crate is a deliberate act: it must be given a ring in `xtask`'s
-table or the check fails. When a bounded context grows big enough to
-deserve its own crates (the rules engine, the MCP server), it gets the same
-three-ring split and joins the table.
+`tests/dependency_rule.rs` walks `src/entities` and `src/use_cases` and
+fails on `crate::adapters`, `crate::use_cases` (from an entity), and on
+anything that smells of I/O, a runtime, a terminal or a clock: `std::io`,
+`std::fs`, `std::process`, `std::net`, `std::os`, `std::env`,
+`std::thread`, `Instant`, `SystemTime`, `tokio`, `crossterm`, `ratatui`,
+`reqwest`, `rusqlite`, `println!`… It also checks the ring folders exist.
+`cargo test` runs it; CI runs `cargo test`.
 
 ## Invariants
 
@@ -208,7 +203,7 @@ three-ring split and joins the table.
 - **Presenters** are tested as pure functions: given a view state and a
   width, this exact text; the panel against ratatui's `TestBackend`.
 - **Controllers** are tested on their parsing and their refusal messages.
-- **The app** is tested end to end by driving the hooks in real shells:
+- **The binary** is tested end to end by driving the hooks in real shells:
   zsh and bash accept piped input in interactive mode; fish needs a
   pseudo-terminal that answers its capability queries, or `emit
   fish_postexec` for the handler alone.

@@ -1,14 +1,14 @@
 //! The integration script `kintsu init` prints for a shell.
 
-use kintsu_entities::Shell;
+use crate::entities::Shell;
 
 /// The script to `eval` or `source`, verbatim from `shell/` at the root of
 /// the repository.
 pub fn shell_hook(shell: Shell) -> &'static str {
     match shell {
-        Shell::Zsh => include_str!("../../../../shell/kintsu.zsh"),
-        Shell::Bash => include_str!("../../../../shell/kintsu.bash"),
-        Shell::Fish => include_str!("../../../../shell/kintsu.fish"),
+        Shell::Zsh => include_str!("../../../shell/kintsu.zsh"),
+        Shell::Bash => include_str!("../../../shell/kintsu.bash"),
+        Shell::Fish => include_str!("../../../shell/kintsu.fish"),
     }
 }
 

@@ -2,4 +2,4 @@
 
 pub mod cli;
 
-pub use cli::{CliError, Command, parse_args};
+pub use cli::{Command, parse_args};

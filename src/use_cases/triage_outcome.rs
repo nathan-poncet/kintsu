@@ -1,6 +1,6 @@
 //! Decide whether a finished command line deserves a bubble.
 
-use kintsu_entities::{CommandOutcome, QuietReason, TriageDecision};
+use crate::entities::{CommandOutcome, QuietReason, TriageDecision};
 
 /// Stays quiet on success and on interruptions the user caused; offers help
 /// for everything else. The denylist, the cooldown and the same-failure
@@ -18,7 +18,7 @@ pub fn triage_outcome(outcome: CommandOutcome) -> TriageDecision {
 
 #[cfg(test)]
 mod tests {
-    use kintsu_entities::{CommandLine, ExitStatus};
+    use crate::entities::{CommandLine, ExitStatus};
 
     use super::*;
 

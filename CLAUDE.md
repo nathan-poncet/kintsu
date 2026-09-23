@@ -12,14 +12,17 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   ♻️ refactor, 👷 ci, 🔒 security…).
 
 ## Design
-- One crate per ring, enforced by the compiler and `cargo xtask check`:
-  `crates/entities` (pure, no I/O, no clock), `crates/use_cases` (interactors
-  plus `ports/`, one role-noun trait per file with its error type, `impl Future`
-  for anything that waits, no runtime), `crates/adapters` (`controllers/` turn
-  argv, socket frames and URL-scheme calls into use case calls; `presenters/`
-  map results to toast, panel, plain and JSON view states; `gateways/`
-  implement the ports over models, agents, terminals, storage, secrets),
-  `apps/kintsu` (composition root: client subcommands and `kintsu daemon`).
+- One crate, one binary, no workspace: Kintsu is an application, not a library.
+  The rings are folders, enforced by `tests/dependency_rule.rs`:
+  `src/entities/` (pure, no I/O, no clock), `src/use_cases/` (interactors plus
+  `ports/`, one role-noun trait per file with its error type, `impl Future` for
+  anything that waits, no runtime), `src/adapters/` (`controllers/` turn argv,
+  socket frames and URL-scheme calls into use case calls; `presenters/` map
+  results to toast, panel, plain and JSON view states; `gateways/` implement the
+  ports over models, agents, terminals, storage, secrets), `src/main.rs` and
+  later `app.rs` / `daemon.rs` / `service.rs` as the composition root.
+- The website is static HTML/CSS/JS in `docs/` next to the design documents
+  (GitHub Pages convention, not switched on yet). No framework, no build step.
 - A new side effect gets a port, an in-memory fake and a contract test first;
   every gateway passes the same contract suite.
 - Design references before proposing anything: `docs/DAEMON.md` (process model,

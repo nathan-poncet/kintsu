@@ -1,6 +1,6 @@
 //! The one dim line printed after a failure, until the real bubble exists.
 
-use kintsu_entities::TriageDecision;
+use crate::entities::TriageDecision;
 
 /// Longest command echoed back before it is abbreviated.
 pub const COMMAND_WIDTH: usize = 60;
@@ -30,7 +30,7 @@ fn abbreviate(text: &str, width: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use kintsu_entities::{CommandLine, CommandOutcome, ExitStatus, QuietReason};
+    use crate::entities::{CommandLine, CommandOutcome, ExitStatus, QuietReason};
 
     use super::*;
 

@@ -1,6 +1,6 @@
 //! What Kintsu decided about a finished command line.
 
-use crate::CommandOutcome;
+use crate::entities::CommandOutcome;
 
 /// The outcome of triage: say nothing, or offer help.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,11 +18,4 @@ pub enum QuietReason {
     Succeeded,
     /// The user stopped the command themselves.
     Interrupted,
-}
-
-impl TriageDecision {
-    /// Whether nothing will be shown.
-    pub const fn is_quiet(&self) -> bool {
-        matches!(self, Self::Quiet(_))
-    }
 }

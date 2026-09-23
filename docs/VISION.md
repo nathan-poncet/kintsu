@@ -242,10 +242,10 @@ as an explicit opt-in for people without any of these. Never re-run.
 Moved to [ARCHITECTURE.md](ARCHITECTURE.md), [DAEMON.md](DAEMON.md) and
 [MODELS.md](MODELS.md). In five lines:
 
-- Three crates for the three rings, `kintsu-entities`, `kintsu-use-cases`
-  with its `ports/`, `kintsu-adapters` with `controllers/`, `gateways/`
-  and `presenters/`; the binary in `apps/kintsu`; `cargo xtask check`
-  enforces the Dependency Rule.
+- One crate, the rings as folders: `src/entities`, `src/use_cases` with
+  its `ports/`, `src/adapters` with `controllers/`, `gateways/` and
+  `presenters/`, `main.rs` as the composition root;
+  `tests/dependency_rule.rs` enforces the Dependency Rule.
 - One resident daemon per user, started on demand or installed as a
   service, talking NDJSON over a Unix socket to thin clients: the hooks,
   the `kintsu` commands, the URL-scheme handler behind clicks.

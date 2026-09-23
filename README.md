@@ -102,7 +102,7 @@ Requires a Rust toolchain ([rustup.rs](https://rustup.rs)).
 ```sh
 git clone https://github.com/nathan-poncet/kintsu.git
 cd kintsu
-cargo install --path apps/kintsu
+cargo install --path .
 ```
 
 Then in your shell configuration:
@@ -131,6 +131,19 @@ Remove the line to uninstall.
 
 Details, ideas parking lot and open questions:
 [docs/VISION.md](docs/VISION.md).
+
+## Website
+
+The site lives in `docs/` as plain static files, the same convention as
+whisk, and is not published yet. Preview it locally:
+
+```sh
+python3 -m http.server -d docs 8000
+```
+
+Then open <http://localhost:8000>. The demo is interactive: click the words
+in the bubble, or press `Tab`, `^K`, `w`, `a`, `i` and `Esc` once the
+terminal has focus.
 
 ## Design documents
 

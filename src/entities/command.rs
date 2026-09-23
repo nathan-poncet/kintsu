@@ -30,11 +30,6 @@ impl CommandLine {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    /// The first word: the program the shell resolved, or tried to.
-    pub fn program(&self) -> &str {
-        self.0.split_whitespace().next().unwrap_or_default()
-    }
 }
 
 impl fmt::Display for CommandLine {
@@ -58,10 +53,5 @@ mod tests {
     fn the_text_is_kept_exactly_as_typed() {
         let line = CommandLine::new("  git   status \n").unwrap();
         assert_eq!(line.as_str(), "  git   status \n");
-    }
-
-    #[test]
-    fn the_program_is_the_first_word() {
-        assert_eq!(CommandLine::new("  gti status").unwrap().program(), "gti");
     }
 }
