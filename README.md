@@ -97,15 +97,23 @@ Notes on each, and on Copilot CLI, Amazon Q, Gemini CLI and friends, in
 
 ## Try the skeleton
 
-Requires a Rust toolchain ([rustup.rs](https://rustup.rs)).
+One line. The installer detects your platform, takes the latest release
+or, while there is none, builds from source with cargo, puts the binary in
+`~/.local/bin`, and asks before adding the hook to your shell:
 
 ```sh
-git clone https://github.com/nathan-poncet/kintsu.git
-cd kintsu
-cargo install --path .
+curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh
 ```
 
-Then in your shell configuration:
+`--dir`, `--no-hook`, `--yes`, `--dry-run` and `--uninstall` do what they
+say; the script is [130 lines of plain sh](install.sh), read it first if
+you like. By hand, with a Rust toolchain ([rustup.rs](https://rustup.rs)):
+
+```sh
+cargo install --git https://github.com/nathan-poncet/kintsu
+```
+
+Then, if you skipped the hook, in your shell configuration:
 
 ```sh
 eval "$(kintsu init zsh)"     # ~/.zshrc

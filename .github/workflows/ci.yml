@@ -45,3 +45,10 @@ jobs:
           bash -n shell/kintsu.bash
           if command -v zsh >/dev/null; then zsh -n shell/kintsu.zsh; fi
           if command -v fish >/dev/null; then fish -n shell/kintsu.fish; fi
+      - name: Installer parses, dry-runs, and the website copy matches
+        shell: bash
+        run: |
+          sh -n install.sh
+          diff install.sh docs/install.sh
+          sh install.sh --dry-run --no-hook --dir "$RUNNER_TEMP/kintsu-bin"
+          if command -v shellcheck >/dev/null; then shellcheck -s sh install.sh; fi

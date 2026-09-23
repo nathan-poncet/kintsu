@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install — Kintsu</title>
+  <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+  <meta name="theme-color" content="#0f0d0b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="26" height="26"><span>Kintsu</span></a>
+  <nav aria-label="Site">
+    <a href="docs.html" aria-current="page">Docs</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main id="main" class="doc">
+  <header class="doc-head">
+    <p class="section-label">Install</p>
+    <h1>One line, <em>or your way.</em></h1>
+    <p class="lede">One static binary, no runtime, no account. The installer does everything; the other methods are here for people who like to see each step.</p>
+  </header>
+  <section id="install">
+    
+    <div class="install-card wide">
+      <div class="config-head"><span>the installer</span><span class="now">today</span></div>
+      <pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh
+
+<span class="c"># the same script, with options</span>
+curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --dir ~/bin --no-hook
+curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --uninstall</code></pre>
+      <p class="card-note">Options: <code>--dir</code>, <code>--version</code>, <code>--from-source</code>, <code>--no-hook</code>, <code>--yes</code>, <code>--dry-run</code>, <code>--uninstall</code>. Release archives are checked against the published SHA256SUMS. <a href="https://github.com/nathan-poncet/kintsu/blob/main/install.sh" target="_blank" rel="noopener">Read it before you run it</a>; it is 130 lines of plain sh.</p>
+    </div>
+    <h3 class="step-title"><span class="step-n">or</span> by hand, your way</h3>
+    <div class="tabs" role="presentation">
+      <input type="radio" name="os" id="os-mac" checked><label for="os-mac">macOS</label>
+      <input type="radio" name="os" id="os-linux"><label for="os-linux">Linux</label>
+      <input type="radio" name="os" id="os-src"><label for="os-src">From source</label>
+      <input type="radio" name="os" id="os-more"><label for="os-more">Other ways</label>
+
+      <div class="tab-panel" data-for="os-mac">
+        <div class="install-card"><div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div><pre><code>brew install nathan-poncet/tap/kintsu</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz
+tar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>. Signed and notarized.</p></div>
+      </div>
+      <div class="tab-panel" data-for="os-linux">
+        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz
+tar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static musl build, any distribution, <code>aarch64</code> too. No <code>curl | sh</code>: you download, you look, you install.</p></div>
+        <div class="install-card"><div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div><pre><code>cargo binstall kintsu</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>Nix, AUR</span><span class="soon">later, help welcome</span></div><pre><code>nix run github:nathan-poncet/kintsu
+yay -S kintsu-bin</code></pre></div>
+      </div>
+      <div class="tab-panel" data-for="os-src">
+        <div class="install-card"><div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div><pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre><p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>. Builds in a second; there are no dependencies yet.</p></div>
+        <div class="install-card"><div class="config-head"><span>clone and build</span><span class="now">today</span></div><pre><code>git clone https://github.com/nathan-poncet/kintsu.git
+cd kintsu &amp;&amp; cargo install --path .</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
+      </div>
+      <div class="tab-panel" data-for="os-more">
+        <div class="install-card"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'cargo install --git https://github.com/nathan-poncet/kintsu'
+<span class="c"># the daemon runs per user on the remote host; your keys stay where you put them</span></code></pre></div>
+        <div class="install-card"><div class="config-head"><span>inside tmux or Herdr</span><span class="now">today</span></div><pre><code><span class="c"># nothing special: the hook lives in your shell; the multiplexer is where</span>
+<span class="c"># Kintsu reads the actual output best</span></code></pre></div>
+        <div class="install-card"><div class="config-head"><span>as a Herdr plugin</span><span class="soon">later</span></div><pre><code>herdr plugin install nathan-poncet/kintsu</code></pre></div>
+      </div>
+    </div>
+
+    <h3 class="step-title"><span class="step-n">2</span> Hook your shell</h3>
+    <div class="tabs" role="presentation">
+      <input type="radio" name="sh" id="sh-zsh" checked><label for="sh-zsh">zsh</label>
+      <input type="radio" name="sh" id="sh-bash"><label for="sh-bash">bash</label>
+      <input type="radio" name="sh" id="sh-fish"><label for="sh-fish">fish</label>
+      <div class="tab-panel" data-for="sh-zsh"><div class="install-card"><div class="config-head"><span>~/.zshrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init zsh)"</code></pre></div></div>
+      <div class="tab-panel" data-for="sh-bash"><div class="install-card"><div class="config-head"><span>~/.bashrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init bash)"</code></pre><p class="card-note">Messages arrive at the next prompt and there is no ghost text: bash has no safe way to draw while readline waits. Everything else is the same.</p></div></div>
+      <div class="tab-panel" data-for="sh-fish"><div class="install-card"><div class="config-head"><span>~/.config/fish/config.fish</span><span class="now">today</span></div><pre><code>kintsu init fish | source</code></pre></div></div>
+    </div>
+
+    <h3 class="step-title"><span class="step-n">3</span> Make it yours, when v0.1 lands</h3>
+    <div class="install-card wide"><div class="config-head"><span>three commands</span><span class="soon">with v0.1</span></div><pre><code>kintsu setup            <span class="c"># Ollama? a key? a CLI agent? Writes ~/.config/kintsu/config.toml</span>
+kintsu doctor           <span class="c"># what works, what is missing, what an answer would cost</span>
+kintsu service install  <span class="c"># the daemon survives logout and restarts on crash</span></code></pre><p class="card-note">Uninstall: remove the line from your rc file, <code>kintsu service uninstall</code>, delete the binary. Nothing else was touched.</p></div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-brand"><img src="media/mark.svg" alt="" width="20" height="20"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
+  <nav aria-label="Footer">
+    <a href="./">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="install.html">Install</a>
+    <a href="keys.html">Keys</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="tour.html">Tour</a>
+    <a href="faq.html">FAQ</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>

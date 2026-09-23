@@ -82,6 +82,10 @@ python3 -m http.server -d docs 8000    # then open http://localhost:8000
 No build step, no framework, no tracking. The interactive demo is vanilla
 JavaScript and the page still reads without it.
 
+`install.sh` at the root is the installer; `docs/install.sh` is the copy
+GitHub Pages serves at the one-liner's URL. Edit the root one and copy it
+over; CI fails when they differ.
+
 ## Reporting bugs and proposing features
 
 Use the issue templates. Security flaws go through the private channel

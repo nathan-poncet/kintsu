@@ -32,29 +32,38 @@
 
   <!-- hero -->
   <section class="hero">
+    <svg class="hero-seam" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="seam-gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a651e"/><stop offset=".5" stop-color="#f3d78a"/><stop offset="1" stop-color="#b8862b"/></linearGradient></defs>
+      <path pathLength="1" d="M-10 300 C 120 280, 190 330, 300 290 S 470 210, 560 250 S 700 340, 820 300 S 980 200, 1100 260 S 1180 300, 1215 285"/>
+      <path pathLength="1" class="branch" d="M560 250 C 590 200, 640 190, 690 150"/>
+      <path pathLength="1" class="branch" d="M820 300 C 850 350, 900 360, 960 400"/>
+    </svg>
     <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha</p>
     <h1>The command failed.<br><em>Kintsu picks it up.</em></h1>
     <p class="sub">A small bubble under the error, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the whole case to the AI agent you already pay for. Your models, your keys, and nothing runs without you.</p>
     <div class="oneliner">
       <span class="dollar" aria-hidden="true">$</span>
-      <code>cargo install --git https://github.com/nathan-poncet/kintsu</code>
-      <button type="button" class="copy" data-copy="cargo install --git https://github.com/nathan-poncet/kintsu">copy</button>
+      <code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code>
+      <button type="button" class="copy" data-copy="curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh">copy</button>
     </div>
-    <p class="hero-meta">macOS · Linux · zsh, bash, fish · MIT <span class="sep">—</span> <a href="docs.html#install">Homebrew, binaries and the other ways <span aria-hidden="true">→</span></a></p>
+    <p class="hero-meta">macOS · Linux · zsh, bash, fish · MIT <span class="sep">—</span> the script installs the binary and hooks your shell; <a href="install.html">Homebrew, cargo and the other ways <span aria-hidden="true">→</span></a></p>
   </section>
 
   <!-- the live terminal -->
   <section class="mock" aria-label="Kintsu, live">
-    <div class="player mock-player" data-scene="landing" data-title="zsh — ~/dev/acme"></div>
+    <div class="tilt" id="tilt"><div class="player mock-player" data-scene="landing" data-title="zsh — ~/dev/acme"></div><div class="glaze" aria-hidden="true"></div></div>
     <p class="mock-hint">It's live. Click a word in the bubble, or focus the terminal and press <kbd>^K</kbd>, <kbd>w</kbd>, <kbd>f</kbd>, <kbd>a</kbd>, <kbd>i</kbd>, <kbd>Esc</kbd>. <a href="tour.html">The guided tour <span aria-hidden="true">→</span></a></p>
   </section>
 
   <!-- five things -->
   <section class="why" aria-label="Why Kintsu">
+    <p class="why-intro reveal"><em>Kintsugi</em> repairs broken pottery with gold. The crack becomes the strongest, most visible line of the piece. A failed command is a crack.</p>
+    <div class="features-wrap">
+      <svg class="features-seam" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 24 1000"><path id="features-path" pathLength="1" d="M12 0 C 6 120, 20 200, 12 300 S 4 480, 12 560 S 22 720, 12 800 S 6 940, 12 1000"/></svg>
     <ol class="features">
-      <li class="feature">
+      <li class="feature reveal">
         <div class="ftext">
-          <span class="fnum">01</span>
+          <span class="fnum"><em>01</em></span>
           <h2><a href="tour.html#ch-2">A bubble, not a wall. <span aria-hidden="true">→</span></a></h2>
           <p>Under the failure: one gold seam, one sentence, a line of words. <kbd>Tab</kbd> accepts the fix already typed for you; <kbd>^K</kbd> unfolds a panel with Why, Fix, Agent, Ignore and Privacy. The words are clickable. Nothing ever steals a keystroke from your prompt.</p>
         </div>
@@ -65,9 +74,9 @@
 <span class="p">$</span> <span class="ghost">git status</span></pre>
       </li>
 
-      <li class="feature">
+      <li class="feature reveal">
         <div class="ftext">
-          <span class="fnum">02</span>
+          <span class="fnum"><em>02</em></span>
           <h2><a href="tour.html#ch-7">Your agent, briefed. <span aria-hidden="true">→</span></a></h2>
           <p>Three test failures, one cause. Kintsu writes the case, command, output, directory, branch, last commands, secrets redacted, and launches Claude Code, Codex, OpenCode or aider in your terminal with it. Then it steps aside. No API key if the CLI already has one.</p>
         </div>
@@ -78,9 +87,9 @@
 <span class="d">claude-code ·</span> npm test → <span class="ok">48 passed</span> · diff ready. Commit?</pre>
       </li>
 
-      <li class="feature">
+      <li class="feature reveal">
         <div class="ftext">
-          <span class="fnum">03</span>
+          <span class="fnum"><em>03</em></span>
           <h2><a href="configuration.html">Your models. Your keys. Local when it must. <span aria-hidden="true">→</span></a></h2>
           <p>A rule for the typo. A tiny model on your machine to read the output. The cloud model you chose to explain. Your agent to fix. One file decides who answers what, and a secret spotted in the output forces local for that case. Automatically.</p>
         </div>
@@ -92,9 +101,9 @@
         </div>
       </li>
 
-      <li class="feature">
+      <li class="feature reveal">
         <div class="ftext">
-          <span class="fnum">04</span>
+          <span class="fnum"><em>04</em></span>
           <h2><a href="tour.html#ch-5">Never runs anything. Shows what leaves. <span aria-hidden="true">→</span></a></h2>
           <p>A fix is inserted in your line; you press Enter. Destructive commands are red first. The Privacy tab is the exact payload that went out, redactions highlighted. No telemetry, no account, no server of ours.</p>
         </div>
@@ -105,9 +114,9 @@
 <span class="s">▎</span> <span class="d">✗ environment · files · anything you did not see here</span></pre>
       </li>
 
-      <li class="feature">
+      <li class="feature reveal">
         <div class="ftext">
-          <span class="fnum">05</span>
+          <span class="fnum"><em>05</em></span>
           <h2><a href="docs.html">Quiet. Fast. Everywhere you already are. <span aria-hidden="true">→</span></a></h2>
           <p>Under a millisecond on success, nothing on Ctrl-C, one bubble for the same failure twice. A resident daemon per user remembers across every tab, and answers that take longer arrive later, above your prompt, without touching the line you type. zsh, bash, fish. Any terminal. SSH, tmux, Herdr.</p>
         </div>
@@ -118,23 +127,25 @@
 <span class="p">$</span> <span class="cur"></span></pre>
       </li>
     </ol>
+    </div>
   </section>
 
   <!-- status -->
-  <section class="band">
+  <section class="band reveal">
     <p><span class="pill">pre-alpha</span> The hooks work today; the bubble is designed and comes with v0.1. <a href="roadmap.html">The roadmap <span aria-hidden="true">→</span></a></p>
   </section>
 
   <!-- install -->
-  <section class="end" id="install">
+  <section class="end reveal" id="install">
+    <svg class="end-seam" viewBox="0 0 800 60" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 40 C 90 20, 150 50, 240 30 S 400 10, 480 35 S 640 55, 800 25"/></svg>
     <h2>One line to try.<br><em>One line to remove.</em></h2>
     <p class="sub">Nothing else about your setup changes. Your shell, your terminal, your agents keep working exactly as they did, except the next failure gets a bubble.</p>
     <div class="oneliner">
       <span class="dollar" aria-hidden="true">$</span>
-      <code>cargo install --git https://github.com/nathan-poncet/kintsu</code>
-      <button type="button" class="copy" data-copy="cargo install --git https://github.com/nathan-poncet/kintsu">copy</button>
+      <code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code>
+      <button type="button" class="copy" data-copy="curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh">copy</button>
     </div>
-    <p class="hero-meta">then <code>eval "$(kintsu init zsh)"</code> in your rc file <span class="sep">—</span> <a href="docs.html#install">all install methods <span aria-hidden="true">→</span></a></p>
+    <p class="hero-meta">it asks before touching your rc file; <code>--uninstall</code> takes it all back <span class="sep">—</span> <a href="install.html">all install methods <span aria-hidden="true">→</span></a></p>
   </section>
 
 </main>
@@ -143,8 +154,10 @@
   <div class="foot-brand"><img src="media/mark.svg" alt="" width="20" height="20"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
   <nav aria-label="Footer">
     <a href="docs.html">Docs</a>
-    <a href="tour.html">Tour</a>
+    <a href="install.html">Install</a>
+    <a href="keys.html">Keys</a>
     <a href="configuration.html">Configuration</a>
+    <a href="tour.html">Tour</a>
     <a href="faq.html">FAQ</a>
     <a href="roadmap.html">Roadmap</a>
     <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>

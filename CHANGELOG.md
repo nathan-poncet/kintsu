@@ -8,6 +8,12 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- `install.sh`, the one-line installer: detects the platform, installs the
+  latest release (checksum verified) or builds from source with cargo while
+  there is none, puts the binary in `~/.local/bin`, asks before adding the
+  hook to zsh, bash or fish; `--dir`, `--version`, `--from-source`,
+  `--no-hook`, `--yes`, `--dry-run`, `--uninstall`. Mirrored in `docs/` so
+  GitHub Pages serves it.
 - The design documents: the crate map and the rings
   ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)), the resident daemon and
   its protocol ([docs/DAEMON.md](docs/DAEMON.md)), models routed per task
