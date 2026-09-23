@@ -22,97 +22,116 @@
     <a href="#tour">The tour</a>
     <a href="#brains">Who answers</a>
     <a href="#install">Install</a>
-    <a href="#faq">FAQ</a>
     <a href="configuration.html">Configuration</a>
     <a href="roadmap.html">Roadmap</a>
+    <a href="faq.html">FAQ</a>
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>
 
 <main id="main">
 
-  <!-- ═══════════════════════ hero + tour ═══════════════════════ -->
+  <!-- ═══════════════════════ hero ═══════════════════════ -->
   <section class="hero">
-    <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha · zsh, bash, fish · Linux and macOS</p>
+    <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha</p>
     <h1>The command failed.<br><em>Kintsu picks it up.</em></h1>
-    <p class="sub">A small bubble under the error. It fixes the typo, explains the stack trace, or hands the whole case to the AI agent you already use. In <strong>your</strong> terminal, <strong>your</strong> shell, with <strong>your</strong> models and <strong>your</strong> keys.</p>
+    <p class="sub">A small bubble under the error. It fixes the typo, explains the stack trace, or hands the whole case to the AI agent you already use. In your terminal, your shell, with your models and your keys.</p>
+    <div class="oneliner">
+      <span class="dollar" aria-hidden="true">$</span>
+      <code>cargo install --git https://github.com/nathan-poncet/kintsu</code>
+      <button type="button" class="copy" data-copy="cargo install --git https://github.com/nathan-poncet/kintsu">copy</button>
+    </div>
+    <p class="hero-meta">macOS · Linux · zsh, bash, fish · MIT <span class="sep">—</span> <a href="#install">Homebrew, binaries and the other ways <span aria-hidden="true">→</span></a></p>
   </section>
 
+  <!-- ═══════════════════════ the tour ═══════════════════════ -->
   <section id="tour" class="tour" aria-labelledby="tour-title">
     <h2 id="tour-title" class="visually-hidden">The tour: every action of the bubble, one chapter each</h2>
     <div class="player lead" data-scene="tour" data-title="zsh — ~/dev/acme"></div>
     <p class="player-note">Scripted scenes of the designed behaviour; Kintsu is pre-alpha and real recordings replace them the day v0.1 runs. Nothing here runs a command, and nothing will in the real thing either.</p>
   </section>
 
-  <!-- ═══════════════════════ who answers (teaser) ═══════════════════════ -->
+  <!-- ═══════════════════════ who answers ═══════════════════════ -->
   <section id="brains" class="brains">
     <div class="seam-rule" aria-hidden="true"></div>
-    <div class="section-head">
-      <div><p class="section-label">Who answers you</p><h2>Four kinds of brains, one per task.</h2></div>
-      <a class="btn ghost" href="configuration.html">The configuration <span aria-hidden="true">→</span></a>
-    </div>
-    <p class="lede">In the tour, four different things answered. A rule. A tiny model on your machine that reads the output. A small or large model, in the cloud or local, that writes one line or explains. Your agent. Which one does what is a config file, and it degrades gracefully when a brain is missing.</p>
+    <p class="section-label">Who answers you</p>
+    <h2>Four kinds of brains. One per task.</h2>
+    <p class="lede">In the tour, four different things answered. Which one does what is a config file, and it degrades gracefully when a brain is missing.</p>
 
-    <div class="brain-board">
-      <figure class="viz latency">
-        <figcaption><span class="viz-title">Time to an answer</span><span class="viz-sub">typical, from the failure to the first character</span></figcaption>
-        <ol class="bars" role="list">
-          <li><span class="lbl">Rule</span><span class="track"><i class="bar" style="--v: 3%"></i></span><span class="val">&lt; 1 ms</span></li>
-          <li><span class="lbl">Tiny model, local</span><span class="track"><i class="bar" style="--v: 22%"></i></span><span class="val">≈ 300 ms</span></li>
-          <li><span class="lbl">Small or large model</span><span class="track"><i class="bar" style="--v: 58%"></i></span><span class="val">1 – 3 s</span></li>
-          <li><span class="lbl">Agent</span><span class="track"><i class="bar" style="--v: 100%"></i></span><span class="val">minutes, it works</span></li>
-        </ol>
-        <p class="viz-note">One hue, one series: longer is longer. The scale is indicative; your models and your network decide.</p>
-      </figure>
+    <ol class="brains-strip">
+      <li>
+        <span class="num">1</span>
+        <h3><a href="configuration.html#routing">Rules <span aria-hidden="true">→</span></a></h3>
+        <p>Typos, wrong directory, Docker down, a rejected push. Ported from the best of thefuck.</p>
+        <p class="facts"><span class="where local">local</span> <span>under a millisecond</span> <span>free</span></p>
+      </li>
+      <li>
+        <span class="num">2</span>
+        <h3><a href="configuration.html#models">A tiny model, on your machine <span aria-hidden="true">→</span></a></h3>
+        <p>Reads the output, decides whether it deserves a bubble, writes the sentence. Ollama.</p>
+        <p class="facts"><span class="where local">local</span> <span>about 300 ms</span> <span>free</span></p>
+      </li>
+      <li>
+        <span class="num">3</span>
+        <h3><a href="configuration.html#models">A model, cloud or local <span aria-hidden="true">→</span></a></h3>
+        <p>One-line fixes with a confidence; explanations streamed in your language. Any provider.</p>
+        <p class="facts"><span class="where cloud">cloud</span> <span class="where local">local</span> <span>1 to 3 s</span> <span>≈ $0.001, or free</span></p>
+      </li>
+      <li>
+        <span class="num">4</span>
+        <h3><a href="configuration.html#agents">Your agent <span aria-hidden="true">→</span></a></h3>
+        <p>Claude Code, Codex, OpenCode, aider, Gemini CLI, launched in your terminal with the brief.</p>
+        <p class="facts"><span class="where you">your account</span> <span>minutes; it works</span> <span>your subscription</span></p>
+      </li>
+    </ol>
 
-      <figure class="viz where">
-        <figcaption><span class="viz-title">Where your data goes</span><span class="viz-sub">and what it costs, per answer</span></figcaption>
-        <table class="chips">
-          <tbody>
-            <tr><th scope="row">Rule</th><td><span class="where local">local</span></td><td>free</td><td class="d">nothing leaves</td></tr>
-            <tr><th scope="row">Tiny model</th><td><span class="where local">local</span></td><td>free</td><td class="d">Ollama on your machine</td></tr>
-            <tr><th scope="row">Small or large model</th><td><span class="where cloud">cloud</span> <span class="where local">local</span></td><td>≈ $0.001 or free</td><td class="d">the redacted case only</td></tr>
-            <tr><th scope="row">Agent</th><td><span class="where you">your account</span></td><td>your subscription</td><td class="d">the redacted brief, in your terminal</td></tr>
-          </tbody>
-        </table>
-        <p class="viz-note">A secret spotted in the output forces <span class="where local">local</span> for that case. Automatically.</p>
-      </figure>
+    <figure class="router" id="router">
+      <div class="router-text">
+        <p class="viz-title">How a task finds its brain</p>
+        <p class="task"><span class="task-name" id="router-task">classify</span> <span class="task-note" id="router-note">is this failure worth a bubble?</span></p>
+        <p class="router-why" id="router-why">A tiny local model reads the output and says whether it deserves your attention.</p>
+        <p class="viz-note">Per task, an ordered list of brains. A secret in the output forces <span class="where local">local</span>; a budget past its cap does too.</p>
+      </div>
+      <svg class="router-svg" viewBox="0 0 420 150" aria-hidden="true">
+        <path class="edge" d="M40 75 C 120 75, 150 22, 230 22"/>
+        <path class="edge" d="M40 75 C 120 75, 150 57, 230 57"/>
+        <path class="edge" d="M40 75 C 120 75, 150 92, 230 92"/>
+        <path class="edge" d="M40 75 C 120 75, 150 127, 230 127"/>
+        <circle class="pulse" r="5" cx="40" cy="75"/>
+        <g class="node" transform="translate(230 22)"><circle r="6"/><text x="14" y="4">rules</text></g>
+        <g class="node" transform="translate(230 57)"><circle r="6"/><text x="14" y="4">tiny · local</text></g>
+        <g class="node" transform="translate(230 92)"><circle r="6"/><text x="14" y="4">haiku · cloud</text></g>
+        <g class="node" transform="translate(230 127)"><circle r="6"/><text x="14" y="4">claude code · your account</text></g>
+        <g class="source" transform="translate(40 75)"><circle r="8"/><text y="30">the failure</text></g>
+      </svg>
+    </figure>
 
-      <figure class="viz router" id="router">
-        <figcaption><span class="viz-title">How a task finds its brain</span><span class="viz-sub">the router, live</span></figcaption>
-        <div class="router-board" aria-live="polite">
-          <div class="task"><span class="task-name" id="router-task">classify</span><span class="task-note" id="router-note">is this failure worth a bubble?</span></div>
-          <svg class="router-svg" viewBox="0 0 560 150" aria-hidden="true">
-            <path id="path-0" class="edge" d="M60 75 C 160 75, 200 22, 300 22"/>
-            <path id="path-1" class="edge" d="M60 75 C 160 75, 200 57, 300 57"/>
-            <path id="path-2" class="edge" d="M60 75 C 160 75, 200 92, 300 92"/>
-            <path id="path-3" class="edge" d="M60 75 C 160 75, 200 127, 300 127"/>
-            <circle class="pulse" r="5" cx="60" cy="75"/>
-            <g class="node" transform="translate(300 22)"><circle r="6"/><text x="14" y="4">rules</text></g>
-            <g class="node" transform="translate(300 57)"><circle r="6"/><text x="14" y="4">tiny · local</text></g>
-            <g class="node" transform="translate(300 92)"><circle r="6"/><text x="14" y="4">haiku · cloud</text></g>
-            <g class="node" transform="translate(300 127)"><circle r="6"/><text x="14" y="4">claude code · your account</text></g>
-            <g class="source" transform="translate(60 75)"><circle r="8"/><text x="-14" y="30">the failure</text></g>
-          </svg>
-          <p class="router-why" id="router-why">A tiny local model reads the output and says whether it deserves your attention.</p>
-        </div>
-        <p class="viz-note">Routing is a table in your config: for each task, an ordered list of brains, and constraints that can force local. <a href="configuration.html#routing">See the routing section</a>.</p>
-      </figure>
-    </div>
+    <p class="section-foot"><a class="more" href="configuration.html">The full configuration: models, routing, constraints, keys <span aria-hidden="true">→</span></a></p>
   </section>
 
-  <!-- ═══════════════════════ guarantees ═══════════════════════ -->
-  <section class="guarantees">
-    <p class="section-label">What never happens</p>
-    <h2>Six things Kintsu will not do.</h2>
-    <ul class="tiles">
-      <li><h3>Run a command for you</h3><p>Suggestions are inserted in your line editor. You press Enter. In the panel it takes two Enters, on purpose. Destructive patterns are red first.</p></li>
-      <li><h3>Send anything you did not see</h3><p>The Privacy tab is the exact payload. Redaction is on by default. A secret spotted anywhere forces local-only routing.</p></li>
-      <li><h3>Make your prompt wait</h3><p>The hook costs under a millisecond on success. The quiet path never touches the network. Slow answers arrive later, as messages.</p></li>
-      <li><h3>Replace your terminal</h3><p>Not a terminal, not a shell, not a PTY wrapper. A hook and a small resident daemon. One line in your rc file, one line to remove it.</p></li>
-      <li><h3>Speak twice about the same thing</h3><p>The same failure twice is one bubble. Dismiss, mute, ignore per command, directory, session or forever.</p></li>
-      <li><h3>Phone home</h3><p>No telemetry, no account, no server of ours. The only recipient of your data is the provider you configured, when you ask.</p></li>
-    </ul>
+  <!-- ═══════════════════════ is / is not ═══════════════════════ -->
+  <section id="is" class="isnot">
+    <div class="seam-rule" aria-hidden="true"></div>
+    <p class="section-label">In one glance</p>
+    <h2>What Kintsu is. What it is not.</h2>
+    <div class="isnot-cols">
+      <ul class="is">
+        <li><b>A hook and a small resident daemon</b> in the shell you already use.</li>
+        <li><b>A bubble under the failure</b>: one seam, one sentence, a line of words you can click.</li>
+        <li><b>Rules first, models when needed</b>, your agent for the real work.</li>
+        <li><b>Your models and your keys</b>: any provider, local when you want, local when it must.</li>
+        <li><b>Quiet by default</b>: nothing on success, one bubble per failure, mute in one word.</li>
+        <li><b>Open source</b>, MIT, one static binary.</li>
+      </ul>
+      <ul class="not">
+        <li><b>Not a terminal emulator</b>, not a shell, not a PTY wrapper.</li>
+        <li><b>Not a chat TUI</b>: if you want to chat, it hands you to one.</li>
+        <li><b>Not autocomplete</b>: zsh-autosuggestions and friends do that.</li>
+        <li><b>Not something that runs commands for you</b>: you press Enter, always.</li>
+        <li><b>Not a service</b>: no account, no telemetry, no server of ours.</li>
+        <li><b>Not finished</b>: pre-alpha, the design is done, the bubble comes with v0.1.</li>
+      </ul>
+    </div>
   </section>
 
   <!-- ═══════════════════════ install ═══════════════════════ -->
@@ -129,68 +148,29 @@
       <input type="radio" name="os" id="os-more"><label for="os-more">Other ways</label>
 
       <div class="tab-panel" data-for="os-mac">
-        <div class="install-card">
-          <div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div>
-          <pre><code>brew install nathan-poncet/tap/kintsu</code></pre>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div>
-          <pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz
-tar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre>
-          <p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>. Signed and notarized, like Whisk.</p>
-        </div>
+        <div class="install-card"><div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div><pre><code>brew install nathan-poncet/tap/kintsu</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz
+tar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>. Signed and notarized.</p></div>
       </div>
-
       <div class="tab-panel" data-for="os-linux">
-        <div class="install-card">
-          <div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div>
-          <pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz
-tar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre>
-          <p class="card-note">Static musl build, runs on any distribution. <code>aarch64</code> too. No <code>curl | sh</code>: you download, you look, you install.</p>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div>
-          <pre><code>cargo binstall kintsu</code></pre>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>Nix, AUR, Debian</span><span class="soon">later, help welcome</span></div>
-          <pre><code>nix run github:nathan-poncet/kintsu      <span class="c"># flake, planned</span>
-yay -S kintsu-bin                        <span class="c"># AUR, planned</span></code></pre>
-        </div>
+        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz
+tar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static musl build, any distribution, <code>aarch64</code> too. No <code>curl | sh</code>: you download, you look, you install.</p></div>
+        <div class="install-card"><div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div><pre><code>cargo binstall kintsu</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>Nix, AUR</span><span class="soon">later, help welcome</span></div><pre><code>nix run github:nathan-poncet/kintsu
+yay -S kintsu-bin</code></pre></div>
       </div>
-
       <div class="tab-panel" data-for="os-src">
-        <div class="install-card">
-          <div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div>
-          <pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre>
-          <p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>. Builds in about a second; there are no dependencies yet.</p>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>clone and build</span><span class="now">today</span></div>
-          <pre><code>git clone https://github.com/nathan-poncet/kintsu.git
-cd kintsu &amp;&amp; cargo install --path .</code></pre>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div>
-          <pre><code>cargo install kintsu</code></pre>
-        </div>
+        <div class="install-card"><div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div><pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre><p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>. Builds in a second; there are no dependencies yet.</p></div>
+        <div class="install-card"><div class="config-head"><span>clone and build</span><span class="now">today</span></div><pre><code>git clone https://github.com/nathan-poncet/kintsu.git
+cd kintsu &amp;&amp; cargo install --path .</code></pre></div>
+        <div class="install-card"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
       </div>
-
       <div class="tab-panel" data-for="os-more">
-        <div class="install-card">
-          <div class="config-head"><span>inside tmux or Herdr</span><span class="now">today</span></div>
-          <pre><code><span class="c"># nothing special: the hook lives in your shell, the multiplexer is where</span>
-<span class="c"># Kintsu reads the actual output best (tmux capture-pane, herdr pane read)</span></code></pre>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div>
-          <pre><code>ssh box 'curl -fsSLO …/kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; tar xzf kintsu-*.tar.gz -C ~/.local/bin kintsu'
-<span class="c"># the daemon runs per user on the remote host; your keys stay where you put them</span></code></pre>
-        </div>
-        <div class="install-card">
-          <div class="config-head"><span>as a Herdr plugin</span><span class="soon">later</span></div>
-          <pre><code>herdr plugin install nathan-poncet/kintsu</code></pre>
-        </div>
+        <div class="install-card"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'cargo install --git https://github.com/nathan-poncet/kintsu'
+<span class="c"># the daemon runs per user on the remote host; your keys stay where you put them</span></code></pre></div>
+        <div class="install-card"><div class="config-head"><span>inside tmux or Herdr</span><span class="now">today</span></div><pre><code><span class="c"># nothing special: the hook lives in your shell; the multiplexer is where</span>
+<span class="c"># Kintsu reads the actual output best</span></code></pre></div>
+        <div class="install-card"><div class="config-head"><span>as a Herdr plugin</span><span class="soon">later</span></div><pre><code>herdr plugin install nathan-poncet/kintsu</code></pre></div>
       </div>
     </div>
 
@@ -199,86 +179,62 @@ cd kintsu &amp;&amp; cargo install --path .</code></pre>
       <input type="radio" name="sh" id="sh-zsh" checked><label for="sh-zsh">zsh</label>
       <input type="radio" name="sh" id="sh-bash"><label for="sh-bash">bash</label>
       <input type="radio" name="sh" id="sh-fish"><label for="sh-fish">fish</label>
-      <div class="tab-panel" data-for="sh-zsh"><div class="install-card"><div class="config-head"><span>~/.zshrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init zsh)"</code></pre><p class="card-note">Ghost-text fixes and messages that arrive while you type: zsh has everything Kintsu needs.</p></div></div>
-      <div class="tab-panel" data-for="sh-bash"><div class="install-card"><div class="config-head"><span>~/.bashrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init bash)"</code></pre><p class="card-note">bash has no preexec and no safe way to draw while readline waits: messages arrive at the next prompt, and there is no ghost text. Everything else works.</p></div></div>
-      <div class="tab-panel" data-for="sh-fish"><div class="install-card"><div class="config-head"><span>~/.config/fish/config.fish</span><span class="now">today</span></div><pre><code>kintsu init fish | source</code></pre><p class="card-note">fish's <code>fish_postexec</code> event is the cleanest hook of the three.</p></div></div>
+      <div class="tab-panel" data-for="sh-zsh"><div class="install-card"><div class="config-head"><span>~/.zshrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init zsh)"</code></pre></div></div>
+      <div class="tab-panel" data-for="sh-bash"><div class="install-card"><div class="config-head"><span>~/.bashrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init bash)"</code></pre><p class="card-note">Messages arrive at the next prompt and there is no ghost text: bash has no safe way to draw while readline waits. Everything else is the same.</p></div></div>
+      <div class="tab-panel" data-for="sh-fish"><div class="install-card"><div class="config-head"><span>~/.config/fish/config.fish</span><span class="now">today</span></div><pre><code>kintsu init fish | source</code></pre></div></div>
     </div>
 
-    <h3 class="step-title"><span class="step-n">3</span> Make it yours</h3>
-    <div class="install-card wide">
-      <div class="config-head"><span>when v0.1 lands</span><span class="soon">with v0.1</span></div>
-      <pre><code>kintsu setup            <span class="c"># three questions: Ollama? a key? a CLI agent? Writes ~/.config/kintsu/config.toml</span>
+    <h3 class="step-title"><span class="step-n">3</span> Make it yours, when v0.1 lands</h3>
+    <div class="install-card wide"><div class="config-head"><span>three commands</span><span class="soon">with v0.1</span></div><pre><code>kintsu setup            <span class="c"># Ollama? a key? a CLI agent? Writes ~/.config/kintsu/config.toml</span>
 kintsu doctor           <span class="c"># what works, what is missing, what an answer would cost</span>
-kintsu service install  <span class="c"># the daemon survives logout and restarts on crash (launchd, systemd --user)</span></code></pre>
-      <p class="card-note">Uninstall: remove the line from your rc file, <code>kintsu service uninstall</code>, delete the binary. Nothing else was touched.</p>
-    </div>
+kintsu service install  <span class="c"># the daemon survives logout and restarts on crash</span></code></pre><p class="card-note">Uninstall: remove the line from your rc file, <code>kintsu service uninstall</code>, delete the binary. Nothing else was touched.</p></div>
   </section>
 
   <!-- ═══════════════════════ roadmap teaser ═══════════════════════ -->
-  <section class="status">
-    <div class="section-head">
-      <div><p class="section-label">Where it stands</p><h2>Design first. Then the bubble.</h2></div>
-      <a class="btn ghost" href="roadmap.html">The roadmap, with charts <span aria-hidden="true">→</span></a>
-    </div>
+  <section id="roadmap" class="status">
+    <div class="seam-rule" aria-hidden="true"></div>
+    <p class="section-label">Where it stands</p>
+    <h2>Design first. Then the bubble.</h2>
     <ol class="milestones">
       <li class="done"><span class="mk"></span><span class="when">now</span><span class="what">The skeleton: hooks, design, website</span></li>
       <li class="next"><span class="mk"></span><span class="when">v0.1</span><span class="what">The bubble: daemon, rules, Why, hand-off, noise control</span></li>
       <li><span class="mk"></span><span class="when">v0.2</span><span class="what">It reads the output: capture, redaction, Privacy, messages</span></li>
       <li><span class="mk"></span><span class="when">v0.3</span><span class="what">Your agent, your keys: keychain, subscriptions, local first, MCP</span></li>
     </ol>
+    <p class="section-foot"><a class="more" href="roadmap.html">The roadmap, with charts: what becomes real when <span aria-hidden="true">→</span></a></p>
   </section>
 
-  <!-- ═══════════════════════ faq ═══════════════════════ -->
-  <section id="faq" class="faq">
+  <!-- ═══════════════════════ questions ═══════════════════════ -->
+  <section id="questions" class="faq">
     <div class="seam-rule" aria-hidden="true"></div>
     <p class="section-label">Questions</p>
-    <h2>Fair ones, answered straight.</h2>
-
-    <div class="faq-groups">
+    <h2>The ones everyone asks first.</h2>
+    <div class="faq-groups compact">
       <div class="faq-group">
-        <h3>Safety and privacy</h3>
-        <details><summary>Does Kintsu ever run a command?</summary><p>No. Never. A fix is inserted in your line editor; you press Enter. In the panel it takes two Enters on purpose: one to insert, one to run. Rules can be marked <code>auto</code> by you, one by one, never by default. The only thing that runs on its own is a read-only probe attached to a rule, such as <code>lsof -i :3000</code> for a port in use, and only when you ask Why; the Privacy tab lists it.</p></details>
-        <details><summary>What exactly leaves my machine, and when?</summary><p>Nothing until you pick an action that needs a model. Then the redacted case: the command line, exit status and duration, the captured output, the working directory, the git branch and whether it is dirty, the last ten commands with their statuses, and the project hints Kintsu found (a package manifest, a <code>CLAUDE.md</code>). Never environment variables, never file contents, never your history beyond those ten lines. The Privacy tab shows the exact payload before and after.</p></details>
-        <details><summary>What if there is a secret in the output?</summary><p>Redaction runs before anything is sent and is on by default: API keys, bearer tokens, JWTs, passwords in URLs, private keys, plus your own patterns. When it finds one, the case is marked sensitive and the router refuses every cloud candidate for it: the answer comes from a local model or from rules alone. You see the redacted token in the Privacy tab as <code>sk-live-••••</code>.</p></details>
-        <details><summary>Can I use it fully offline?</summary><p>Yes. Rules need nothing. With Ollama, classification, fixes and explanations run on your machine; set <code>offline = "local_only"</code> or simply configure no cloud model. Without Ollama you keep the rules and the hand-off to a CLI agent, and Kintsu tells you once a day what it is missing.</p></details>
-        <details><summary>Does it keep logs? Telemetry?</summary><p>No telemetry, no account, no server of ours, ever. Locally, the daemon keeps a SQLite file with your cases, your decisions and what each answer cost, so <code>kintsu models</code> can show you a bill and so a fix you accepted twice can become a rule. Secrets are redacted before they are stored. Delete <code>~/.local/state/kintsu</code> and it is gone.</p></details>
-        <details><summary>Can a web page with a kintsu:// link do something to my shell?</summary><p>No. A click can only open or focus the panel on an action; it can never insert a command, run one, or start an agent. Case ids are random 128-bit tokens that expire with the case, the socket is a local Unix socket with the peer's uid checked, and there is no network listener.</p></details>
+        <details><summary>Does Kintsu ever run a command?</summary><p>No. Never. A fix is inserted in your line editor; you press Enter. In the panel it takes two Enters on purpose. Destructive patterns are red first.</p></details>
+        <details><summary>What leaves my machine, and when?</summary><p>Nothing until you pick an action that needs a model. Then the redacted case: command, status, output, cwd, git state, the last ten commands. Never your files, never your environment. The Privacy tab shows the exact payload.</p></details>
+        <details><summary>Can I use it fully offline?</summary><p>Yes. Rules need nothing; with Ollama, fixes and explanations run on your machine. A secret spotted in the output forces local-only for that case anyway.</p></details>
       </div>
-
       <div class="faq-group">
-        <h3>Compatibility</h3>
-        <details><summary>Which shells?</summary><p>zsh, bash and fish, on Linux and macOS. zsh and fish get the full experience: ghost-text fixes and messages that arrive while you type. bash has no preexec and no safe way to draw while readline waits, so messages come at the next prompt and there is no ghost text; everything else is the same. PowerShell and nushell are on the later list.</p></details>
-        <details><summary>Which terminals make the bubble clickable?</summary><p>Any terminal that renders OSC 8 hyperlinks: iTerm2, WezTerm, Kitty, Ghostty, foot, VS Code, Windows Terminal, GNOME Terminal and the other VTE terminals. Alacritty through its hints. Terminal.app does not render links, so the words show but do not click; the keys and the commands still work. The panel uses real mouse tracking while it is open, everywhere.</p></details>
-        <details><summary>Does it work over SSH, inside tmux, inside Herdr?</summary><p>Yes. The daemon runs per user on whatever host the shell is on, so on a server it runs on the server. tmux and Herdr are where Kintsu reads the actual output best, with <code>capture-pane</code> and <code>pane read</code>; WezTerm, Kitty and iTerm2 expose their scrollback too. Elsewhere the case is the command and its status until you enable the opt-in stderr capture.</p></details>
-        <details><summary>Will it slow down my prompt?</summary><p>On success, the hook assigns a variable and returns: under a millisecond, no process. On failure, the client talks to the daemon with a 40 ms budget and prints the toast if a rule answered in time; otherwise it returns and the bubble arrives later. Nothing on the sync path touches the network. If the daemon is dead, the hook stays silent.</p></details>
-        <details><summary>Does it change my exit status or my history?</summary><p>No. The hooks return the status of your command so your prompt and your <code>$?</code> are untouched, and they never write to your history. The dependency tests and the hook tests in the repository check both.</p></details>
-      </div>
-
-      <div class="faq-group">
-        <h3>Models and cost</h3>
-        <details><summary>What does an answer cost?</summary><p>Rules and the tiny local model: nothing. An explanation from a small cloud model such as Haiku: about a tenth of a cent for a typical case. A large model: a few cents. Your agent: whatever your subscription already covers. <code>kintsu models</code> shows the running total and <code>max_daily_cost</code> caps it; past the cap the router falls back to local and rules.</p></details>
-        <details><summary>Can I use my Claude, ChatGPT or Copilot subscription instead of an API key?</summary><p>Yes, through the CLI you already have: Claude Code, Codex, Copilot CLI or Gemini CLI configured as a <code>cli_agent</code>. Kintsu writes the brief and launches the CLI; the CLI uses its own login. That is how Agent works, and it can also serve Why and Fix if you route them there, at the cost of a slower answer.</p></details>
-        <details><summary>Do I need Ollama?</summary><p>No, but it is the difference between good and great. With a tiny local model, classification and summaries are free and instant, and sensitive cases still get an answer. Without it, those tasks fall back to rules and the toast is a little less clever. <code>kintsu setup</code> detects Ollama and picks a small model if you say yes.</p></details>
-        <details><summary>How does the router pick a brain?</summary><p>Per task, an ordered list of candidates from your config. The router drops what the constraints forbid (a cloud model for a sensitive case, a paid model past the budget, a slow model for a fast task), skips models whose circuit is open after three failures, and takes the first one left. On a timeout it moves to the next. The last candidate is always <code>rules-only</code>.</p></details>
-        <details><summary>Which providers?</summary><p>Anthropic, OpenAI, Gemini, Ollama, and any endpoint that speaks the OpenAI chat API: OpenRouter, Groq, Mistral, Together, LM Studio, llama-server, vLLM. Plus any CLI agent as a provider. Keys come from your keychain, an environment variable or a command such as <code>op read</code>; a literal in the file works and gets a warning.</p></details>
-      </div>
-
-      <div class="faq-group">
-        <h3>Compared to</h3>
-        <details><summary>Isn't this Warp?</summary><p>Warp did it first, and did it well, inside Warp: with a Warp account, Warp's models and Warp's quota. Kintsu does it in the terminal and shell you already use, with any model or agent, keys in your keychain and the source on GitHub. If you are happy in Warp, stay there.</p></details>
-        <details><summary>Isn't this thefuck?</summary><p>For chapter 1, yes, and Kintsu ports its best rules with credit. thefuck waits for you to type a word, has no model for what rules cannot know, cannot read the output, and cannot hand a case to an agent. It also starts a Python interpreter each time; Kintsu's quiet path is a native binary.</p></details>
-        <details><summary>Isn't this Claude Code, Codex, Copilot CLI, Gemini CLI?</summary><p>Those are agents you open. Kintsu is what notices the failure, writes the brief and opens them for you with the case attached. They are not competitors; they are where Agent hands off to.</p></details>
-        <details><summary>What about zsh-autofix, ai-fix, butterfish, shell_gpt?</summary><p>Each has a piece: zsh-autofix triggers on failure but is zsh plus oh-my-zsh plus Ollama only; ai-fix re-runs your failed command to capture its error, which is unsafe; butterfish wraps your shell in a PTY; shell_gpt and aichat are chat CLIs you call. None combines the automatic trigger, any shell and terminal, any model, safe capture and a real hand-off. <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md#what-exists-already" target="_blank" rel="noopener">The full comparison</a> is in the vision document.</p></details>
-      </div>
-
-      <div class="faq-group">
-        <h3>The project</h3>
-        <details><summary>What works today?</summary><p>The hooks, and a placeholder line after a failure. The bubble, the daemon, the rules and the models are designed in four documents and land with v0.1. The <a href="roadmap.html">roadmap</a> shows what becomes real when, chapter by chapter.</p></details>
-        <details><summary>Why Rust, and why one binary?</summary><p>The quiet path runs after every failed command and must start in well under a millisecond; a static binary installs everywhere, including a server you do not own. One crate, three rings as folders, a test that keeps them honest. It is an application, not a library.</p></details>
-        <details><summary>License, contributions?</summary><p>MIT. Issues and pull requests are welcome; the most useful contribution before v0.1 is an opinion on the design documents. Conventions are in <a href="https://github.com/nathan-poncet/kintsu/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>.</p></details>
-        <details><summary>Why "Kintsu"?</summary><p>Kintsugi, 金継ぎ, is the Japanese craft of repairing broken pottery with gold: the crack becomes the most visible and most valued part of the piece. A failed command is a crack. Kintsu is the gold seam, and the thing you learn from the fix is worth more than a command that never failed.</p></details>
+        <details><summary>Isn't this Warp?</summary><p>Warp did it first, inside Warp, with a Warp account and Warp's models. Kintsu does it in the terminal and shell you already use, with any model or agent, keys in your keychain, source on GitHub.</p></details>
+        <details><summary>Can I use my Claude or ChatGPT subscription instead of a key?</summary><p>Yes, through the CLI you already have: Claude Code, Codex, Copilot CLI or Gemini CLI as the agent. Kintsu writes the brief and launches the CLI; the CLI uses its own login.</p></details>
+        <details><summary>Which terminals make the bubble clickable?</summary><p>iTerm2, WezTerm, Kitty, Ghostty, foot, VS Code, Windows Terminal, GNOME Terminal and other VTE terminals render the links. Elsewhere the words still show and the keys still work.</p></details>
       </div>
     </div>
+    <p class="section-foot"><a class="more" href="faq.html">All twenty-four questions: safety, compatibility, models and cost, comparisons, the project <span aria-hidden="true">→</span></a></p>
+  </section>
+
+  <!-- ═══════════════════════ end ═══════════════════════ -->
+  <section class="end">
+    <div class="seam-rule" aria-hidden="true"></div>
+    <h2>One line to try. One line to remove.</h2>
+    <p class="lede">Nothing else about your setup changes: your shell, your terminal, your agents keep working exactly as they did, except the next failure gets a bubble.</p>
+    <div class="oneliner">
+      <span class="dollar" aria-hidden="true">$</span>
+      <code>cargo install --git https://github.com/nathan-poncet/kintsu</code>
+      <button type="button" class="copy" data-copy="cargo install --git https://github.com/nathan-poncet/kintsu">copy</button>
+    </div>
+    <p class="hero-meta">then <code>eval "$(kintsu init zsh)"</code> in your rc file <span class="sep">—</span> <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">star or follow on GitHub <span aria-hidden="true">→</span></a></p>
   </section>
 
 </main>
@@ -288,9 +244,9 @@ kintsu service install  <span class="c"># the daemon survives logout and restart
   <nav aria-label="Footer">
     <a href="configuration.html">Configuration</a>
     <a href="roadmap.html">Roadmap</a>
+    <a href="faq.html">FAQ</a>
     <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md" target="_blank" rel="noopener">Vision</a>
-    <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/UI.md" target="_blank" rel="noopener">The bubble</a>
     <a href="https://ko-fi.com/S3V726AT7H" target="_blank" rel="noopener">Ko-fi</a>
   </nav>
 </footer>

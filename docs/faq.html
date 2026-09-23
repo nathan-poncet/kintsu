@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAQ — Kintsu</title>
+  <meta name="description" content="Twenty-four fair questions about Kintsu, answered straight: safety and privacy, compatibility, models and cost, how it compares to Warp, thefuck and the agent CLIs, and the project itself.">
+  <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+  <meta name="theme-color" content="#0f0d0b">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="28" height="28"><span>Kintsu</span></a>
+  <nav aria-label="Sections">
+    <a href="./#tour">The tour</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="faq.html" aria-current="page">FAQ</a>
+    <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main id="main" class="doc faq">
+  <header class="doc-head">
+    <p class="section-label">Questions</p>
+    <h1>Fair ones, answered straight.</h1>
+    <p class="lede">Twenty-four questions in five groups. If yours is missing, <a href="https://github.com/nathan-poncet/kintsu/issues" target="_blank" rel="noopener">open an issue</a>: the answer becomes a line here.</p>
+  </header>
+  <section>
+    <div class="faq-groups">
+<div class="faq-group">
+        <h3>Safety and privacy</h3>
+        <details><summary>Does Kintsu ever run a command?</summary><p>No. Never. A fix is inserted in your line editor; you press Enter. In the panel it takes two Enters on purpose: one to insert, one to run. Rules can be marked <code>auto</code> by you, one by one, never by default. The only thing that runs on its own is a read-only probe attached to a rule, such as <code>lsof -i :3000</code> for a port in use, and only when you ask Why; the Privacy tab lists it.</p></details>
+        <details><summary>What exactly leaves my machine, and when?</summary><p>Nothing until you pick an action that needs a model. Then the redacted case: the command line, exit status and duration, the captured output, the working directory, the git branch and whether it is dirty, the last ten commands with their statuses, and the project hints Kintsu found (a package manifest, a <code>CLAUDE.md</code>). Never environment variables, never file contents, never your history beyond those ten lines. The Privacy tab shows the exact payload before and after.</p></details>
+        <details><summary>What if there is a secret in the output?</summary><p>Redaction runs before anything is sent and is on by default: API keys, bearer tokens, JWTs, passwords in URLs, private keys, plus your own patterns. When it finds one, the case is marked sensitive and the router refuses every cloud candidate for it: the answer comes from a local model or from rules alone. You see the redacted token in the Privacy tab as <code>sk-live-••••</code>.</p></details>
+        <details><summary>Can I use it fully offline?</summary><p>Yes. Rules need nothing. With Ollama, classification, fixes and explanations run on your machine; set <code>offline = "local_only"</code> or simply configure no cloud model. Without Ollama you keep the rules and the hand-off to a CLI agent, and Kintsu tells you once a day what it is missing.</p></details>
+        <details><summary>Does it keep logs? Telemetry?</summary><p>No telemetry, no account, no server of ours, ever. Locally, the daemon keeps a SQLite file with your cases, your decisions and what each answer cost, so <code>kintsu models</code> can show you a bill and so a fix you accepted twice can become a rule. Secrets are redacted before they are stored. Delete <code>~/.local/state/kintsu</code> and it is gone.</p></details>
+        <details><summary>Can a web page with a kintsu:// link do something to my shell?</summary><p>No. A click can only open or focus the panel on an action; it can never insert a command, run one, or start an agent. Case ids are random 128-bit tokens that expire with the case, the socket is a local Unix socket with the peer's uid checked, and there is no network listener.</p></details>
+      </div>
+
+      <div class="faq-group">
+        <h3>Compatibility</h3>
+        <details><summary>Which shells?</summary><p>zsh, bash and fish, on Linux and macOS. zsh and fish get the full experience: ghost-text fixes and messages that arrive while you type. bash has no preexec and no safe way to draw while readline waits, so messages come at the next prompt and there is no ghost text; everything else is the same. PowerShell and nushell are on the later list.</p></details>
+        <details><summary>Which terminals make the bubble clickable?</summary><p>Any terminal that renders OSC 8 hyperlinks: iTerm2, WezTerm, Kitty, Ghostty, foot, VS Code, Windows Terminal, GNOME Terminal and the other VTE terminals. Alacritty through its hints. Terminal.app does not render links, so the words show but do not click; the keys and the commands still work. The panel uses real mouse tracking while it is open, everywhere.</p></details>
+        <details><summary>Does it work over SSH, inside tmux, inside Herdr?</summary><p>Yes. The daemon runs per user on whatever host the shell is on, so on a server it runs on the server. tmux and Herdr are where Kintsu reads the actual output best, with <code>capture-pane</code> and <code>pane read</code>; WezTerm, Kitty and iTerm2 expose their scrollback too. Elsewhere the case is the command and its status until you enable the opt-in stderr capture.</p></details>
+        <details><summary>Will it slow down my prompt?</summary><p>On success, the hook assigns a variable and returns: under a millisecond, no process. On failure, the client talks to the daemon with a 40 ms budget and prints the toast if a rule answered in time; otherwise it returns and the bubble arrives later. Nothing on the sync path touches the network. If the daemon is dead, the hook stays silent.</p></details>
+        <details><summary>Does it change my exit status or my history?</summary><p>No. The hooks return the status of your command so your prompt and your <code>$?</code> are untouched, and they never write to your history. The dependency tests and the hook tests in the repository check both.</p></details>
+      </div>
+
+      <div class="faq-group">
+        <h3>Models and cost</h3>
+        <details><summary>What does an answer cost?</summary><p>Rules and the tiny local model: nothing. An explanation from a small cloud model such as Haiku: about a tenth of a cent for a typical case. A large model: a few cents. Your agent: whatever your subscription already covers. <code>kintsu models</code> shows the running total and <code>max_daily_cost</code> caps it; past the cap the router falls back to local and rules.</p></details>
+        <details><summary>Can I use my Claude, ChatGPT or Copilot subscription instead of an API key?</summary><p>Yes, through the CLI you already have: Claude Code, Codex, Copilot CLI or Gemini CLI configured as a <code>cli_agent</code>. Kintsu writes the brief and launches the CLI; the CLI uses its own login. That is how Agent works, and it can also serve Why and Fix if you route them there, at the cost of a slower answer.</p></details>
+        <details><summary>Do I need Ollama?</summary><p>No, but it is the difference between good and great. With a tiny local model, classification and summaries are free and instant, and sensitive cases still get an answer. Without it, those tasks fall back to rules and the toast is a little less clever. <code>kintsu setup</code> detects Ollama and picks a small model if you say yes.</p></details>
+        <details><summary>How does the router pick a brain?</summary><p>Per task, an ordered list of candidates from your config. The router drops what the constraints forbid (a cloud model for a sensitive case, a paid model past the budget, a slow model for a fast task), skips models whose circuit is open after three failures, and takes the first one left. On a timeout it moves to the next. The last candidate is always <code>rules-only</code>.</p></details>
+        <details><summary>Which providers?</summary><p>Anthropic, OpenAI, Gemini, Ollama, and any endpoint that speaks the OpenAI chat API: OpenRouter, Groq, Mistral, Together, LM Studio, llama-server, vLLM. Plus any CLI agent as a provider. Keys come from your keychain, an environment variable or a command such as <code>op read</code>; a literal in the file works and gets a warning.</p></details>
+      </div>
+
+      <div class="faq-group">
+        <h3>Compared to</h3>
+        <details><summary>Isn't this Warp?</summary><p>Warp did it first, and did it well, inside Warp: with a Warp account, Warp's models and Warp's quota. Kintsu does it in the terminal and shell you already use, with any model or agent, keys in your keychain and the source on GitHub. If you are happy in Warp, stay there.</p></details>
+        <details><summary>Isn't this thefuck?</summary><p>For chapter 1, yes, and Kintsu ports its best rules with credit. thefuck waits for you to type a word, has no model for what rules cannot know, cannot read the output, and cannot hand a case to an agent. It also starts a Python interpreter each time; Kintsu's quiet path is a native binary.</p></details>
+        <details><summary>Isn't this Claude Code, Codex, Copilot CLI, Gemini CLI?</summary><p>Those are agents you open. Kintsu is what notices the failure, writes the brief and opens them for you with the case attached. They are not competitors; they are where Agent hands off to.</p></details>
+        <details><summary>What about zsh-autofix, ai-fix, butterfish, shell_gpt?</summary><p>Each has a piece: zsh-autofix triggers on failure but is zsh plus oh-my-zsh plus Ollama only; ai-fix re-runs your failed command to capture its error, which is unsafe; butterfish wraps your shell in a PTY; shell_gpt and aichat are chat CLIs you call. None combines the automatic trigger, any shell and terminal, any model, safe capture and a real hand-off. <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md#what-exists-already" target="_blank" rel="noopener">The full comparison</a> is in the vision document.</p></details>
+      </div>
+
+      <div class="faq-group">
+        <h3>The project</h3>
+        <details><summary>What works today?</summary><p>The hooks, and a placeholder line after a failure. The bubble, the daemon, the rules and the models are designed in four documents and land with v0.1. The <a href="roadmap.html">roadmap</a> shows what becomes real when, chapter by chapter.</p></details>
+        <details><summary>Why Rust, and why one binary?</summary><p>The quiet path runs after every failed command and must start in well under a millisecond; a static binary installs everywhere, including a server you do not own. One crate, three rings as folders, a test that keeps them honest. It is an application, not a library.</p></details>
+        <details><summary>License, contributions?</summary><p>MIT. Issues and pull requests are welcome; the most useful contribution before v0.1 is an opinion on the design documents. Conventions are in <a href="https://github.com/nathan-poncet/kintsu/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>.</p></details>
+        <details><summary>Why "Kintsu"?</summary><p>Kintsugi, 金継ぎ, is the Japanese craft of repairing broken pottery with gold: the crack becomes the most visible and most valued part of the piece. A failed command is a crack. Kintsu is the gold seam, and the thing you learn from the fix is worth more than a command that never failed.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-brand"><img src="media/mark.svg" alt="" width="22" height="22"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
+  <nav aria-label="Footer">
+    <a href="./">Home</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</footer>
+</body>
+</html>

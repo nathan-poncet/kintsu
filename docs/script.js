@@ -169,22 +169,23 @@
 
     render() {
       const title = esc(this.root.dataset.title);
-      const list = this.chapters.map((c, k) => `
+      const steps = this.chapters.map((c, k) => `
         <li>
           <button type="button" class="chapter" data-chapter="${k}" aria-label="Chapter ${k + 1}: ${esc(c.title)}">
             <span class="n">${k + 1}</span>
             <span class="tag">${esc(c.tag)}</span>
             <span class="t">${esc(c.title)}</span>
-            <span class="who"><span class="where ${whereClass(c.where)}">${esc(c.where)}</span></span>
             <i class="fill"></i>
           </button>
-          <div class="ch-body">
-            <p class="ch-text">${c.text}</p>
-            <p class="ch-meta"><span class="where ${whereClass(c.where)}">${esc(c.where)}</span> ${esc(c.who)} <span class="d">· ${esc(c.cost)}</span></p>
-            <p class="ch-keys">${c.keys.split(" · ").map((x) => `<span>${esc(x)}</span>`).join(`<span class="sep"> · </span>`)}</p>
-          </div>
         </li>`).join("");
       this.root.innerHTML = `
+        <aside class="ch-panel" aria-live="polite">
+          <p class="ch-count"></p>
+          <h3 class="ch-title"><span class="tag"></span><span class="t"></span></h3>
+          <p class="ch-text"></p>
+          <p class="ch-meta"></p>
+          <p class="ch-keys"></p>
+        </aside>
         <div class="player-main">
           <div class="terminal" tabindex="0" aria-label="Kintsu tour. Click a word in the bubble, or use Tab, Control K, w, f, a, i, p, Escape. Space pauses.">
             <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><button type="button" class="badge playpause" aria-label="Pause">⏸ playing</button></div>
@@ -192,10 +193,11 @@
             <div class="keycap" aria-hidden="true"></div>
           </div>
         </div>
-        <ol class="chapters" aria-label="Chapters: pick one to play it">${list}</ol>`;
-      this.term = this.root.querySelector(".terminal"); this.screen = this.root.querySelector(".screen");
-      this.badge = this.root.querySelector(".playpause"); this.keycap = this.root.querySelector(".keycap");
+        <ol class="chapters" aria-label="Chapters: pick one to play it">${steps}</ol>`;
+      const $ = (s) => this.root.querySelector(s);
+      this.term = $(".terminal"); this.screen = $(".screen"); this.badge = $(".playpause"); this.keycap = $(".keycap");
       this.items = [...this.root.querySelectorAll(".chapters > li")];
+      this.ex = { count: $(".ch-count"), tag: $(".ch-title .tag"), title: $(".ch-title .t"), text: $(".ch-text"), meta: $(".ch-meta"), keys: $(".ch-keys") };
       this.badge.addEventListener("click", () => this.togglePause());
       this.root.querySelectorAll(".chapter").forEach((b) => b.addEventListener("click", () => this.play(Number(b.dataset.chapter))));
       this.screen.addEventListener("click", (e) => {
@@ -227,8 +229,13 @@
     // ── chapters ──
     showChapter(k) {
       this.chapterIndex = k;
-      this.items.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); const f = li.querySelector(".fill"); f.style.setProperty("--w", i < k ? "100%" : "0%"); });
-      if (!this.instant) this.items[k].scrollIntoView?.({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+      const c = this.chapters[k];
+      this.ex.count.textContent = `Chapter ${k + 1} of ${this.chapters.length}`;
+      this.ex.tag.textContent = c.tag; this.ex.title.textContent = c.title;
+      this.ex.text.innerHTML = c.text;
+      this.ex.meta.innerHTML = `<span class="where ${whereClass(c.where)}">${esc(c.where)}</span> ${esc(c.who)} <span class="d">· ${esc(c.cost)}</span>`;
+      this.ex.keys.innerHTML = c.keys.split(" · ").map((x) => `<span>${esc(x)}</span>`).join(`<span class="sep"> · </span>`);
+      this.items.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); li.querySelector(".fill").style.setProperty("--w", i < k ? "100%" : "0%"); });
     }
     progress(i) {
       const k = this.chapterIndex; if (k < 0) return;
@@ -393,6 +400,12 @@
     }
   }
 
+  // ── copy buttons ─────────────────────────────────────────────────────
+  document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; } catch { b.textContent = "select it"; }
+    setTimeout(() => (b.textContent = "copy"), 1400);
+  }));
+
   // ── bars grow when they scroll into view ─────────────────────────────
   const vizzes = [...document.querySelectorAll(".viz")].filter((v) => v.querySelector(".bar"));
   if (vizzes.length && typeof IntersectionObserver === "function" && !reduced) {
@@ -420,7 +433,7 @@
       nodes.forEach((n, i) => n.classList.toggle("on", i === route.to));
       paths.forEach((p, i) => p.classList.toggle("on", i === route.to));
       const path = paths[route.to]; const len = path.getTotalLength?.() ?? 0;
-      if (!len || reduced) { const end = path.getPointAtLength?.(len) ?? { x: 300, y: 22 + 35 * route.to }; pulse.setAttribute("cx", end.x); pulse.setAttribute("cy", end.y); return; }
+      if (!len || reduced) { const end = path.getPointAtLength?.(len) ?? { x: 230, y: 22 + 35 * route.to }; pulse.setAttribute("cx", end.x); pulse.setAttribute("cy", end.y); return; }
       const t0 = performance.now(), dur = 900;
       const step = (now) => { const k = Math.min(1, (now - t0) / dur); const pt = path.getPointAtLength(len * k); pulse.setAttribute("cx", pt.x); pulse.setAttribute("cy", pt.y); if (k < 1) requestAnimationFrame(step); };
       requestAnimationFrame(step);
