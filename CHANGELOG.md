@@ -25,12 +25,11 @@ All notable changes to kintsu are recorded here. The format follows
   and the purity of the inner rings.
 - The website in `docs/`: static HTML, CSS and JavaScript. The landing
   page says the minimum, a live terminal to click into, five strengths and
-  one line to install; `docs.html` is the documentation hub with every
-  install method and the keys, `tour.html` the nine-chapter tour,
-  `configuration.html` the configuration reference with the live router,
-  `roadmap.html` the roadmap with charts whose colours were validated for
-  colour-vision deficiencies, `faq.html` the full FAQ. Ready for GitHub
-  Pages, not published yet.
+  one line to install; the documentation is one page per subject:
+  `docs.html` the hub, `install.html`, `keys.html`, `configuration.html`
+  with the live router, `tour.html` the nine-chapter tour, `faq.html`,
+  `roadmap.html` a one-screen timeline. Ready for GitHub Pages, not
+  published yet.
 - The project vision, competitive landscape and feature roadmap
   ([docs/VISION.md](docs/VISION.md)).
 - Shell hooks for zsh, bash and fish (`kintsu init <shell>`) that call

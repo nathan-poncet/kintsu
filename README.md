@@ -151,10 +151,11 @@ python3 -m http.server -d docs 8000
 
 Then open <http://localhost:8000>. The landing page says the minimum: what
 Kintsu is, a live terminal you can click into, five strengths, one line to
-install. Everything else is documentation: `docs.html` is the hub with every
-install method and the keys, `tour.html` the nine-chapter tour,
-`configuration.html` the configuration reference, `roadmap.html` the roadmap
-with its charts, `faq.html` the twenty-four questions.
+install. Everything else is documentation, one page per subject: `docs.html` the
+hub, `install.html` every install method, `keys.html` the keys and
+commands, `configuration.html` the configuration reference, `tour.html` the
+nine-chapter tour, `faq.html` the twenty-four questions, `roadmap.html` a
+one-screen timeline.
 
 ## Design documents
 
