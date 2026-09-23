@@ -31,6 +31,7 @@
   const INSERT = () => ({ insert: 1 });             // insert the suggestion in the line
   const IGNORE = () => ({ ignore: 1 });             // the Ignore action
   const MSG = (spec) => ({ msg: spec });            // a message arriving above the prompt
+  const KEY = (label) => ({ key: label });        // flash the key the scene presses
   const END = () => ({ end: 1 });
 
   const ACTS = {
@@ -103,54 +104,54 @@
 
   const SCENES = {
     tour: [
-      CH({ id: "typo", title: "A typo, fixed by a rule", who: "a rule", where: "local", cost: "under a millisecond · no model", keys: "Tab or → accepts · anything else ignores · Enter runs",
+      CH({ id: "typo", tag: "Tab", title: "A typo, fixed by a rule", who: "a rule", where: "local", cost: "under a millisecond · no model", keys: "Tab or → accepts · anything else ignores · Enter runs",
         text: "<b>gti</b> is not on your PATH. A rule ported from thefuck finds the nearest command and puts it on your next prompt as ghost text. Nothing left the machine, and nothing ran until you pressed Enter." }),
       S("A typo. A rule knows. The fix is already typed for you."),
       P(), W(600), T("gti status"), E(), O(err("zsh: command not found: gti")), W(400),
-      TOAST(typoToast), GHOST("git status"), W(1600), TAB(), W(600), E(),
+      TOAST(typoToast), GHOST("git status"), W(1600), KEY("Tab"), TAB(), W(700), KEY("Enter"), E(),
       O("On branch main", "Your branch is up to date with 'origin/main'.", "nothing to commit, working tree clean"), W(1500),
 
-      CH({ id: "bubble", title: "A real failure, a real bubble", who: "a rule and a tiny model", where: "local", cost: "a few hundred milliseconds · free", keys: "click a word · ^K for more",
+      CH({ id: "bubble", tag: "the bubble", title: "A real failure, a real bubble", who: "a rule and a tiny model", where: "local", cost: "a few hundred milliseconds · free", keys: "click a word · ^K for more",
         text: "The build fails after twelve seconds. A tiny local model turns fourteen lines of trace into one sentence. The bubble: a gold seam, the sentence, a line of words. The words are links. Nothing steals a keystroke from your prompt." }),
       S("A real failure. One sentence, a line of words. Click them, or ^K."),
       P(), T("npm run build"), E(), O(...BUILD_TRACE), W(500), TOAST(buildToast), P(), W(2400),
 
-      CH({ id: "panel", title: "^K: the bubble becomes a panel", who: "Kintsu", where: "local", cost: "instant", keys: "w f a i p · Esc folds it back · mouse and wheel",
+      CH({ id: "panel", tag: "^K", title: "The bubble becomes a panel", who: "Kintsu", where: "local", cost: "instant", keys: "w f a i p · Esc folds it back · mouse and wheel",
         text: "The same bubble, unfolded in place under your prompt, never full screen. The command and its status, five sections with one-letter keys, mouse welcome. It opened on Why, the first word of the bubble." }),
       S("^K unfolds the bubble in place. Five sections, one key each."),
-      OPEN("why", false), W(2800),
+      KEY("^K"), W(500), OPEN("why", false), W(2600),
 
-      CH({ id: "why", title: "Why", who: "haiku · Anthropic", where: "cloud", cost: "about a tenth of a cent · or local, one line of config", keys: "w · click Why · kintsu why",
+      CH({ id: "why", tag: "w · Why", title: "Why it failed", who: "haiku · Anthropic", where: "cloud", cost: "about a tenth of a cent · or local, one line of config", keys: "w · click Why · kintsu why",
         text: "The explanation streams from the model you routed the <b>explain</b> task to, here Claude Haiku. Swap it for Ollama and it never leaves your machine. It reads the redacted case, never your files." }),
       S("Why: the explanation streams in from the model you chose."),
-      TABTO("why"), W(3400),
+      KEY("w"), W(400), TABTO("why"), W(3400),
 
-      CH({ id: "privacy", title: "Privacy: what left the machine", who: "Kintsu", where: "local", cost: "redaction on by default", keys: "p · click Privacy · kintsu privacy",
+      CH({ id: "privacy", tag: "p · Privacy", title: "What left the machine", who: "Kintsu", where: "local", cost: "redaction on by default", keys: "p · click Privacy · kintsu privacy",
         text: "Not a promise, a tab. The exact payload that went to Haiku, redactions highlighted: an npm token sat in the output and the model never saw it. A case marked sensitive would have been answered locally, automatically." }),
       S("Privacy: the exact payload, secrets redacted."),
-      TABTO("privacy"), W(3800),
+      KEY("p"), W(400), TABTO("privacy"), W(3800),
 
-      CH({ id: "fix", title: "Fix, and two Enters", who: "a small model", where: "cloud or local", cost: "confidence 0.92 · not destructive", keys: "f · ⏎ inserts · Enter runs",
+      CH({ id: "fix", tag: "f · Fix", title: "One command, two Enters", who: "a small model", where: "cloud or local", cost: "confidence 0.92 · not destructive", keys: "f · ⏎ inserts · Enter runs",
         text: "One corrected command with its confidence, and a red flag when it deserves one. ⏎ inserts it in your line editor and closes the panel; you press Enter again to run it. Kintsu never runs anything itself." }),
       S("Fix: ⏎ puts the command in your line. You press Enter."),
-      TABTO("fix"), W(2400), INSERT(), W(1400), E(),
+      KEY("f"), W(400), TABTO("fix"), W(2400), KEY("⏎"), INSERT(), W(1400), KEY("Enter"), E(),
       O(dim("Now using node v22.12.0"), "> acme@1.4.0 build", "> node scripts/build.js", "✓ built in 3.1 s"), W(1800),
 
-      CH({ id: "agent", title: "Agent: hand the case over", who: "Claude Code · your account", where: "your terminal", cost: "no API key needed", keys: "a · click Agent · kintsu agent",
+      CH({ id: "agent", tag: "a · Agent", title: "Hand the case to your agent", who: "Claude Code · your account", where: "your terminal", cost: "no API key needed", keys: "a · click Agent · kintsu agent",
         text: "Tests fail: three failures, one cause, found by the tiny local model. Agent writes the brief, command, output, cwd, branch, last commands, your CLAUDE.md, all redacted, and launches Claude Code in your terminal on your subscription. Kintsu sent nothing to a cloud model." }),
       S("A wall of test output. One cause. Your agent, briefed."),
-      P(), T("npm test"), E(), O(...TEST_OUTPUT), W(500), TOAST(testToast), P(), W(2000), OPEN("agent"), W(7200), CLOSE(), W(800),
+      P(), T("npm test"), E(), O(...TEST_OUTPUT), W(500), TOAST(testToast), P(), W(2000), KEY("a"), W(400), OPEN("agent"), W(7200), KEY("Esc"), CLOSE(), W(800),
 
-      CH({ id: "later", title: "Later, a message", who: "the daemon, then haiku", where: "local + cloud", cost: "no polling in your shell", keys: "^K opens it · arrives at the next prompt in bash",
+      CH({ id: "later", tag: "messages", title: "Later, a message arrives", who: "the daemon, then haiku", where: "local + cloud", cost: "no polling in your shell", keys: "^K opens it · arrives at the next prompt in bash",
         text: "You moved on. The resident daemon kept the case and, when the follow-up was ready, delivered it above your prompt without touching the line you were typing. Messages arrive; they never interrupt." }),
       S("You move on. The follow-up arrives above your prompt."),
       T("vim scripts/build.js"), E(), P(), W(1800), MSG(followUp), W(3800),
 
-      CH({ id: "ignore", title: "Ignore and mute", who: "Kintsu", where: "local", cost: "quiet by default", keys: "i · kintsu ignore · kintsu mute 1h",
+      CH({ id: "ignore", tag: "i · Ignore", title: "Ignore, mute, forever", who: "Kintsu", where: "local", cost: "quiet by default", keys: "i · kintsu ignore · kintsu mute 1h",
         text: "A flaky linter you already know about. Ignore has scopes: this command, this directory, this session, forever. <b>kintsu mute 1h</b> buys an hour of nothing. The same failure twice is one bubble anyway." }),
       S("Ignore: this command, this directory, this session, or forever."),
       T("make lint"), E(), O(err("src/legacy.c:12: warning treated as error: unused variable 'tmp'"), err("make: *** [Makefile:31: lint] Error 1")), W(400),
-      TOAST(lintToast), P(), W(1800), IGNORE(), W(1400), T("kintsu mute 1h"), E(), O(dim("quiet until 17:42")), W(3200), END(),
+      TOAST(lintToast), P(), W(1800), KEY("i"), IGNORE(), W(1400), T("kintsu mute 1h"), E(), O(dim("quiet until 17:42")), W(3200), END(),
     ],
   };
 
@@ -159,98 +160,80 @@
     constructor(root) {
       this.root = root;
       this.scene = SCENES[root.dataset.scene];
-      this.loop = root.dataset.loop === "true";
       this.chapters = [];
       this.scene.forEach((st, i) => { if (st.ch) this.chapters.push({ step: i, ...st.ch }); });
-      this.run = 0; this.driving = false; this.paused = false; this.guided = false; this.instant = false; this.playing = false;
-      this.current = null; this.prompt = null; this.chapterIndex = -1; this.wake = null;
+      this.run = 0; this.driving = false; this.paused = false; this.instant = false; this.playing = false;
+      this.current = null; this.prompt = null; this.chapterIndex = -1; this.wake = null; this.keyTimer = null;
       this.render();
     }
 
     render() {
       const title = esc(this.root.dataset.title);
-      const chapterList = this.chapters.map((c, k) => `<li><button type="button" class="chapter" data-chapter="${k}"><span class="n">${k + 1}</span><span class="t">${c.title}</span><span class="where ${whereClass(c.where)}">${esc(c.where)}</span></button></li>`).join("");
-      const segments = this.chapters.map((c, k) => `<button type="button" class="seg" data-chapter="${k}" aria-label="Chapter ${k + 1}: ${esc(c.title)}"><i></i></button>`).join("");
+      const list = this.chapters.map((c, k) => `
+        <li>
+          <button type="button" class="chapter" data-chapter="${k}" aria-label="Chapter ${k + 1}: ${esc(c.title)}">
+            <span class="n">${k + 1}</span>
+            <span class="tag">${esc(c.tag)}</span>
+            <span class="t">${esc(c.title)}</span>
+            <span class="who"><span class="where ${whereClass(c.where)}">${esc(c.where)}</span></span>
+            <i class="fill"></i>
+          </button>
+          <div class="ch-body">
+            <p class="ch-text">${c.text}</p>
+            <p class="ch-meta"><span class="where ${whereClass(c.where)}">${esc(c.where)}</span> ${esc(c.who)} <span class="d">· ${esc(c.cost)}</span></p>
+            <p class="ch-keys">${c.keys.split(" · ").map((x) => `<span>${esc(x)}</span>`).join(`<span class="sep"> · </span>`)}</p>
+          </div>
+        </li>`).join("");
       this.root.innerHTML = `
         <div class="player-main">
-          <div class="terminal" tabindex="0" aria-label="Kintsu tour. Click a word in the bubble, or use Tab, Control K, w, f, a, i, p, Escape. Space pauses; arrows change chapter.">
-            <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><span class="badge">playing</span></div>
+          <div class="terminal" tabindex="0" aria-label="Kintsu tour. Click a word in the bubble, or use Tab, Control K, w, f, a, i, p, Escape. Space pauses.">
+            <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><button type="button" class="badge playpause" aria-label="Pause">⏸ playing</button></div>
             <div class="screen"></div>
+            <div class="keycap" aria-hidden="true"></div>
           </div>
-          <div class="controls">
-            <button type="button" class="ctl prev" aria-label="Previous chapter">⏮</button>
-            <button type="button" class="ctl playpause" aria-label="Pause">⏸</button>
-            <button type="button" class="ctl next" aria-label="Next chapter">⏭</button>
-            <div class="progress" role="group" aria-label="Chapters">${segments}</div>
-            <button type="button" class="ctl replay" aria-label="Replay from the start">↻</button>
-            <label class="switch"><input type="checkbox" class="guided"><span>Step by step</span></label>
-          </div>
-          <p class="subtitle" aria-live="polite"></p>
         </div>
-        <aside class="player-side">
-          <div class="explainer">
-            <p class="ch-count"></p>
-            <h3 class="ch-title"></h3>
-            <p class="ch-who"></p>
-            <p class="ch-text"></p>
-            <p class="ch-keys"></p>
-            <button type="button" class="btn small continue" hidden>Continue <span aria-hidden="true">▶</span></button>
-          </div>
-          <ol class="chapters">${chapterList}</ol>
-        </aside>`;
-      const $ = (s) => this.root.querySelector(s);
-      this.term = $(".terminal"); this.screen = $(".screen"); this.badge = $(".badge"); this.subtitle = $(".subtitle");
-      this.playpause = $(".playpause"); this.continueBtn = $(".continue");
-      this.ex = { count: $(".ch-count"), title: $(".ch-title"), who: $(".ch-who"), text: $(".ch-text"), keys: $(".ch-keys") };
-      this.segs = [...this.root.querySelectorAll(".seg i")];
-
-      $(".prev").addEventListener("click", () => this.play(Math.max(0, this.chapterIndex - 1)));
-      $(".next").addEventListener("click", () => this.play(Math.min(this.chapters.length - 1, this.chapterIndex + 1)));
-      $(".replay").addEventListener("click", () => this.play(0));
-      this.playpause.addEventListener("click", () => this.togglePause());
-      this.continueBtn.addEventListener("click", () => this.setPaused(false));
-      $(".guided").addEventListener("change", (e) => { this.guided = e.target.checked; if (this.guided && this.playing && !this.paused) this.setPaused(true); });
-      this.root.addEventListener("click", (e) => { const b = e.target.closest("[data-chapter]"); if (b && this.root.contains(b)) this.play(Number(b.dataset.chapter)); });
+        <ol class="chapters" aria-label="Chapters: pick one to play it">${list}</ol>`;
+      this.term = this.root.querySelector(".terminal"); this.screen = this.root.querySelector(".screen");
+      this.badge = this.root.querySelector(".playpause"); this.keycap = this.root.querySelector(".keycap");
+      this.items = [...this.root.querySelectorAll(".chapters > li")];
+      this.badge.addEventListener("click", () => this.togglePause());
+      this.root.querySelectorAll(".chapter").forEach((b) => b.addEventListener("click", () => this.play(Number(b.dataset.chapter))));
       this.screen.addEventListener("click", (e) => {
-        const a = e.target.closest("[data-act]"); if (a) { e.stopPropagation(); this.act(a.dataset.act); return; }
-        const t = e.target.closest("[data-tab]"); if (t) { e.stopPropagation(); this.takeWheel(); this.switchTab(t.dataset.tab); }
+        const a = e.target.closest("[data-act]"); if (a) { this.act(a.dataset.act); return; }
+        const t = e.target.closest("[data-tab]"); if (t) { this.takeWheel(); this.switchTab(t.dataset.tab); }
       });
       this.term.addEventListener("keydown", (e) => this.onTerminalKey(e));
-      this.root.addEventListener("keydown", (e) => this.onPlayerKey(e));
     }
 
     // ── timing, pause, instant ──
     stale(id) { return id !== this.run; }
     async gate(id) { while (this.paused && !this.stale(id)) await new Promise((r) => (this.wake = r)); }
     async sleep(ms, id) { await this.gate(id); if (this.instant || reduced || this.stale(id)) return; await timeout(ms); await this.gate(id); }
-    setPaused(v, why) {
+    setPaused(v) {
       if (this.paused === v) return;
       this.paused = v;
-      this.playpause.textContent = v ? "▶" : "⏸"; this.playpause.setAttribute("aria-label", v ? "Play" : "Pause");
-      this.continueBtn.hidden = !(v && why === "chapter");
-      this.setBadge(v ? (why === "chapter" ? "paused · step by step" : "paused") : "playing", false);
+      this.setBadge(v ? "▶ paused" : "⏸ playing", v ? "Play" : "Pause");
       if (!v && this.wake) { const w = this.wake; this.wake = null; w(); }
     }
     togglePause() { if (!this.playing) { this.play(Math.max(0, this.chapterIndex)); return; } this.setPaused(!this.paused); }
-    setBadge(text, live) { this.badge.textContent = text; this.badge.classList.toggle("live", !!live); }
+    setBadge(text, label) { this.badge.textContent = text; this.badge.setAttribute("aria-label", label || text); }
     scrollDown() { this.screen.scrollTop = this.screen.scrollHeight; }
+    flashKey(label) {
+      if (this.instant || reduced) return;
+      this.keycap.textContent = label; this.keycap.classList.add("on");
+      clearTimeout(this.keyTimer); this.keyTimer = setTimeout(() => this.keycap.classList.remove("on"), 1100);
+    }
 
     // ── chapters ──
     showChapter(k) {
       this.chapterIndex = k;
-      const c = this.chapters[k];
-      this.ex.count.textContent = `Chapter ${k + 1} of ${this.chapters.length}`;
-      this.ex.title.textContent = c.title;
-      this.ex.who.innerHTML = `<span class="where ${whereClass(c.where)}">${esc(c.where)}</span> ${esc(c.who)} <span class="d">· ${esc(c.cost)}</span>`;
-      this.ex.text.innerHTML = c.text;
-      this.ex.keys.innerHTML = c.keys.split(" · ").map((x) => `<span>${esc(x)}</span>`).join(`<span class="sep"> · </span>`);
-      this.root.querySelectorAll(".chapter").forEach((b, i) => { b.classList.toggle("on", i === k); b.classList.toggle("done", i < k); });
-      this.segs.forEach((s, i) => { s.style.setProperty("--w", i < k ? "100%" : "0%"); });
+      this.items.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); const f = li.querySelector(".fill"); f.style.setProperty("--w", i < k ? "100%" : "0%"); });
+      if (!this.instant) this.items[k].scrollIntoView?.({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
     }
     progress(i) {
       const k = this.chapterIndex; if (k < 0) return;
       const start = this.chapters[k].step, end = this.chapters[k + 1]?.step ?? this.scene.length;
-      this.segs[k].style.setProperty("--w", `${Math.round(((i - start) / Math.max(1, end - start)) * 100)}%`);
+      this.items[k].querySelector(".fill").style.setProperty("--w", `${Math.round(((i - start) / Math.max(1, end - start)) * 100)}%`);
     }
 
     // ── lines ──
@@ -332,10 +315,8 @@
     // ── taking the wheel ──
     takeWheel() {
       if (this.driving) return;
-      this.driving = true; this.run++; this.playing = false; this.paused = false; this.continueBtn.hidden = true;
-      this.setBadge("you're driving", true);
-      this.playpause.textContent = "▶"; this.playpause.setAttribute("aria-label", "Resume the tour from this chapter");
-      this.subtitle.textContent = "You're driving. Tab accepts ghost text · ^K toggles the panel · w f a i p switch sections · Esc folds · ⏎ inserts. Pick a chapter to resume the tour.";
+      this.driving = true; this.run++; this.playing = false; this.paused = false;
+      this.setBadge("✋ you're driving · pick a chapter to resume", "Resume the tour");
     }
     act(name) {
       this.takeWheel();
@@ -349,6 +330,7 @@
     }
     onTerminalKey(e) {
       const k = e.key;
+      if (k === " ") { e.preventDefault(); this.togglePause(); return; }
       if (k === "Tab") { if (this.acceptGhost()) { e.preventDefault(); this.takeWheel(); } return; }
       if ((e.ctrlKey && k.toLowerCase() === "k") || k === "k") { e.preventDefault(); this.act("more"); return; }
       if (k === "Escape") { e.preventDefault(); this.takeWheel(); this.collapse(); return; }
@@ -356,37 +338,27 @@
       const map = { w: "why", f: "fix", a: "agent", i: "ignore", p: "privacy" };
       if (map[k] && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); this.act(map[k]); }
     }
-    onPlayerKey(e) {
-      if (e.target.matches("input, button") && e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      if (e.key === " " && e.target === this.term) { e.preventDefault(); this.togglePause(); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); this.play(Math.max(0, this.chapterIndex - 1)); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); this.play(Math.min(this.chapters.length - 1, this.chapterIndex + 1)); }
-    }
 
     // ── playback ──
     async play(fromChapter = 0) {
       const id = ++this.run;
       this.driving = false; this.paused = false; this.playing = true; this.wake = null;
       this.screen.innerHTML = ""; this.current = null; this.prompt = null;
-      this.playpause.textContent = "⏸"; this.playpause.setAttribute("aria-label", "Pause"); this.continueBtn.hidden = true;
-      this.setBadge("playing", false);
+      this.setBadge("⏸ playing", "Pause");
       const start = this.chapters[fromChapter]?.step ?? 0;
       const steps = this.scene;
       for (let i = 0; i < steps.length; i++) {
         if (this.stale(id)) return;
         this.instant = i < start;
         const st = steps[i];
-        if (st.ch) {
-          this.showChapter(this.chapters.findIndex((c) => c.step === i));
-          if (!this.instant && this.guided) this.setPaused(true, "chapter");
-          await this.gate(id); if (this.stale(id)) return;
-        }
+        if (st.ch) { this.showChapter(this.chapters.findIndex((c) => c.step === i)); await this.gate(id); if (this.stale(id)) return; }
         else if (st.p) this.newPrompt();
         else if (st.t != null) await this.type(st.t, id);
         else if (st.e) { await this.sleep(260, id); this.settle(); }
         else if (st.o) { for (const l of st.o) { if (this.stale(id)) return; this.out(l); await this.sleep(28, id); } }
         else if (st.w) await this.sleep(st.w, id);
-        else if (st.s != null) this.subtitle.textContent = st.s;
+        else if (st.s != null) { /* subtitles retired: the chapter text carries the story */ }
+        else if (st.key) this.flashKey(st.key);
         else if (st.toast) this.toast(st.toast);
         else if (st.ghost != null) this.ghost(st.ghost);
         else if (st.tab) this.acceptGhost();
@@ -397,9 +369,9 @@
         else if (st.ignore) this.ignore();
         else if (st.msg) this.message(st.msg);
         else if (st.end) {
-          this.playing = false; this.instant = false; this.setBadge("end · ↻ to replay", false);
-          this.playpause.textContent = "▶"; this.playpause.setAttribute("aria-label", "Replay");
-          if (this.loop && !this.guided && !reduced) { await timeout(4000); if (!this.stale(id)) this.play(0); }
+          this.playing = false; this.instant = false;
+          this.items[this.chapterIndex]?.querySelector(".fill").style.setProperty("--w", "100%");
+          this.setBadge("↻ replay", "Replay from the first chapter");
           return;
         }
         if (!this.instant) this.progress(i);
@@ -410,20 +382,53 @@
   const whereClass = (where) => /cloud/.test(where) && !/local/.test(where) ? "cloud" : /your/.test(where) ? "you" : /cloud/.test(where) ? "mixed" : "local";
 
   const lead = document.querySelector(".player.lead[data-scene]");
-  if (!lead) return;
-  const player = new Player(lead);
-  window.kintsuTour = player;
+  if (lead) {
+    const player = new Player(lead);
+    window.kintsuTour = player;
+    if (typeof IntersectionObserver === "function") {
+      const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !player.playing && player.chapterIndex < 0) player.play(0); }, { threshold: 0.25 });
+      io.observe(lead);
+    } else {
+      player.play(0);
+    }
+  }
 
-  // cards elsewhere on the page jump to a chapter of the tour
-  document.querySelectorAll(".watch[data-chapter]").forEach((b) => b.addEventListener("click", () => {
-    lead.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "start" });
-    player.play(Number(b.dataset.chapter));
-  }));
+  // ── bars grow when they scroll into view ─────────────────────────────
+  const vizzes = [...document.querySelectorAll(".viz")].filter((v) => v.querySelector(".bar"));
+  if (vizzes.length && typeof IntersectionObserver === "function" && !reduced) {
+    vizzes.forEach((v) => v.classList.add("anim"));
+    const vio = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting) { en.target.classList.add("in"); vio.unobserve(en.target); } }, { threshold: 0.4 });
+    vizzes.forEach((v) => vio.observe(v));
+  }
 
-  if (typeof IntersectionObserver === "function") {
-    const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !player.playing && player.chapterIndex < 0) player.play(0); }, { threshold: 0.3 });
-    io.observe(lead);
-  } else {
-    player.play(0);
+  // ── the router, live: a task finds its brain ─────────────────────────
+  const router = document.getElementById("router");
+  if (router) {
+    const ROUTES = [
+      { task: "classify", note: "is this failure worth a bubble?", to: 1, why: "A tiny local model reads the output and says whether it deserves your attention. Free, on your machine." },
+      { task: "quick_fix", note: "one corrected command", to: 1, why: "The tiny model tries first; if it is not confident, the router moves to the next candidate, Haiku." },
+      { task: "explain", note: "why did it fail?", to: 2, why: "Routed to Haiku in the cloud with the redacted case. One line of config makes it local instead." },
+      { task: "investigate", note: "fix the code", to: 3, why: "Handed to Claude Code in your terminal, on your subscription. Kintsu wrote the brief; it sends nothing itself." },
+      { task: "explain", note: "a token was in the output", to: 1, why: "Redaction found a secret: sensitive_output = local_only. Every cloud candidate is refused; the tiny model answers." },
+      { task: "quick_fix", note: "a typo, a rule knows", to: 0, why: "Rules win before any model is asked. Under a millisecond, offline." },
+    ];
+    const nodes = [...router.querySelectorAll(".node")], paths = [...router.querySelectorAll(".edge")];
+    const pulse = router.querySelector(".pulse"), taskEl = document.getElementById("router-task"), noteEl = document.getElementById("router-note"), whyEl = document.getElementById("router-why");
+    let r = 0, running = false;
+    const show = (route) => {
+      taskEl.textContent = route.task; noteEl.textContent = route.note; whyEl.textContent = route.why;
+      nodes.forEach((n, i) => n.classList.toggle("on", i === route.to));
+      paths.forEach((p, i) => p.classList.toggle("on", i === route.to));
+      const path = paths[route.to]; const len = path.getTotalLength?.() ?? 0;
+      if (!len || reduced) { const end = path.getPointAtLength?.(len) ?? { x: 300, y: 22 + 35 * route.to }; pulse.setAttribute("cx", end.x); pulse.setAttribute("cy", end.y); return; }
+      const t0 = performance.now(), dur = 900;
+      const step = (now) => { const k = Math.min(1, (now - t0) / dur); const pt = path.getPointAtLength(len * k); pulse.setAttribute("cx", pt.x); pulse.setAttribute("cy", pt.y); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    };
+    const tick = () => { show(ROUTES[r % ROUTES.length]); r++; };
+    tick();
+    const start = () => { if (running) return; running = true; if (!reduced) router.dataset.timer = setInterval(tick, 3200); };
+    if (typeof IntersectionObserver === "function") new IntersectionObserver((en) => { if (en.some((e) => e.isIntersecting)) start(); }, { threshold: 0.3 }).observe(router);
+    else start();
   }
 })();

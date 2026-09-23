@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Roadmap — Kintsu</title>
+  <meta name="description" content="Where Kintsu stands and where it goes: what is real today, what each version brings, which chapter of the tour becomes real when, and how the pieces depend on each other.">
+  <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+  <meta name="theme-color" content="#0f0d0b">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="28" height="28"><span>Kintsu</span></a>
+  <nav aria-label="Sections">
+    <a href="./#tour">The tour</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="roadmap.html" aria-current="page">Roadmap</a>
+    <a href="./#faq">FAQ</a>
+    <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main id="main" class="doc">
+  <header class="doc-head">
+    <p class="section-label">Roadmap</p>
+    <h1>Design first. Then the bubble.</h1>
+    <p class="lede">No dates: versions ship when their chapters work. What you see here is honest about what exists, the hooks and a placeholder line, and precise about what each version adds. Every item links to a design document or an issue when there is one.</p>
+    <nav class="toc" aria-label="On this page">
+      <a href="#now">Today</a><a href="#milestones">Milestones</a><a href="#chapters">Chapters becoming real</a><a href="#graph">How the pieces depend</a><a href="#detail">Version by version</a><a href="#never">Not planned</a>
+    </nav>
+  </header>
+
+  <!-- ─────────── today ─────────── -->
+  <section id="now">
+    <h2>Today</h2>
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-label">Chapters of the tour that work</span><span class="kpi-value">0 <span class="of">/ 9</span></span><span class="kpi-delta">the hooks and a placeholder line</span></div>
+      <div class="kpi"><span class="kpi-label">Shells hooked</span><span class="kpi-value">3</span><span class="kpi-delta">zsh · bash · fish, tested in real sessions</span></div>
+      <div class="kpi"><span class="kpi-label">Design documents</span><span class="kpi-value">5</span><span class="kpi-delta">vision · architecture · daemon · models · bubble</span></div>
+      <div class="kpi"><span class="kpi-label">Tests</span><span class="kpi-value">27</span><span class="kpi-delta">entities, use cases, adapters, the dependency rule</span></div>
+    </div>
+  </section>
+
+  <!-- ─────────── milestones ─────────── -->
+  <section id="milestones">
+    <h2>Milestones</h2>
+    <p>Each version is a list of work items; the bar is how many are done. One hue: gold is shipped, the track is what remains.</p>
+    <figure class="viz">
+      <figcaption><span class="viz-title">Work items shipped, per version</span><span class="viz-sub">counted from the lists below</span></figcaption>
+      <ol class="meters" role="list">
+        <li><span class="lbl"><span class="v v0">now</span> The skeleton</span><span class="track"><i class="bar" style="--v: 100%"></i></span><span class="val">6 / 6</span></li>
+        <li><span class="lbl"><span class="v v1">v0.1</span> The bubble</span><span class="track"><i class="bar" style="--v: 0%"></i></span><span class="val">0 / 10</span></li>
+        <li><span class="lbl"><span class="v v2">v0.2</span> It reads the output</span><span class="track"><i class="bar" style="--v: 0%"></i></span><span class="val">0 / 8</span></li>
+        <li><span class="lbl"><span class="v v3">v0.3</span> Your agent, your keys</span><span class="track"><i class="bar" style="--v: 0%"></i></span><span class="val">0 / 6</span></li>
+        <li class="dimrow"><span class="lbl"><span class="v vl">later</span> Ideas</span><span class="track"><i class="bar" style="--v: 0%"></i></span><span class="val">0 / 9</span></li>
+      </ol>
+      <details class="table-view"><summary>Table view</summary>
+        <table><thead><tr><th>version</th><th>theme</th><th>done</th><th>items</th></tr></thead>
+        <tbody><tr><td>now</td><td>the skeleton</td><td>6</td><td>6</td></tr><tr><td>v0.1</td><td>the bubble</td><td>0</td><td>10</td></tr><tr><td>v0.2</td><td>it reads the output</td><td>0</td><td>8</td></tr><tr><td>v0.3</td><td>your agent, your keys</td><td>0</td><td>6</td></tr><tr><td>later</td><td>ideas</td><td>0</td><td>9</td></tr></tbody></table>
+      </details>
+    </figure>
+  </section>
+
+  <!-- ─────────── chapters × versions ─────────── -->
+  <section id="chapters">
+    <h2>Chapters becoming real</h2>
+    <p>The tour on the home page has nine chapters. This is the version in which each one stops being a scripted scene. A second mark means the chapter gets better later.</p>
+    <figure class="viz">
+      <figcaption><span class="viz-title">In which version each chapter of the tour works</span><span class="viz-sub">● lands · ◐ improves</span></figcaption>
+      <div class="matrix-wrap">
+        <table class="matrix">
+          <thead><tr><th scope="col">chapter</th><th scope="col"><span class="v v1">v0.1</span></th><th scope="col"><span class="v v2">v0.2</span></th><th scope="col"><span class="v v3">v0.3</span></th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1 · Tab, a typo fixed by a rule</th><td><span class="cell lands v1">● rules, ghost text in zsh and fish</span></td><td></td><td></td></tr>
+            <tr><th scope="row">2 · The bubble</th><td><span class="cell lands v1">● the toast</span></td><td><span class="cell improves v2">◐ the sentence from a tiny model</span></td><td></td></tr>
+            <tr><th scope="row">3 · ^K, the panel</th><td><span class="cell lands v1">● keys, sections</span></td><td><span class="cell improves v2">◐ mouse, clickable words</span></td><td></td></tr>
+            <tr><th scope="row">4 · Why</th><td><span class="cell lands v1">● one provider layer</span></td><td></td><td><span class="cell improves v3">◐ routed per task</span></td></tr>
+            <tr><th scope="row">5 · Privacy</th><td></td><td><span class="cell lands v2">● redaction, the exact payload</span></td><td></td></tr>
+            <tr><th scope="row">6 · Fix, two Enters</th><td><span class="cell lands v1">● rule fixes, insert</span></td><td><span class="cell improves v2">◐ model fixes, confidence, danger</span></td><td></td></tr>
+            <tr><th scope="row">7 · Agent</th><td><span class="cell lands v1">● hand-off by template</span></td><td></td><td><span class="cell improves v3">◐ subscription reuse, print mode</span></td></tr>
+            <tr><th scope="row">8 · Messages arriving</th><td></td><td><span class="cell lands v2">● zsh, fish; bash at next prompt</span></td><td></td></tr>
+            <tr><th scope="row">9 · Ignore and mute</th><td><span class="cell lands v1">● scopes, mute, dedupe</span></td><td></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="viz-note">Six chapters land with v0.1. That is why v0.1 is called "the bubble": after it, the tour is mostly real.</p>
+    </figure>
+  </section>
+
+  <!-- ─────────── dependency graph ─────────── -->
+  <section id="graph">
+    <h2>How the pieces depend</h2>
+    <p>The daemon comes first because everything that remembers, waits or arrives later needs it. Capture comes before Privacy because you cannot redact what you have not read. Routing comes last because it only matters once there is more than one brain.</p>
+    <figure class="viz graph">
+      <figcaption><span class="viz-title">Workstreams and what each one needs</span><span class="viz-sub">colour is the version; an arrow means "needs"</span></figcaption>
+      <svg viewBox="0 0 920 420" role="img" aria-labelledby="graph-title graph-desc">
+        <title id="graph-title">Dependency graph of Kintsu's workstreams</title>
+        <desc id="graph-desc">Hooks (done) lead to the daemon and sessions (v0.1), which lead to rules, the toast, the panel, the provider layer, Why and Fix, and the agent hand-off (all v0.1). Sessions lead to output capture (v0.2), then redaction and Privacy (v0.2), then model fixes with danger (v0.2). The daemon leads to messages (v0.2). The panel leads to clickable words (v0.2). The provider layer leads to keychain (v0.3), subscription reuse (v0.3), routing and constraints (v0.3), cost ledger (v0.3). Sessions lead to the MCP server (v0.3).</desc>
+        <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="arrowhead"/></marker></defs>
+        <g class="edges">
+          <path d="M150 60 L230 60"/>
+          <path d="M370 60 L450 60"/>
+          <path d="M370 60 C 400 60, 420 150, 450 150"/>
+          <path d="M590 150 L670 150"/>
+          <path d="M590 60 L670 60"/>
+          <path d="M590 60 C 620 60, 640 240, 670 240"/>
+          <path d="M810 60 C 830 60, 840 110, 830 150 C 820 190, 810 220, 790 240"/>
+          <path d="M300 90 L300 150 L450 150" class="hidden"/>
+          <path d="M300 90 L300 330 L450 330"/>
+          <path d="M590 330 L670 330"/>
+          <path d="M370 60 C 400 60, 420 240, 450 240"/>
+          <path d="M590 240 L670 240"/>
+          <path d="M150 60 C 190 60, 190 240, 230 240"/>
+          <path d="M300 270 L300 330" class="hidden"/>
+          <path d="M370 240 C 400 240, 420 390, 450 390"/>
+          <path d="M590 390 L670 390"/>
+          <path d="M730 180 L730 210"/>
+          <path d="M730 270 L730 300"/>
+        </g>
+        <g class="nodes">
+          <g transform="translate(80 60)" class="node v0 done"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Hooks</text><text y="14" class="sub">zsh · bash · fish · done</text></g>
+          <g transform="translate(300 60)" class="node v1"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Daemon &amp; sessions</text><text y="14" class="sub">socket · memory · v0.1</text></g>
+          <g transform="translate(520 60)" class="node v1"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Rules &amp; toast</text><text y="14" class="sub">instant fixes · v0.1</text></g>
+          <g transform="translate(740 60)" class="node v1"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Panel</text><text y="14" class="sub">^K · sections · v0.1</text></g>
+          <g transform="translate(520 150)" class="node v1"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Providers</text><text y="14" class="sub">Why · Fix · v0.1</text></g>
+          <g transform="translate(740 150)" class="node v1"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Agent hand-off</text><text y="14" class="sub">brief · CLI · v0.1</text></g>
+          <g transform="translate(300 240)" class="node v2"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Messages</text><text y="14" class="sub">arrive later · v0.2</text></g>
+          <g transform="translate(520 240)" class="node v2"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Clickable words</text><text y="14" class="sub">OSC 8 · handler · v0.2</text></g>
+          <g transform="translate(740 240)" class="node v3"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Routing</text><text y="14" class="sub">constraints · cost · v0.3</text></g>
+          <g transform="translate(520 330)" class="node v2"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Output capture</text><text y="14" class="sub">tmux · Herdr · APIs · v0.2</text></g>
+          <g transform="translate(740 330)" class="node v2"><rect x="-70" y="-30" width="140" height="60" rx="10"/><text y="-4">Redaction &amp; Privacy</text><text y="14" class="sub">the exact payload · v0.2</text></g>
+          <g transform="translate(520 390)" class="node v3"><rect x="-70" y="-24" width="140" height="48" rx="10"/><text y="-2">Keychain</text><text y="14" class="sub">subscriptions · v0.3</text></g>
+          <g transform="translate(740 390)" class="node v3"><rect x="-70" y="-24" width="140" height="48" rx="10"/><text y="-2">MCP server</text><text y="14" class="sub">last failure · v0.3</text></g>
+        </g>
+      </svg>
+      <ul class="legend" aria-label="Legend">
+        <li><i class="sw v0"></i> done</li><li><i class="sw v1"></i> v0.1</li><li><i class="sw v2"></i> v0.2</li><li><i class="sw v3"></i> v0.3</li>
+      </ul>
+    </figure>
+  </section>
+
+  <!-- ─────────── detail ─────────── -->
+  <section id="detail">
+    <h2>Version by version</h2>
+    <div class="versions">
+      <article class="version done">
+        <h3><span class="v v0">now</span> The skeleton</h3>
+        <ul class="items">
+          <li class="ok">Hooks for zsh, bash and fish, validated in real sessions</li>
+          <li class="ok"><code>kintsu triage</code>: quiet on success, Ctrl-C, broken pipes, Ctrl-Z</li>
+          <li class="ok">One crate, three rings, the dependency-rule test</li>
+          <li class="ok">Design: <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md">vision</a>, <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/ARCHITECTURE.md">architecture</a>, <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/DAEMON.md">daemon</a>, <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/MODELS.md">models</a>, <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/UI.md">the bubble</a></li>
+          <li class="ok">CI on Linux and macOS</li>
+          <li class="ok">This website</li>
+        </ul>
+      </article>
+      <article class="version">
+        <h3><span class="v v1">v0.1</span> The bubble</h3>
+        <ul class="items">
+          <li>The daemon: Unix socket, NDJSON protocol, on-demand start, <code>service install</code></li>
+          <li>Sessions: the last commands, the terminal identity, the last case</li>
+          <li>The rule engine: typos against PATH, cd into a file, git did-you-mean, Docker down, port in use, missing sudo flagged</li>
+          <li>The toast and ghost text in zsh and fish</li>
+          <li>The panel: ^K, five sections, keys, Esc</li>
+          <li>One provider layer: OpenAI-compatible, Anthropic, Ollama; keys from env or config</li>
+          <li>Why, streamed</li>
+          <li>Agent hand-off by preset and template</li>
+          <li>Config file, <code>setup</code>, <code>doctor</code>, <code>default-config</code></li>
+          <li>Noise control: ignore scopes, mute, dedupe, cooldown, never-triage list</li>
+        </ul>
+      </article>
+      <article class="version">
+        <h3><span class="v v2">v0.2</span> It reads the output</h3>
+        <ul class="items">
+          <li>Output capture: tmux, Herdr, WezTerm, Kitty, iTerm2, OSC 133 marks; the opt-in stderr tee</li>
+          <li>Redaction on by default; the Privacy tab with the exact payload</li>
+          <li>Model fixes with confidence; the danger guard</li>
+          <li>Messages that arrive above the prompt in zsh and fish</li>
+          <li>Clickable words: OSC 8 links and the <code>kintsu://</code> handler</li>
+          <li>The sentence of the toast from a tiny model; <code>summarize</code></li>
+          <li>Project awareness: manifests, <code>.kintsu.toml</code>, <code>CLAUDE.md</code></li>
+          <li><code>$pipestatus</code></li>
+        </ul>
+      </article>
+      <article class="version">
+        <h3><span class="v v3">v0.3</span> Your agent, your keys</h3>
+        <ul class="items">
+          <li>Keychain and secret-service; <code>kintsu login</code></li>
+          <li>Subscription reuse through the CLIs; print mode in the panel</li>
+          <li>Local models first class: Ollama, LM Studio, llama.cpp, MLX</li>
+          <li>Routing per task with constraints, budgets, circuit breakers</li>
+          <li>The cost ledger; <code>kintsu models</code></li>
+          <li>The MCP server: <code>last_failure</code>, <code>recent_history</code>, <code>captured_output</code></li>
+        </ul>
+      </article>
+      <article class="version later">
+        <h3><span class="v vl">later</span> Ideas, in no order</h3>
+        <ul class="items">
+          <li>Learned rules from accepted fixes</li>
+          <li>Team runbooks in the repository</li>
+          <li>CI mode: <code>kintsu wrap -- make test</code></li>
+          <li>Slow-command hints</li>
+          <li>PowerShell, nushell, elvish</li>
+          <li>Explanations in the user's language, French first</li>
+          <li>Interactive bubble in multiplexer popups</li>
+          <li>A Herdr plugin packaging</li>
+          <li>Homebrew tap, cargo-binstall, prebuilt binaries, Nix, AUR</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- ─────────── never ─────────── -->
+  <section id="never">
+    <h2>Not planned</h2>
+    <ul class="never">
+      <li><b>A terminal emulator, a shell, a PTY wrapper.</b> Kintsu is a hook and a daemon.</li>
+      <li><b>A general chat TUI.</b> If you want to chat, Kintsu hands you to one.</li>
+      <li><b>Autocomplete.</b> zsh-autosuggestions, Amazon Q and inshellisense do that.</li>
+      <li><b>Running anything on its own.</b> Not now, not as an option, not later.</li>
+      <li><b>An account, telemetry, a server of ours.</b></li>
+    </ul>
+    <p class="note">Follow the <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">repository</a> for releases; the <a href="https://github.com/nathan-poncet/kintsu/blob/main/CHANGELOG.md" target="_blank" rel="noopener">changelog</a> is where a version's list becomes fact.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-brand"><img src="media/mark.svg" alt="" width="22" height="22"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
+  <nav aria-label="Footer">
+    <a href="./">Home</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md" target="_blank" rel="noopener">Vision</a>
+  </nav>
+</footer>
+</body>
+</html>
