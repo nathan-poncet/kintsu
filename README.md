@@ -141,14 +141,12 @@ whisk, and is not published yet. Preview it locally:
 python3 -m http.server -d docs 8000
 ```
 
-Then open <http://localhost:8000>. The home page is the tour: one terminal,
-nine chapters, one per action of the bubble; pick a chapter to play it, and
-each one says who is doing the work, a rule, a local model, a cloud model or
-your agent. Click the words in the bubble, or press `Tab`, `^K`, `w`, `f`,
-`a`, `i`, `p` and `Esc` once the terminal has focus, to take the wheel.
-The landing page stops at understanding and installing; `configuration.html`
-is the full configuration reference, `roadmap.html` the roadmap with its
-charts, `faq.html` the twenty-four questions.
+Then open <http://localhost:8000>. The landing page says the minimum: what
+Kintsu is, a live terminal you can click into, five strengths, one line to
+install. Everything else is documentation: `docs.html` is the hub with every
+install method and the keys, `tour.html` the nine-chapter tour,
+`configuration.html` the configuration reference, `roadmap.html` the roadmap
+with its charts, `faq.html` the twenty-four questions.
 
 ## Design documents
 
