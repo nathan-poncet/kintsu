@@ -59,6 +59,7 @@ esac
 
 # ── shell hook ────────────────────────────────────────────────────────────────
 shell_name="$(basename "${SHELL:-sh}")"
+# shellcheck disable=SC2016  # the hook lines must reach the rc file unexpanded
 case "$shell_name" in
   zsh)  rc="${ZDOTDIR:-$HOME}/.zshrc"; hook_line='eval "$(kintsu init zsh)"' ;;
   bash) rc="$HOME/.bashrc"; hook_line='eval "$(kintsu init bash)"' ;;
@@ -93,7 +94,7 @@ if [ "$FROM_SOURCE" = 0 ]; then
     if curl -fsSL -o "$tmp/SHA256SUMS" "$base/SHA256SUMS" 2>/dev/null; then
       expected="$(grep " $asset\$" "$tmp/SHA256SUMS" | cut -d' ' -f1)"
       if have sha256sum; then actual="$(sha256sum "$tmp/$asset" | cut -d' ' -f1)"; else actual="$(shasum -a 256 "$tmp/$asset" | cut -d' ' -f1)"; fi
-      [ -n "$expected" ] && [ "$expected" = "$actual" ] || die "checksum mismatch for $asset; refusing to install"
+      if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then die "checksum mismatch for $asset; refusing to install"; fi
       note "checksum verified"
     else
       note "no SHA256SUMS published for this release; installing unverified"
