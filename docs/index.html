@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kintsu — the command failed. Kintsu picks it up.</title>
-  <meta name="description" content="Kintsu is an open-source bubble under a failed command. Typos, ports in use, Docker down, rejected pushes, walls of test output, secrets in the command: see what it does with each, in your terminal, with your models and your agent.">
+  <meta name="description" content="Kintsu is an open-source bubble under a failed command. Tab fixes the typo, ^K opens a panel, Why explains, Fix inserts one command, Agent hands the case to Claude Code or the agent you use. Your terminal, your shell, your models, your keys.">
   <meta property="og:title" content="Kintsu — the command failed. Kintsu picks it up.">
-  <meta property="og:description" content="Seven ordinary terminal failures and what Kintsu does with each. Your terminal, your shell, your models, your agent. Open source.">
+  <meta property="og:description" content="A small bubble under the error. Tab, ^K, Why, Fix, Privacy, Agent, Ignore: one chapter each. Your terminal, your shell, your models, your agent. Open source.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
   <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -19,8 +19,9 @@
 <header class="top">
   <a class="brand" href="#"><img src="media/mark.svg" alt="" width="28" height="28"><span>Kintsu</span></a>
   <nav aria-label="Sections">
-    <a href="#cases">Situations</a>
-    <a href="#models">Your models</a>
+    <a href="#tour">The tour</a>
+    <a href="#features">One action at a time</a>
+    <a href="#models">Who answers</a>
     <a href="#install">Install</a>
     <a href="#faq">FAQ</a>
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
@@ -34,152 +35,111 @@
     <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha · zsh, bash, fish · Linux and macOS</p>
     <h1>The command failed.<br><em>Kintsu picks it up.</em></h1>
     <p class="sub">A small bubble under the error. It fixes the typo, explains the stack trace, or hands the whole case to the AI agent you already use. In <strong>your</strong> terminal, <strong>your</strong> shell, with <strong>your</strong> models and <strong>your</strong> keys.</p>
-    <div class="cta">
-      <a class="btn primary" href="#cases">See what it does <span aria-hidden="true">↓</span></a>
-      <a class="btn ghost" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener"><span aria-hidden="true">☆</span> GitHub</a>
+  </section>
+
+  <!-- ═══════════════════════ the tour ═══════════════════════ -->
+  <section id="tour" class="tour" aria-labelledby="tour-title">
+    <h2 id="tour-title" class="visually-hidden">The tour, in nine chapters</h2>
+    <div class="player lead" data-scene="tour" data-loop="true" data-title="zsh — ~/dev/acme"></div>
+    <p class="player-note">Scripted scenes of the designed behaviour; Kintsu is pre-alpha and real recordings replace them the day v0.1 runs. Nothing here runs a command, and nothing will in the real thing either.</p>
+  </section>
+
+  <!-- ═══════════════════════ features, one by one ═══════════════════════ -->
+  <section id="features" class="features">
+    <div class="seam-rule" aria-hidden="true"></div>
+    <p class="section-label">One action at a time</p>
+    <h2>Everything the bubble can do.</h2>
+    <p class="lede">Every action has a key, a word you can click, and a command. Each card jumps to the chapter of the tour where you see it happen, and says who is doing the work: a rule, a model on your machine, a model in the cloud, or your agent.</p>
+    <div class="feature-grid">
+      <article class="feature">
+        <p class="fkey"><kbd>Tab</kbd></p>
+        <h3>Accept the ghost-text fix</h3>
+        <p>When a rule is sure and the fix is harmless, the corrected command is already on your next prompt, dim. Tab or → accepts it; typing anything else discards it; Enter runs it.</p>
+        <p class="who"><span class="where local">local</span> a rule · under a millisecond · no model</p>
+        <button type="button" class="watch" data-chapter="0">Watch chapter 1 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey">the bubble</p>
+        <h3>One seam, one sentence, a line of words</h3>
+        <p>Printed right under the failure, three lines at most. The words are OSC 8 links, so they are clickable in most terminals without stealing your mouse selection. It never takes a keystroke from your prompt.</p>
+        <p class="who"><span class="where local">local</span> a rule, plus a tiny model that reads the output and writes the sentence</p>
+        <button type="button" class="watch" data-chapter="1">Watch chapter 2 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>^K</kbd></p>
+        <h3>Expand into the panel</h3>
+        <p>The same bubble, unfolded in place under your prompt, never full screen. The command and its status, five sections with one-letter keys, mouse and wheel welcome, Esc to fold it back. Click any word of the bubble to open it there.</p>
+        <p class="who"><span class="where local">local</span> Kintsu · instant</p>
+        <button type="button" class="watch" data-chapter="2">Watch chapter 3 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>w</kbd> · Why · <code>kintsu why</code></p>
+        <h3>Why it failed</h3>
+        <p>An explanation, streamed into the panel, in your language. It reads the redacted case: command, status, output, cwd, git state, recent commands. Never your files.</p>
+        <p class="who"><span class="where cloud">cloud</span> or <span class="where local">local</span> the model you routed <code>explain</code> to; Haiku by default, Ollama with one line of config</p>
+        <button type="button" class="watch" data-chapter="3">Watch chapter 4 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>p</kbd> · Privacy · <code>kintsu privacy</code></p>
+        <h3>What left the machine</h3>
+        <p>The exact payload that was sent, with the redactions highlighted. Tokens, keys, passwords in URLs are redacted by default; add your own patterns. A case that contains a secret is answered locally, automatically.</p>
+        <p class="who"><span class="where local">local</span> Kintsu · redaction on by default</p>
+        <button type="button" class="watch" data-chapter="4">Watch chapter 5 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>f</kbd> · Fix · <code>kintsu fix</code></p>
+        <h3>One command, two Enters</h3>
+        <p>One corrected command, its confidence, a red flag when it is destructive. ⏎ inserts it in your line editor and closes the panel; you press Enter again to run it. Kintsu never runs anything itself.</p>
+        <p class="who"><span class="where cloud">cloud</span> or <span class="where local">local</span> the model you routed <code>quick_fix</code> to; a rule when one knows</p>
+        <button type="button" class="watch" data-chapter="5">Watch chapter 6 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>a</kbd> · Agent · <code>kintsu agent</code></p>
+        <h3>Hand the case to your agent</h3>
+        <p>Kintsu writes the brief, redacted, and launches Claude Code, Codex, OpenCode, aider or Gemini CLI in your terminal with it. No API key if the CLI already has one. The agent works; Kintsu steps aside.</p>
+        <p class="who"><span class="where you">your account</span> the agent you configured, in your terminal</p>
+        <button type="button" class="watch" data-chapter="6">Watch chapter 7 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey">messages</p>
+        <h3>Answers that arrive later</h3>
+        <p>Anything slower than a prompt should wait is delivered later, above your prompt, without touching the line you are typing. In zsh and fish, immediately; in bash, at the next prompt.</p>
+        <p class="who"><span class="where local">local</span> the resident daemon, one per user, started on demand</p>
+        <button type="button" class="watch" data-chapter="7">Watch chapter 8 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature">
+        <p class="fkey"><kbd>i</kbd> · Ignore · <code>kintsu mute 1h</code></p>
+        <h3>Ignore, mute, forever</h3>
+        <p>Ignore for this command, this directory, this session, or always. Mute for an hour. Editors, pagers, ssh and your own list are never triaged. The same failure twice is one bubble anyway.</p>
+        <p class="who"><span class="where local">local</span> Kintsu · quiet by default</p>
+        <button type="button" class="watch" data-chapter="8">Watch chapter 9 <span aria-hidden="true">▶</span></button>
+      </article>
+      <article class="feature commands">
+        <p class="fkey">the command line</p>
+        <h3>Everything, also as a command</h3>
+        <pre><code>kintsu why · fix · agent · privacy · ignore    <span class="c"># act on the last failure</span>
+kintsu mute 1h                                <span class="c"># an hour of nothing</span>
+kintsu setup                                  <span class="c"># Ollama? a key? a CLI agent?</span>
+kintsu models · kintsu models test            <span class="c"># who answers, health, cost</span>
+kintsu doctor                                 <span class="c"># what works, what is missing</span>
+kintsu service install                        <span class="c"># the daemon survives logout</span>
+kintsu init zsh | bash | fish                 <span class="c"># the hook</span></code></pre>
+        <p class="who"><span class="where local">local</span> alias <code>k</code> if you like short</p>
+      </article>
     </div>
   </section>
 
-  <section class="hero-player" aria-labelledby="hero-player-title">
-    <h2 id="hero-player-title" class="visually-hidden">Kintsu in forty seconds</h2>
-    <div class="player lead" data-scene="hero" data-loop="true" data-title="zsh — ~/dev/acme"></div>
-    <p class="player-help">The scene plays itself and loops. Take the wheel any time: click a word in the bubble, or focus the terminal and press <kbd>Tab</kbd>, <kbd>^K</kbd>, <kbd>w</kbd>, <kbd>f</kbd>, <kbd>a</kbd>, <kbd>i</kbd>, <kbd>p</kbd>, <kbd>Esc</kbd>, <kbd>⏎</kbd>. Nothing here runs a command, and nothing will in the real thing either.</p>
-    <p class="player-note">These are scripted scenes of the designed behaviour; Kintsu is pre-alpha. Real recordings replace them the day v0.1 runs.</p>
-  </section>
-
-  <!-- ═══════════════════════ situations ═══════════════════════ -->
-  <section id="cases" class="cases">
-    <div class="seam-rule" aria-hidden="true"></div>
-    <p class="section-label">Seven ordinary failures</p>
-    <h2>What Kintsu actually does with each.</h2>
-    <p class="lede">Not features. Situations, the way they happen at 4 pm on a Tuesday, and the exact bubble you would get. Every scene is a small player: it starts when it scrolls into view, and you can click inside it.</p>
-    <nav class="case-index" aria-label="Situations">
-      <a href="#case-typo">You typed it wrong</a>
-      <a href="#case-port">Port already in use</a>
-      <a href="#case-docker">Docker isn't running</a>
-      <a href="#case-git">The push was rejected</a>
-      <a href="#case-wall">A wall of test output</a>
-      <a href="#case-secret">A token in the command</a>
-      <a href="#case-quiet">Nothing happened, on purpose</a>
-    </nav>
-
-    <!-- 1 typo -->
-    <article class="case" id="case-typo">
-      <div class="case-text">
-        <p class="case-kicker">01 · Rules, no model</p>
-        <h3>You typed it wrong.</h3>
-        <p><code>gti status</code>. <code>cd api</code> when the folder is <code>apps/api</code>. The cheapest failures are the most frequent, and they never deserve a round trip to a model.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>Exit 127, or <em>not a directory</em>. A rule matched the command against your <code>PATH</code> and the directory tree, in under a millisecond.</dd>
-          <dt>Kintsu offered</dt><dd>The corrected line, already on your next prompt as ghost text. <kbd>Tab</kbd> accepts it; anything else ignores it.</dd>
-          <dt>Never happened</dt><dd>No model call. Nothing left the machine. Nothing ran until you pressed Enter.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="typo" data-title="zsh — ~/dev/acme"></div>
-    </article>
-
-    <!-- 2 port -->
-    <article class="case flip" id="case-port">
-      <div class="case-text">
-        <p class="case-kicker">02 · A read-only probe, a red flag</p>
-        <h3>Port 3000 is already in use.</h3>
-        <p>You start the dev server. <code>EADDRINUSE</code>. Somewhere, a forgotten process from another project still holds the port.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>The address-in-use error in the output. When you asked <em>Why</em>, the rule ran its read-only probe, <code>lsof -i :3000</code>, and found who.</dd>
-          <dt>Kintsu offered</dt><dd><code>kill 4821</code>, flagged in red because it ends a process. Inserted in your line, not executed.</dd>
-          <dt>Never happened</dt><dd>Kintsu killed nothing. You did, with Enter, knowing what it was and where it came from.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="port" data-title="zsh — ~/dev/acme"></div>
-    </article>
-
-    <!-- 3 docker -->
-    <article class="case" id="case-docker">
-      <div class="case-text">
-        <p class="case-kicker">03 · A message that arrives later</p>
-        <h3>Docker isn't running.</h3>
-        <p><em>Cannot connect to the Docker daemon.</em> The error never says the obvious thing: Docker Desktop is closed.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>The socket error. A rule knows this one and knows the platform: <code>open -a Docker</code> on macOS, <code>systemctl start docker</code> on Linux, <code>sudo</code> flagged.</dd>
-          <dt>Kintsu offered</dt><dd>Start it, with Tab. Then, twenty seconds later, a message above your prompt: Docker is up, run the compose again?</dd>
-          <dt>Never happened</dt><dd>No polling loop in your shell. The resident daemon watched, and your prompt never waited.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="docker" data-title="fish — ~/dev/acme"></div>
-    </article>
-
-    <!-- 4 git -->
-    <article class="case flip" id="case-git">
-      <div class="case-text">
-        <p class="case-kicker">04 · The dangerous option exists, and comes last</p>
-        <h3>The push was rejected.</h3>
-        <p>Non-fast-forward. git's own advice is right there, buried in eight lines of <code>hint:</code>. Someone pushed while you were working.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>The rejection, and from <code>git log origin/main</code>, who pushed what and when.</dd>
-          <dt>Kintsu offered</dt><dd><code>git pull --rebase &amp;&amp; git push</code>. The explanation names the two commits you are missing.</dd>
-          <dt>Never happened</dt><dd><code>git push --force</code> was mentioned, in red, as the thing that would erase their work. Kintsu never proposes it first.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="git" data-title="zsh — ~/dev/acme (feat/refresh)"></div>
-    </article>
-
-    <!-- 5 wall -->
-    <article class="case" id="case-wall">
-      <div class="case-text">
-        <p class="case-kicker">05 · Your agent, briefed</p>
-        <h3>Forty lines of test output.</h3>
-        <p>Three failures. You would scroll, squint, spot the common line, open the fixture, fix the date. Or you would hand it over with everything already attached.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>Forty-eight lines. A tiny local model found the one panic site shared by the three failures.</dd>
-          <dt>Kintsu offered</dt><dd>A one-sentence diagnosis and a hand-off to Claude Code with the brief: command, output, cwd, branch, recent commands, your <code>CLAUDE.md</code>.</dd>
-          <dt>Never happened</dt><dd>Kintsu sent nothing to a cloud model. The agent ran in your terminal, on your account, and asked before committing.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="wall" data-title="zsh — ~/dev/acme (feat/refresh)"></div>
-    </article>
-
-    <!-- 6 secret -->
-    <article class="case flip" id="case-secret">
-      <div class="case-text">
-        <p class="case-kicker">06 · Local only, automatically</p>
-        <h3>There's a token in that command.</h3>
-        <p>A <code>curl</code> with a bearer token, a 401. The most useful context for a model is also the one thing that must not leave the machine.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>Redaction matched <code>Bearer sk-live-…</code> in the command line. The case was marked sensitive.</dd>
-          <dt>Kintsu offered</dt><dd>The explanation and the fix, from the local model only. The <em>Privacy</em> tab shows the redacted payload and the routing decision.</dd>
-          <dt>Never happened</dt><dd>The token left the machine. Not to a cloud model, not to an agent, not in a log.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="secret" data-title="bash — ~/dev/acme"></div>
-    </article>
-
-    <!-- 7 quiet -->
-    <article class="case" id="case-quiet">
-      <div class="case-text">
-        <p class="case-kicker">07 · Silence is a feature</p>
-        <h3>Nothing happened. On purpose.</h3>
-        <p>Most commands succeed. Some you stop yourself. Some fail the same way twice while you fix them. A tool that speaks every time is a tool you uninstall by Friday.</p>
-        <dl class="facts">
-          <dt>Kintsu saw</dt><dd>Exit 0, Ctrl-C, a broken pipe from <code>| head</code>, an editor, and the same failure twice in a row.</dd>
-          <dt>Kintsu offered</dt><dd>One bubble, for the one real failure. Then <code>kintsu ignore</code> per command, directory or forever, and <code>kintsu mute 1h</code>.</dd>
-          <dt>Never happened</dt><dd>A bubble you did not want.</dd>
-        </dl>
-      </div>
-      <div class="player" data-scene="quiet" data-title="zsh — ~/dev/acme"></div>
-    </article>
-  </section>
-
-  <!-- ═══════════════════════ models ═══════════════════════ -->
+  <!-- ═══════════════════════ who answers ═══════════════════════ -->
   <section id="models" class="models">
     <div class="seam-rule" aria-hidden="true"></div>
-    <p class="section-label">Behind the scenes</p>
-    <h2>Several brains, one per task.</h2>
-    <p class="lede">In the scenes above, four different things answered you. A rule. A tiny local model that reads output and decides whether it is worth a bubble. A small model that writes one line. Your agent. Which one does what is a config file, and it degrades gracefully when a brain is missing.</p>
+    <p class="section-label">Who answers you</p>
+    <h2>Four kinds of brains, one per task.</h2>
+    <p class="lede">In the tour, four different things answered. Which one does what is a config file, and it degrades gracefully when a brain is missing: no Ollama means rules only for classification; no key means no cloud; no agent means Fix and Why still work.</p>
     <div class="tiers">
-      <div class="tier"><span class="tag">Rules</span><h3>Instant</h3><p>Typos, wrong directory, missing flag, Docker down, non-fast-forward push. Ported from the best of thefuck. No model, no network, under a millisecond.</p></div>
-      <div class="tier"><span class="tag">Tiny · local</span><h3>Classify &amp; summarise</h3><p>Reads forty lines and says whether they deserve your attention, and why in one sentence. Never leaves the machine.</p></div>
-      <div class="tier"><span class="tag">Small or large</span><h3>Fix &amp; explain</h3><p>One corrected command with a confidence and a danger flag; an explanation streamed in the panel, in your language.</p></div>
-      <div class="tier"><span class="tag">Agent</span><h3>Investigate</h3><p>The brief handed to Claude Code, Codex, OpenCode, aider or Gemini CLI. No API key if the CLI already has one.</p></div>
+      <div class="tier"><span class="where local">local</span><h3>Rules</h3><p>Typos, wrong directory, missing flag, Docker down, non-fast-forward push. Ported from the best of thefuck. Under a millisecond, free, offline.</p></div>
+      <div class="tier"><span class="where local">local</span><h3>Tiny model</h3><p>Reads the output, decides whether it deserves a bubble, writes the sentence, summarises forty lines into one. Ollama, a few hundred milliseconds, free.</p></div>
+      <div class="tier"><span class="where cloud">cloud</span> <span class="where local">local</span><h3>Small or large model</h3><p>One-line fixes with a confidence; explanations streamed in your language. Anthropic, OpenAI, Gemini, OpenRouter, or any local server; your choice per task, and local only when a secret is spotted.</p></div>
+      <div class="tier"><span class="where you">your account</span><h3>Agent</h3><p>Claude Code, Codex, OpenCode, aider, Gemini CLI, launched in your terminal with the brief. No API key if the CLI already has one.</p></div>
     </div>
     <div class="config">
       <div class="config-head"><span>~/.config/kintsu/config.toml</span></div>
@@ -199,7 +159,7 @@ explain     = [<span class="s">"haiku"</span>]
 investigate = [<span class="s">"claude-code"</span>]
 
 <span class="k">[routing.constraints]</span>
-sensitive_output = <span class="s">"local_only"</span>   <span class="c"># scene 06: a secret in the output, nothing leaves the machine</span>
+sensitive_output = <span class="s">"local_only"</span>   <span class="c"># a secret in the output: nothing leaves the machine</span>
 max_daily_cost   = <span class="s">"1.00 USD"</span></code></pre>
     </div>
     <p class="providers">Anthropic · OpenAI · Gemini · Ollama · OpenRouter · Groq · Mistral · LM Studio · llama.cpp · anything OpenAI-compatible · any CLI agent</p>
@@ -255,8 +215,8 @@ kintsu doctor           <span class="c"># what works, what is missing, what it w
     <h2>Design first. Then the bubble.</h2>
     <ol class="timeline">
       <li class="now"><span class="when">now</span><h3>The skeleton</h3><p>Hooks for zsh, bash and fish, a placeholder hint after a failure, and the design: architecture, daemon, models, the bubble.</p></li>
-      <li><span class="when">v0.1</span><h3>The bubble</h3><p>The daemon and its socket, context capture, rule-based fixes, one provider layer, <code>why</code>, hand-off to a CLI agent, config file, noise control. Scenes 01, 03, 04 and 07 become real.</p></li>
-      <li><span class="when">v0.2</span><h3>It reads the output</h3><p>Capture through terminal and multiplexer APIs, redaction and the Privacy tab, ghost-text fixes, the danger guard, project awareness. Scenes 02, 05 and 06.</p></li>
+      <li><span class="when">v0.1</span><h3>The bubble</h3><p>The daemon and its socket, context capture, rule-based fixes, one provider layer, Why, hand-off to a CLI agent, config file, noise control. Chapters 1, 2, 3, 4, 8 and 9 become real.</p></li>
+      <li><span class="when">v0.2</span><h3>It reads the output</h3><p>Capture through terminal and multiplexer APIs, redaction and the Privacy tab, ghost-text fixes, the danger guard, project awareness. Chapters 5, 6 and 7.</p></li>
       <li><span class="when">v0.3</span><h3>Your agent, your keys</h3><p>Keychain, subscription reuse, local models as first-class citizens, cheap-model triage, an MCP server exposing the last failure to any agent.</p></li>
     </ol>
   </section>
@@ -268,8 +228,8 @@ kintsu doctor           <span class="c"># what works, what is missing, what it w
     <h2>Fair ones.</h2>
     <dl>
       <div><dt>Isn't this Warp?</dt><dd>Warp did it first, inside Warp, with a Warp account and Warp's models. Kintsu does it in the terminal and shell you already use, with any model or agent, keys in your keychain, source on GitHub.</dd></div>
-      <div><dt>Isn't this thefuck?</dt><dd>For scene 01, yes, and Kintsu ports its best rules. thefuck waits for you to type a word, has no model for everything rules cannot know, and cannot hand a case to an agent.</dd></div>
-      <div><dt>Does it run my commands?</dt><dd>No. Never. A fix is inserted in your line; you press Enter. Read-only probes such as <code>lsof</code> may run when you ask <em>Why</em>, and the Privacy tab lists them.</dd></div>
+      <div><dt>Isn't this thefuck?</dt><dd>For chapter 1, yes, and Kintsu ports its best rules. thefuck waits for you to type a word, has no model for what rules cannot know, and cannot hand a case to an agent.</dd></div>
+      <div><dt>Does it run my commands?</dt><dd>No. Never. A fix is inserted in your line; you press Enter. Read-only probes such as <code>lsof</code> may run when you ask Why, and the Privacy tab lists them.</dd></div>
       <div><dt>Which terminals make the bubble clickable?</dt><dd>iTerm2, WezTerm, Kitty, Ghostty, foot, VS Code, Windows Terminal, GNOME Terminal and other VTE terminals render the links. Elsewhere the words still show and the keys still work.</dd></div>
       <div><dt>Does it work over SSH, in tmux, in Herdr?</dt><dd>Yes. The daemon runs per user on whatever host the shell is on. tmux and Herdr are where Kintsu reads the actual output best.</dd></div>
       <div><dt>Why "Kintsu"?</dt><dd>Kintsugi, 金継ぎ, is the Japanese craft of repairing broken pottery with gold: the crack becomes the most visible and most valued part of the piece. A failed command is a crack. Kintsu is the gold seam.</dd></div>

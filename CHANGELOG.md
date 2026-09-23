@@ -17,8 +17,10 @@ All notable changes to kintsu are recorded here. The format follows
   `ports/`, `src/adapters` with `controllers/`, `presenters/` and
   `gateways/`, and `tests/dependency_rule.rs` enforcing the Dependency Rule
   and the purity of the inner rings.
-- The website in `docs/`: static HTML, CSS and JavaScript with an
-  interactive demo of the bubble, ready for GitHub Pages, not published yet.
+- The website in `docs/`: static HTML, CSS and JavaScript, a tour of the
+  bubble in nine chapters with pause, chapter navigation and a step-by-step
+  mode, then every action one by one; ready for GitHub Pages, not
+  published yet.
 - The project vision, competitive landscape and feature roadmap
   ([docs/VISION.md](docs/VISION.md)).
 - Shell hooks for zsh, bash and fish (`kintsu init <shell>`) that call

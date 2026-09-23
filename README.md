@@ -141,9 +141,12 @@ whisk, and is not published yet. Preview it locally:
 python3 -m http.server -d docs 8000
 ```
 
-Then open <http://localhost:8000>. The demo is interactive: click the words
-in the bubble, or press `Tab`, `^K`, `w`, `a`, `i` and `Esc` once the
-terminal has focus.
+Then open <http://localhost:8000>. The page opens on a tour in nine
+chapters, one per action of the bubble, with pause, chapter navigation and
+a step-by-step mode; each chapter says who is doing the work, a rule, a
+local model, a cloud model or your agent. Click the words in the bubble, or
+press `Tab`, `^K`, `w`, `f`, `a`, `i`, `p` and `Esc` once the terminal has
+focus, to take the wheel.
 
 ## Design documents
 
