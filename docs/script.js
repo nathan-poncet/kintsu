@@ -32,6 +32,7 @@
   const IGNORE = () => ({ ignore: 1 });             // the Ignore action
   const MSG = (spec) => ({ msg: spec });            // a message arriving above the prompt
   const KEY = (label) => ({ key: label });        // flash the key the scene presses
+  const LIVE = () => ({ live: 1 });                // everything before is drawn at once; from here, real time
   const END = () => ({ end: 1 });
 
   const ACTS = {
@@ -103,6 +104,14 @@
   };
 
   const SCENES = {
+    landing: [
+      P(), T("gti status"), E(), O(err("zsh: command not found: gti")),
+      TOAST(typoToast), GHOST("git status"), TAB(), E(),
+      O("On branch main", "nothing to commit, working tree clean"),
+      P(), T("npm run build"), E(), O(...BUILD_TRACE.slice(0, 7), dim("    … 6 more")),
+      TOAST(buildToast), P(),
+      LIVE(), W(9000), MSG(followUp), END(),
+    ],
     tour: [
       CH({ id: "typo", tag: "Tab", title: "A typo, fixed by a rule", who: "a rule", where: "local", cost: "under a millisecond · no model", keys: "Tab or → accepts · anything else ignores · Enter runs",
         text: "<b>gti</b> is not on your PATH. A rule ported from thefuck finds the nearest command and puts it on your next prompt as ghost text. Nothing left the machine, and nothing ran until you pressed Enter." }),
@@ -169,6 +178,22 @@
 
     render() {
       const title = esc(this.root.dataset.title);
+      if (!this.chapters.length) {
+        this.root.innerHTML = `
+          <div class="terminal" tabindex="0" aria-label="Kintsu, live. Click a word in the bubble, or use Control K, w, f, a, i, p, Escape, Enter.">
+            <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><span class="badge static">live · click a word · ^K</span></div>
+            <div class="screen"></div>
+            <div class="keycap" aria-hidden="true"></div>
+          </div>`;
+        this.term = this.root.querySelector(".terminal"); this.screen = this.root.querySelector(".screen"); this.badge = this.root.querySelector(".badge"); this.keycap = this.root.querySelector(".keycap");
+        this.items = []; this.ex = null;
+        this.screen.addEventListener("click", (e) => {
+          const a = e.target.closest("[data-act]"); if (a) { this.act(a.dataset.act); return; }
+          const t = e.target.closest("[data-tab]"); if (t) { this.takeWheel(); this.switchTab(t.dataset.tab); }
+        });
+        this.term.addEventListener("keydown", (e) => this.onTerminalKey(e));
+        return;
+      }
       const steps = this.chapters.map((c, k) => `
         <li>
           <button type="button" class="chapter" data-chapter="${k}" aria-label="Chapter ${k + 1}: ${esc(c.title)}">
@@ -218,7 +243,7 @@
       if (!v && this.wake) { const w = this.wake; this.wake = null; w(); }
     }
     togglePause() { if (!this.playing) { this.play(Math.max(0, this.chapterIndex)); return; } this.setPaused(!this.paused); }
-    setBadge(text, label) { this.badge.textContent = text; this.badge.setAttribute("aria-label", label || text); }
+    setBadge(text, label) { if (this.badge.classList.contains("static")) return; this.badge.textContent = text; this.badge.setAttribute("aria-label", label || text); }
     scrollDown() { this.screen.scrollTop = this.screen.scrollHeight; }
     flashKey(label) {
       if (this.instant || reduced) return;
@@ -229,6 +254,7 @@
     // ── chapters ──
     showChapter(k) {
       this.chapterIndex = k;
+      if (!this.ex) return;
       const c = this.chapters[k];
       this.ex.count.textContent = `Chapter ${k + 1} of ${this.chapters.length}`;
       this.ex.tag.textContent = c.tag; this.ex.title.textContent = c.title;
@@ -238,7 +264,7 @@
       this.items.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); li.querySelector(".fill").style.setProperty("--w", i < k ? "100%" : "0%"); });
     }
     progress(i) {
-      const k = this.chapterIndex; if (k < 0) return;
+      const k = this.chapterIndex; if (k < 0 || !this.items.length) return;
       const start = this.chapters[k].step, end = this.chapters[k + 1]?.step ?? this.scene.length;
       this.items[k].querySelector(".fill").style.setProperty("--w", `${Math.round(((i - start) / Math.max(1, end - start)) * 100)}%`);
     }
@@ -352,8 +378,9 @@
       this.driving = false; this.paused = false; this.playing = true; this.wake = null;
       this.screen.innerHTML = ""; this.current = null; this.prompt = null;
       this.setBadge("⏸ playing", "Pause");
-      const start = this.chapters[fromChapter]?.step ?? 0;
       const steps = this.scene;
+      const liveAt = steps.findIndex((s) => s.live);
+      const start = this.chapters.length ? (this.chapters[fromChapter]?.step ?? 0) : Math.max(0, liveAt);
       for (let i = 0; i < steps.length; i++) {
         if (this.stale(id)) return;
         this.instant = i < start;
@@ -365,6 +392,7 @@
         else if (st.o) { for (const l of st.o) { if (this.stale(id)) return; this.out(l); await this.sleep(28, id); } }
         else if (st.w) await this.sleep(st.w, id);
         else if (st.s != null) { /* subtitles retired: the chapter text carries the story */ }
+        else if (st.live) { /* real time from here */ }
         else if (st.key) this.flashKey(st.key);
         else if (st.toast) this.toast(st.toast);
         else if (st.ghost != null) this.ghost(st.ghost);
@@ -377,7 +405,7 @@
         else if (st.msg) this.message(st.msg);
         else if (st.end) {
           this.playing = false; this.instant = false;
-          this.items[this.chapterIndex]?.querySelector(".fill").style.setProperty("--w", "100%");
+          this.items[this.chapterIndex]?.querySelector(".fill")?.style.setProperty("--w", "100%");
           this.setBadge("↻ replay", "Replay from the first chapter");
           return;
         }
@@ -388,17 +416,21 @@
 
   const whereClass = (where) => /cloud/.test(where) && !/local/.test(where) ? "cloud" : /your/.test(where) ? "you" : /cloud/.test(where) ? "mixed" : "local";
 
-  const lead = document.querySelector(".player.lead[data-scene]");
-  if (lead) {
-    const player = new Player(lead);
-    window.kintsuTour = player;
+  const roots = [...document.querySelectorAll(".player[data-scene]")];
+  const players = roots.map((root) => new Player(root));
+  window.kintsuPlayers = players;
+  window.kintsuTour = players.find((p) => p.chapters.length) || null;
+  const fromHash = () => { const m = /^#ch-(\d+)$/.exec(location.hash); return m ? Math.max(0, Math.min(8, Number(m[1]) - 1)) : 0; };
+  for (const p of players) {
+    const first = p.chapters.length ? fromHash() : 0;
     if (typeof IntersectionObserver === "function") {
-      const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !player.playing && player.chapterIndex < 0) player.play(0); }, { threshold: 0.25 });
-      io.observe(lead);
+      const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !p.playing && p.chapterIndex < 0 && !p.driving) { p.play(first); io.disconnect(); } }, { threshold: 0.2 });
+      io.observe(p.root);
     } else {
-      player.play(0);
+      p.play(first);
     }
   }
+  if (window.kintsuTour) window.addEventListener("hashchange", () => window.kintsuTour.play(fromHash()));
 
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {

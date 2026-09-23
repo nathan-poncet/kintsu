@@ -7,18 +7,19 @@
   <meta name="description" content="Every knob of Kintsu: models and providers, routing per task, privacy constraints, keys, the bubble, noise control, the daemon, agents, and four complete example configurations.">
   <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
   <meta name="theme-color" content="#0f0d0b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="page">
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="top">
-  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="28" height="28"><span>Kintsu</span></a>
-  <nav aria-label="Sections">
-    <a href="./#tour">The tour</a>
-    <a href="configuration.html" aria-current="page">Configuration</a>
+  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="26" height="26"><span>Kintsu</span></a>
+  <nav aria-label="Site">
+    <a href="docs.html" aria-current="page">Docs</a>
     <a href="roadmap.html">Roadmap</a>
-    <a href="./#faq">FAQ</a>
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>
@@ -97,6 +98,27 @@ quick_fix = <span class="s">"3s"</span>
 explain   = <span class="s">"1s"</span>                     <span class="c"># to the first token; explanations stream</span>
 summarize = <span class="s">"2s"</span></code></pre>
     </div>
+
+    <figure class="router" id="router">
+      <div class="router-text">
+        <p class="viz-title">How a task finds its brain</p>
+        <p class="task"><span class="task-name" id="router-task">classify</span> <span class="task-note" id="router-note">is this failure worth a bubble?</span></p>
+        <p class="router-why" id="router-why">A tiny local model reads the output and says whether it deserves your attention.</p>
+        <p class="viz-note">Per task, an ordered list of brains; constraints filter it first.</p>
+      </div>
+      <svg class="router-svg" viewBox="0 0 420 150" aria-hidden="true">
+        <path class="edge" d="M40 75 C 120 75, 150 22, 230 22"/>
+        <path class="edge" d="M40 75 C 120 75, 150 57, 230 57"/>
+        <path class="edge" d="M40 75 C 120 75, 150 92, 230 92"/>
+        <path class="edge" d="M40 75 C 120 75, 150 127, 230 127"/>
+        <circle class="pulse" r="5" cx="40" cy="75"/>
+        <g class="node" transform="translate(230 22)"><circle r="6"/><text x="14" y="4">rules</text></g>
+        <g class="node" transform="translate(230 57)"><circle r="6"/><text x="14" y="4">tiny · local</text></g>
+        <g class="node" transform="translate(230 92)"><circle r="6"/><text x="14" y="4">haiku · cloud</text></g>
+        <g class="node" transform="translate(230 127)"><circle r="6"/><text x="14" y="4">claude code · your account</text></g>
+        <g class="source" transform="translate(40 75)"><circle r="8"/><text y="30">the failure</text></g>
+      </svg>
+    </figure>
     <table class="ref">
       <thead><tr><th>task</th><th>input</th><th>output</th><th>typical tier</th><th>when</th></tr></thead>
       <tbody>
@@ -347,14 +369,17 @@ max_daily_cost   = <span class="s">"2.00 USD"</span></code></pre>
 </main>
 
 <footer>
-  <div class="foot-brand"><img src="media/mark.svg" alt="" width="22" height="22"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
+  <div class="foot-brand"><img src="media/mark.svg" alt="" width="20" height="20"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
   <nav aria-label="Footer">
     <a href="./">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="tour.html">Tour</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="faq.html">FAQ</a>
     <a href="roadmap.html">Roadmap</a>
     <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/MODELS.md" target="_blank" rel="noopener">MODELS.md</a>
-    <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/DAEMON.md" target="_blank" rel="noopener">DAEMON.md</a>
   </nav>
 </footer>
+<script src="script.js" defer></script>
 </body>
 </html>
