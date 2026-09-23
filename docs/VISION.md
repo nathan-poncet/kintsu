@@ -150,8 +150,10 @@ your agent, your key." · "The bubble under the error."
 - `kintsu agent`: hand-off by template. Presets for `claude -p`,
   `codex exec`, `opencode run`, `aider --message`, `gemini -p`,
   `gh copilot`; `command = "..."` for anything else.
-- Passive bubble by default (a printed hint) plus a hotkey (`Ctrl-K`?) and
-  the bare `kintsu` command to act on the last failure. No stolen keystrokes.
+- A resident daemon per user, started on demand, with the shell hooks as
+  thin clients over a Unix socket ([DAEMON.md](DAEMON.md)).
+- The toast, printed in the flow, expandable into the panel with `^K` or a
+  click; no stolen keystrokes ([UI.md](UI.md)).
 - Config in `~/.config/kintsu/config.toml`, `kintsu default-config`,
   `kintsu doctor`.
 - Noise control: exit-code allow/deny, command denylist (editors, pagers,
@@ -210,26 +212,11 @@ your agent, your key." · "The bubble under the error."
 
 ## UX details
 
-**The bubble.** Appears under the failed command's output, before the next
-prompt. Three lines at most. Default variant is a single dim line so it
-never dominates the screen; a boxed variant and "hotkey only" are options.
-It never steals keystrokes at the prompt: reading a key inside `precmd`
-would block or eat the next command. Actions come from the hotkey, the
-bare `kintsu` command, or a shell widget (ZLE in zsh, `bind` in fish,
-`bind -x` in bash).
-
-**Ghost text.** For rule and one-shot fixes, the corrected command appears
-as ghost text in the line editor; Tab accepts, anything else ignores.
-Confirmation before execution is implicit here: the user presses Enter.
-
-**Agent hand-off.** The agent starts in the same pane by default (the
-user's terminal, the user's agent, they know how to use it). Options: a
-tmux/Herdr split, or `--print` mode for a non-interactive answer streamed
-under the bubble.
-
-**Noise.** The same failure twice in a row is reported once. A cooldown
-after a dismiss. `kintsu ignore` with scopes: this command, this directory,
-this session, always. `kintsu mute 1h`.
+Moved to [UI.md](UI.md): the bubble has two states, a toast printed in the
+flow that never steals a keystroke, and a panel it expands into on `^K` or
+on a click. Action words are OSC 8 links, so the toast is clickable in most
+terminals without mouse tracking. Messages arrive above the prompt in zsh
+and fish, at the next prompt in bash.
 
 ## Capturing the output: the hard part
 
@@ -252,19 +239,24 @@ as an explicit opt-in for people without any of these. Never re-run.
 
 ## Architecture sketch
 
-Same shape as herdr-fingers: one Rust binary, Clean Architecture, TDD.
+Moved to [ARCHITECTURE.md](ARCHITECTURE.md), [DAEMON.md](DAEMON.md) and
+[MODELS.md](MODELS.md). In five lines:
 
-- `domain/`: the failure case, rules, redaction, triage decision. Pure,
-  no I/O.
-- `usecases/`: `triage`, `why`, `fix`, `agent`, `ignore`, against ports
-  (`OutputSource`, `Model`, `Agent`, `Clipboard`, `Config`, `History`).
-- `adapters/`: shell hooks, tmux/Herdr/WezTerm/Kitty/iTerm2 output sources,
-  provider clients, agent launchers, TOML config, keychain, ratatui popup.
-- `app.rs`: composition root, one function per subcommand.
-
-Rust because the quiet path runs after every command and must start in
-well under a millisecond; a single static binary installs everywhere; the
-author already has the tooling from herdr-fingers.
+- Three crates for the three rings, `kintsu-entities`, `kintsu-use-cases`
+  with its `ports/`, `kintsu-adapters` with `controllers/`, `gateways/`
+  and `presenters/`; the binary in `apps/kintsu`; `cargo xtask check`
+  enforces the Dependency Rule.
+- One resident daemon per user, started on demand or installed as a
+  service, talking NDJSON over a Unix socket to thin clients: the hooks,
+  the `kintsu` commands, the URL-scheme handler behind clicks.
+- The sync path (hook to toast) is rules only and takes milliseconds;
+  everything that needs a model runs after the prompt is back and lands as
+  a message.
+- Several models, chosen per task by a router: tiny local for
+  classification, small for one-line fixes, large for explanations, the
+  user's own CLI agent for investigations, with privacy and budget
+  constraints that can force local only.
+- Rust, single static binary, Clean Architecture and TDD.
 
 ## Privacy and safety
 
@@ -288,15 +280,22 @@ author already has the tooling from herdr-fingers.
 
 ## Open questions
 
-- Passive hint versus interactive bubble: is a printed line plus a hotkey
-  enough, or do people expect to press a key right there?
-- What happens with no provider configured: rule fixes only, plus a
-  one-line invitation to `kintsu setup`?
-- Where does the agent open: same pane, split, or streamed answer?
-- Should a rule ever auto-apply? Current answer: no, opt-in per rule at most.
-- Bash without bash-preexec: is PROMPT_COMMAND plus history good enough?
+Decided on 2026-09-23: a resident daemon rather than a stateless hook; a
+passive toast that expands into a panel rather than a bubble that steals
+keys; OSC 8 links for clickability; several models routed per task; the
+name.
+
+Still open:
+
+- Where does the agent open by default: same pane, a multiplexer split, or
+  a streamed answer in the panel?
+- Should a rule ever auto-apply? Current answer: no, opt-in per rule at
+  most.
+- Is next-prompt delivery acceptable for bash, or is bash-preexec worth
+  depending on?
+- Eager `QuickFix` on every offer, or only on request? Eager feels magical
+  and costs a model call per failure.
 - MIT or Apache-2.0?
-- Does the name survive a week?
 
 ## The name
 
@@ -308,4 +307,4 @@ you learn from the fix is worth more than a command that never failed.
 
 Availability checked 2026-09-23: free on crates.io, npm, PyPI and Homebrew;
 no GitHub project of that exact name. Runner-up was `pardon` (free on
-crates.io and Homebrew, taken on npm by Adobe).
+crates.io and Homebrew, taken on npm by Adobe). Confirmed on 2026-09-23.

@@ -8,6 +8,15 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- The design documents: the crate map and the rings
+  ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)), the resident daemon and
+  its protocol ([docs/DAEMON.md](docs/DAEMON.md)), models routed per task
+  ([docs/MODELS.md](docs/MODELS.md)), the bubble, toast and panel
+  ([docs/UI.md](docs/UI.md)).
+- A Cargo workspace with one crate per ring (`kintsu-entities`,
+  `kintsu-use-cases`, `kintsu-adapters`), the binary in `apps/kintsu`, and
+  `cargo xtask check` enforcing the Dependency Rule and the purity of the
+  inner rings.
 - The project vision, competitive landscape and feature roadmap
   ([docs/VISION.md](docs/VISION.md)).
 - Shell hooks for zsh, bash and fish (`kintsu init <shell>`) that call

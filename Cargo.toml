@@ -1,16 +1,19 @@
-[package]
-name = "kintsu"
+[workspace]
+resolver = "3"
+members = ["apps/*", "crates/*", "tools/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
-description = "When a command fails, kintsu offers to hand it to your AI agent, right there in the terminal. Any provider, your own key."
 license = "MIT"
 repository = "https://github.com/nathan-poncet/kintsu"
-readme = "README.md"
-keywords = ["terminal", "shell", "ai", "agent", "cli"]
-categories = ["command-line-utilities", "development-tools"]
 
-[dependencies]
+[workspace.dependencies]
+kintsu-entities = { path = "crates/entities" }
+kintsu-use-cases = { path = "crates/use_cases" }
+kintsu-adapters = { path = "crates/adapters" }
+thiserror = "2"
 
 [profile.release]
 lto = true

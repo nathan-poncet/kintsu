@@ -1,0 +1,11 @@
+[package]
+name = "kintsu-entities"
+description = "Kintsu's enterprise rules: the command line, its outcome, the triage decision, the shells. No I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true

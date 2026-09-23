@@ -12,10 +12,19 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   ♻️ refactor, 👷 ci, 🔒 security…).
 
 ## Design
-- `src/domain/` is the kernel: pure, synchronous, deterministic, no I/O.
-  `src/usecases/` orchestrates against ports and is just as pure.
-  `src/adapters/` does the I/O. `src/app.rs` wires one function per subcommand.
-- A new side effect gets a port method and an in-memory fake first.
+- One crate per ring, enforced by the compiler and `cargo xtask check`:
+  `crates/entities` (pure, no I/O, no clock), `crates/use_cases` (interactors
+  plus `ports/`, one role-noun trait per file with its error type, `impl Future`
+  for anything that waits, no runtime), `crates/adapters` (`controllers/` turn
+  argv, socket frames and URL-scheme calls into use case calls; `presenters/`
+  map results to toast, panel, plain and JSON view states; `gateways/`
+  implement the ports over models, agents, terminals, storage, secrets),
+  `apps/kintsu` (composition root: client subcommands and `kintsu daemon`).
+- A new side effect gets a port, an in-memory fake and a contract test first;
+  every gateway passes the same contract suite.
+- Design references before proposing anything: `docs/DAEMON.md` (process model,
+  protocol, delivery into live shells), `docs/MODELS.md` (tasks, tiers, router),
+  `docs/UI.md` (toast and panel, keys, OSC 8 clicks).
 - Newtypes and enums over strings and bools; validate at the edge, so the
   kernel never sees a raw config value.
 - **The quiet path is sacred**: `kintsu triage` runs after every failed

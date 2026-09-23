@@ -1,0 +1,15 @@
+[package]
+name = "kintsu"
+description = "When a command fails, Kintsu offers to hand it to your AI agent, right there in the terminal. Any provider, your own key."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["terminal", "shell", "ai", "agent", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+kintsu-adapters.workspace = true
+kintsu-use-cases.workspace = true

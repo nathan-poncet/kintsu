@@ -28,6 +28,8 @@ jobs:
         run: cargo clippy --all-targets --locked -- -D warnings
       - name: Test
         run: cargo test --locked
+      - name: Architecture (Dependency Rule, pure inner rings)
+        run: cargo xtask check
       - name: Release build
         run: cargo build --release --locked
       - name: Smoke test the binary

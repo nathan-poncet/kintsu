@@ -32,34 +32,46 @@ model and *your* key.
 ```
 $ gti status
 zsh: command not found: gti
-╭─ kintsu ──────────────────────────────────────────────╮
-│ `gti status` exited 127                               │
-│ ↵ fix   a agent   w why   i ignore   esc dismiss      │
-╰───────────────────────────────────────────────────────╯
+▎ Did you mean git status?
+▎ Tab to fix · Why · Agent · Ignore · ^K more
+$ git status
 ```
 
-- **fix**, the fast path: a one-line correction shown as ghost text you
+A small bubble, one gold seam on the left, one sentence, a line of words.
+The words are links, so they are clickable; `^K` expands the bubble into a
+panel with real buttons, streaming explanations and a mouse; and nothing
+ever steals a keystroke from your prompt.
+
+- **Fix**, the fast path: a one-line correction shown as ghost text you
   accept with Tab. Rules first (in the spirit of
   [thefuck](https://github.com/nvbn/thefuck)), a small model when rules
-  don't know.
-- **agent**, the real path: kintsu packages the command, its exit status,
+  don't know. You press Enter; Kintsu never runs anything itself.
+- **Agent**, the real path: Kintsu packages the command, its exit status,
   the captured output, the working directory, git state and recent history
-  into a prompt and hands it to the agent you configured: Claude Code,
+  into a brief and hands it to the agent you configured: Claude Code,
   Codex, OpenCode, aider, Gemini CLI, a plain API call… to investigate and fix.
-- **why**: an explanation, no action.
-- **ignore**: for this command, this session, or forever.
+- **Why**: an explanation, no action.
+- **Ignore**: for this command, this session, or forever.
 
-Quiet by default: nothing on success, on Ctrl-C, on a denylisted command,
-or twice in a row for the same failure.
+Answers that take longer than a prompt should wait arrive later, as
+messages above your prompt, while you keep working. Quiet by default:
+nothing on success, on Ctrl-C, on a denylisted command, or twice in a row
+for the same failure.
 
 ## Principles
 
 - **Your terminal, your shell.** One native binary plus a 30-line hook for
   zsh, bash and fish. Works in any terminal emulator; better with tmux,
-  Herdr, WezTerm, Kitty or iTerm2, which let kintsu read the actual output.
-- **Bring your own model.** Anthropic, OpenAI, Gemini, any OpenAI-compatible
-  endpoint, Ollama for fully local. Keys from env, config or the keychain. Or
-  no key at all: reuse the CLI agent you already pay for.
+  Herdr, WezTerm, Kitty or iTerm2, which let Kintsu read the actual output.
+- **One brain, every shell.** A resident daemon per user, started on
+  demand, remembers your sessions and your fixes across every tab and
+  every shell, and never makes a prompt wait.
+- **Bring your own models.** Several at once, chosen per task: a tiny
+  local one to decide whether a failure deserves your attention, a small
+  one for one-line fixes, a large one to explain, your CLI agent to
+  investigate. Anthropic, OpenAI, Gemini, any OpenAI-compatible endpoint,
+  Ollama for fully local. Keys from the keychain, env or config. Or no key
+  at all: reuse the agent you already pay for.
 - **Agent-agnostic hand-off.** kintsu is not another chat TUI. It prepares
   the case and delegates to the agent you like.
 - **Never runs anything on its own.** Suggestions are shown, you confirm.
@@ -90,7 +102,7 @@ Requires a Rust toolchain ([rustup.rs](https://rustup.rs)).
 ```sh
 git clone https://github.com/nathan-poncet/kintsu.git
 cd kintsu
-cargo install --path .
+cargo install --path apps/kintsu
 ```
 
 Then in your shell configuration:
@@ -106,9 +118,10 @@ Remove the line to uninstall.
 
 ## Roadmap
 
-1. **v0.1, the bubble**: hooks, context capture, rule-based fixes, one
-   provider layer (OpenAI-compatible, Anthropic, Ollama), `why`, hand-off
-   to a CLI agent by template, config file, noise control.
+1. **v0.1, the bubble**: the daemon and its socket, hooks, context
+   capture, rule-based fixes, one provider layer (OpenAI-compatible,
+   Anthropic, Ollama), `why`, hand-off to a CLI agent by template, config
+   file, noise control.
 2. **v0.2, it reads the output**: stderr/stdout capture through terminal
    and multiplexer APIs, redaction and "what leaves the machine" preview,
    ghost-text fixes, danger guard, project awareness.
@@ -118,6 +131,16 @@ Remove the line to uninstall.
 
 Details, ideas parking lot and open questions:
 [docs/VISION.md](docs/VISION.md).
+
+## Design documents
+
+- [VISION.md](docs/VISION.md): the itch, the landscape, the roadmap.
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): entities, use cases, adapters,
+  the crate map and the Dependency Rule.
+- [DAEMON.md](docs/DAEMON.md): the resident process, its socket protocol,
+  how a bubble reaches a live shell.
+- [MODELS.md](docs/MODELS.md): several models, routed per task.
+- [UI.md](docs/UI.md): the bubble, toast and panel, keys and clicks.
 
 ## Why "kintsu"
 

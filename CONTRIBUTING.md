@@ -21,16 +21,28 @@ CI runs exactly these, on Linux and macOS. Run them locally first:
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
+cargo xtask check
 cargo build --release --locked
 bash -n shell/kintsu.bash && zsh -n shell/kintsu.zsh && fish -n shell/kintsu.fish
 ```
 
 ## Architecture in one minute
 
-Clean Architecture in one crate, rings are folders; see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Ground rules:
+Clean Architecture, one crate per ring; see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- **The kernel does no I/O.** `src/domain/` decides; adapters act.
+| ring | crate | may depend on (of ours) |
+|---|---|---|
+| Entities | `crates/entities` (`kintsu-entities`) | nothing |
+| Use cases + ports | `crates/use_cases` (`kintsu-use-cases`) | entities |
+| Adapters: controllers, gateways, presenters | `crates/adapters` (`kintsu-adapters`) | entities, use cases |
+| Composition root | `apps/kintsu` | all three |
+
+`cargo xtask check` (also run by `cargo test`) fails the build when a crate
+reaches outward or when an inner ring touches I/O, a runtime, a terminal or
+the clock. Ground rules:
+
+- **The inner rings do no I/O.** Entities and use cases decide; gateways act.
 - **Validate at the edge.** Config becomes typed `Settings` in the adapter;
   the kernel never interprets a raw string.
 - **A new side effect gets a port first**, with an in-memory fake for tests.

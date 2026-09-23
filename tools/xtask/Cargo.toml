@@ -1,0 +1,12 @@
+[package]
+name = "xtask"
+description = "Guards of the architecture: the Dependency Rule over the cargo graph and the purity of the inner rings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+cargo_metadata = "0.19"
