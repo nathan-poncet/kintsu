@@ -146,8 +146,9 @@ nine chapters, one per action of the bubble; pick a chapter to play it, and
 each one says who is doing the work, a rule, a local model, a cloud model or
 your agent. Click the words in the bubble, or press `Tab`, `^K`, `w`, `f`,
 `a`, `i`, `p` and `Esc` once the terminal has focus, to take the wheel.
-`configuration.html` is the full configuration reference and
-`roadmap.html` the roadmap with its charts.
+The landing page stops at understanding and installing; `configuration.html`
+is the full configuration reference, `roadmap.html` the roadmap with its
+charts, `faq.html` the twenty-four questions.
 
 ## Design documents
 
