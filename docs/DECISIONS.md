@@ -175,10 +175,13 @@ nothing can be dismissed without a panel.
 by `sh -c` with the terminal attached; `{brief}` is the path of a private
 (0600) file removed after the agent exits. Presets: `claude`, `codex`,
 `opencode --prompt`, `aider --message-file`, `gemini -i`, `copilot -i`,
-anything else `<name> "$(cat {brief})"`. **The flags for opencode, gemini
-and copilot were written from memory and not verified against the current
-CLIs**; a `template = "…"` overrides any preset, and `kintsu doctor` only
-checks that the program is on the PATH.
+anything else `<name> "$(cat {brief})"`. Verified on 2026-09-25 against
+the installed CLIs (`claude --help`, `codex --help`, `copilot --help`)
+and the published references (opencode, Gemini CLI, aider): all six
+presets match. One caveat: aider's `--message-file` processes the brief
+and exits instead of staying in chat, because aider has no "start
+interactive with a prompt" flag. A `template = "…"` overrides any preset;
+`kintsu doctor` only checks that the program is on the PATH.
 
 ## 10. Models: synchronous, non-streaming HTTP with `ureq`
 
@@ -330,9 +333,11 @@ presenters, the TOML and JSON edges. Changed:
   it.
 
 Known debt, accepted for now: the prompt-height arithmetic exists twice,
-once per shell, because the shells differ; state is JSON files, not the
-SQLite the design mentions; `app.rs` is the largest file and will split
-once the panel arrives; the harness is manual, not in CI.
+once per shell, because the shells differ; state is JSON files behind
+the `SessionRegistry`, `CaseStore` and `IgnoreStore` ports, so the SQLite
+the design mentions is one more gateway when it is needed; `app.rs` is
+the largest file and will split once the panel arrives; the harness is
+manual, not in CI.
 
 ## What is not built, by priority
 
