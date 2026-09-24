@@ -123,6 +123,7 @@ def shell(page: Path) -> tuple[str, list[dict]]:
     m = re.search(r'<main id="main"[^>]*>.*?</main>', src, re.S)
     assert m, page
     main_html = ensure_ids(m.group(0))
+    main_html = re.sub(r'\s*<nav class="toc" aria-label="On this page">.*?</nav>', "", main_html, flags=re.S)  # the side column replaces it
     main_html = re.sub(r'\s*<footer class="pager">.*?</footer>\s*(?=</main>)', "", main_html, flags=re.S)
     main_html = re.sub(r'\s*</main>\s*$', "</main>", main_html)
     main_html = main_html.replace("</main>", f"\n  {prev_next(current)}\n</main>")
