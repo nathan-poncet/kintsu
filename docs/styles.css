@@ -217,11 +217,12 @@ section { padding: 60px 0 6px; }
 .brains b { font-weight: 600; font-family: var(--mono); font-size: 13px; }
 .brains .d { font-size: 13px; }
 .band { padding: 96px 0 0; }
-.band p { margin: 0; padding: 18px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-2); color: var(--muted); font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.band p { .band-link { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 22px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 15px; text-decoration: none; transition: background .15s; } }
 .band .pill { font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--gold); padding: 3px 9px; }
-.band a { color: var(--text); text-decoration: none; margin-left: auto; }
-.band a b { color: var(--gold); font-weight: 600; }
-.band a:hover { color: var(--gold); }
+.band-link:hover, .band-link:focus-visible { background: var(--bg-2); color: var(--muted); }
+.band-cta { margin-left: auto; color: var(--text); white-space: nowrap; }
+.band-cta b { color: var(--gold); font-weight: 600; }
+.band-link:hover .band-cta, .band-link:focus-visible .band-cta { color: var(--gold); }
 .band a:hover { color: var(--gold-2); }
 .end { padding: 96px 0 80px; max-width: 960px; }
 .end h2 { font-size: clamp(30px, 4.2vw, 50px); line-height: 1.02; letter-spacing: 0; text-transform: uppercase; margin-bottom: 18px; }
