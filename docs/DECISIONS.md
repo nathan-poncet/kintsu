@@ -246,6 +246,30 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 | 5. secrets redacted before sending, stored as typed | keep the code; the FAQ now says so |
 | 6. when to tag v0.1 | after the maintainer has tested in daily use |
 
+## Open questions for the maintainer (2026-09-24, evening)
+
+1. **`eager_fix` by default.** Off today, so nothing is sent to a model
+   without an explicit command. On, every failure no rule can fix goes to
+   the `quick_fix` model with the command, the directory and the last ten
+   command lines (secrets redacted, cloud excluded for sensitive cases).
+   Options: keep it off; on; on only when the first `quick_fix` model is
+   local. Suggested: on only when local, which keeps the default private.
+2. **The landing page's terminal shows v0.2**: `Tab to fix`, ghost text,
+   clickable words, the panel. The installed product says `^K to insert ·
+   kintsu why · kintsu agent · kintsu ignore` and an "asking…" line.
+   Options: leave the vision with the pre-alpha label; align the "Play
+   with it" mode with v0.1 and keep the guided tour as the vision.
+   Suggested: align "Play with it", since the installer is one line away.
+3. **`kintsu why` stays synchronous** (the prompt waits for the answer),
+   while the eager fix arrives as a message. Consistent alternative: run
+   `why` through the daemon and deliver it as a message too. Suggested:
+   keep it synchronous until the panel exists; an explicit question
+   deserves an immediate answer.
+4. **Tagging v0.1.** Everything the roadmap listed for v0.1 exists. What
+   is left is the maintainer's daily-use verdict, the agent presets for
+   opencode, gemini and copilot (unverified), and the first run of the
+   release workflow. Suggested: a few days of use, then `v0.1.0`.
+
 ## What is not built, by priority
 
 1. What the daemon unlocks next: the panel, ghost text, clickable words,
