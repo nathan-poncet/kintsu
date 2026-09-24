@@ -10,6 +10,8 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   maintainer may be in French.
 - Prefix commits and issues with a **Gitmoji** (📝 docs, ✨ feat, 🐛 fix, ✅ tests,
   ♻️ refactor, 👷 ci, 🔒 security…).
+- Commits carry the maintainer's identity only: **no `Co-Authored-By` or
+  "Generated with" line for an AI assistant**, in commit messages or PR bodies.
 
 ## Design
 - One crate, one binary, no workspace: Kintsu is an application, not a library.
