@@ -91,8 +91,8 @@ main { position: relative; }
 .badge.static { cursor: default; color: #8d8478; }
 .badge.static:hover { border-color: #2a2521; color: #8d8478; }
 .mock-hint { margin: 18px 0 0; font-size: 13px; color: var(--dim); text-align: center; }
-.mock-hint a { color: var(--muted); text-decoration: none; }
-.mock-hint a:hover { color: var(--text); }
+.mock-hint a { color: var(--gold); text-decoration: none; }
+.mock-hint a:hover { color: var(--gold-2); }
 .player-note { margin: 14px auto 0; max-width: 780px; color: var(--dim); font-size: 13.5px; text-align: center; }
 
 /* ── the tour: explainer left, terminal right, chapters below ── */
