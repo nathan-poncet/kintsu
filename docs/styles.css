@@ -58,7 +58,7 @@ p { margin: 0 0 14px; }
 .top nav a:hover { color: var(--gold); }
 .top nav a.gh { padding: 5px 12px; line-height: 1.4; border: 1px solid var(--line); border-radius: 0; transition: border-color .15s, color .15s; }
 .top nav a.gh:hover { border-color: var(--gold); color: var(--gold); }
-.top nav a[aria-current="page"] { text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 5px; }
+.top nav a[aria-current="page"] { color: var(--gold); }
 @media (max-width: 760px) { .top nav a:not(.gh):not([href$=".html"]) { display: none; } }
 
 /* ── hero: text left, one command ── */
