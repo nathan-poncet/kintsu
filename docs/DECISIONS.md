@@ -193,6 +193,16 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 - GitHub Pages was switched on (source `main`, folder `/docs`); the
   one-line installer URL is live.
 
+## The maintainer's answers (2026-09-24)
+
+| decision | answer |
+|---|---|
+| 2. hooks report every command line | keep |
+| 3. commands and install methods the site promised | removed from the site until they exist; `kintsu setup` first, after v0.1 |
+| 4. `^K` inserts the fix, shadowing `kill-line` | keep; configurable when the panel arrives |
+| 5. secrets redacted before sending, stored as typed | keep the code; the FAQ now says so |
+| 6. when to tag v0.1 | after the maintainer has tested in daily use |
+
 ## What is not built, by priority
 
 1. The daemon and everything it unlocks (async messages, panel, ghost

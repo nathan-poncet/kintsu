@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Install — Kintsu</title>
-  <meta name="description" content="Install Kintsu: one line, or Homebrew, prebuilt binaries, cargo, from source; the shell hook; uninstall.">
+  <meta name="description" content="Install Kintsu: one line, prebuilt binaries, cargo, from source; the shell hook; uninstall.">
   <link rel="canonical" href="https://nathan-poncet.github.io/kintsu/install.html">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://nathan-poncet.github.io/kintsu/install.html">
   <meta property="og:title" content="Install — Kintsu">
-  <meta property="og:description" content="Install Kintsu: one line, or Homebrew, prebuilt binaries, cargo, from source; the shell hook; uninstall.">
+  <meta property="og:description" content="Install Kintsu: one line, prebuilt binaries, cargo, from source; the shell hook; uninstall.">
   <meta property="og:image" content="https://nathan-poncet.github.io/kintsu/media/share-card.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -105,7 +105,7 @@
 
   <section id="other">
     <h2>Other ways</h2>
-    <p class="plain">Package managers arrive with v0.1. Building from source works today.</p>
+    <p class="plain">Prebuilt binaries arrive with the first tagged release. Building from source works today.</p>
     <div class="tabs">
       <div class="tab-list" role="tablist">
         <button type="button" role="tab" aria-selected="true" data-tab="mac">macOS</button>
@@ -114,26 +114,18 @@
         <button type="button" role="tab" aria-selected="false" data-tab="remote">Servers, tmux, Herdr</button>
       </div>
       <div class="tab-panel on" data-tab="mac" role="tabpanel">
-        <div class="config"><div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div><pre><code>brew install nathan-poncet/tap/kintsu</code></pre></div>
-        <div class="or" aria-hidden="true"><span>or</span></div>
         <div class="config"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz\ntar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>.</p></div>
       </div>
       <div class="tab-panel" data-tab="linux" role="tabpanel">
         <div class="config"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz\ntar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static build, any distribution. <code>aarch64</code> too.</p></div>
-        <div class="or" aria-hidden="true"><span>or</span></div>
-        <div class="config"><div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div><pre><code>cargo binstall kintsu</code></pre></div>
-        <div class="or" aria-hidden="true"><span>or</span></div>
-        <div class="config"><div class="config-head"><span>Nix, AUR</span><span class="soon">later, help welcome</span></div><pre><code>nix run github:nathan-poncet/kintsu</code></pre></div>
       </div>
       <div class="tab-panel" data-tab="source" role="tabpanel">
         <div class="config"><div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div><pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre><p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>.</p></div>
         <div class="or" aria-hidden="true"><span>or</span></div>
         <div class="config"><div class="config-head"><span>clone and build</span><span class="now">today</span></div><pre><code>git clone https://github.com/nathan-poncet/kintsu.git\ncd kintsu &amp;&amp; cargo install --path .</code></pre></div>
-        <div class="or" aria-hidden="true"><span>or</span></div>
-        <div class="config"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
       </div>
       <div class="tab-panel" data-tab="remote" role="tabpanel">
-        <div class="config"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes'</code></pre><p class="card-note">The daemon runs per user on the remote host; keys are read there, nothing is sent from your machine.</p></div>
+        <div class="config"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes'</code></pre><p class="card-note">Kintsu runs per user on the remote host; keys are read there, nothing is sent from your machine.</p></div>
         <p class="plain">Inside tmux or Herdr, nothing changes: the hook runs in your shell. A Herdr plugin is planned.</p>
       </div>
     </div>
@@ -160,11 +152,6 @@
     </table>
     <div class="config"><div class="config-head"><span>example: a CI job, no prompt, no rc change</span></div><pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes --no-hook --dir /usr/local/bin</code></pre></div>
     <p class="plain">Release archives are checked against the published SHA256SUMS. The script is <a href="https://github.com/nathan-poncet/kintsu/blob/main/install.sh" target="_blank" rel="noopener">130 lines of plain sh</a>.</p>
-  </section>
-
-  <section id="next" class="subtle">
-    <h2>After v0.1</h2>
-    <p class="plain">Three commands come with the first release: <code>kintsu setup</code> writes the configuration, <code>kintsu doctor</code> checks it, <code>kintsu service install</code> keeps the daemon running after logout.</p>
   </section>
   <footer class="pager"><a class="prev" href="docs.html"><span>Previous</span><b>Overview</b></a><a class="next" href="keys.html"><span>Next</span><b>Keys and commands</b></a></footer>
 </main>

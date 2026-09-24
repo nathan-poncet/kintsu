@@ -79,13 +79,13 @@
 <main id="main" class="doc">
   <header class="doc-head">
     <h1>Configuration</h1>
-    <p class="lede"><code>~/.config/kintsu/config.toml</code>, written by <code>kintsu setup</code>, checked by <code>kintsu doctor</code>, overridden per project by a <code>.kintsu.toml</code> at the root of a repository. This is the planned schema; it may change until v0.1 ships, and every change will be listed in the changelog.</p>
+    <p class="lede"><code>~/.config/kintsu/config.toml</code>: start from <code>kintsu default-config</code>, check it with <code>kintsu doctor</code>. This page is the target schema. Today the binary reads <code>models</code>, <code>routing</code>, <code>quiet</code> and <code>ui</code> and ignores the rest, so a file written for the full schema loads; every change is listed in the changelog.</p>
   </header>
 
   <!-- ─────────── models ─────────── -->
   <section id="models">
     <h2>Models</h2>
-    <p>A model is a named endpoint: a provider, a model id, how to reach it, what it may be used for. Name them the way you will read them in <code>kintsu models</code>: <code>tiny</code>, <code>haiku</code>, <code>local-big</code>, <code>work</code>.</p>
+    <p>A model is a named endpoint: a provider, a model id, how to reach it, what it may be used for. Name them the way you will read them in <code>kintsu doctor</code>: <code>tiny</code>, <code>haiku</code>, <code>local-big</code>, <code>work</code>.</p>
     <div class="config">
       <div class="config-head"><span>[models.&lt;name&gt;]</span></div>
 <pre><code><span class="k">[models.tiny]</span>
@@ -179,7 +179,7 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
         <tr><td><code>sensitive_output</code></td><td><code>"local_only"</code> · <code>"ask"</code> · <code>"allow"</code></td><td>default <code>local_only</code>. <code>ask</code> shows the Privacy tab before any cloud call.</td></tr>
         <tr><td><code>offline</code></td><td><code>"local_only"</code></td><td>the only supported value.</td></tr>
         <tr><td><code>private_paths</code></td><td>globs</td><td>a case whose cwd matches is treated as sensitive.</td></tr>
-        <tr><td><code>max_daily_cost</code></td><td>an amount</td><td>tracked from the providers' token counts and the prices in <code>kintsu models</code>.</td></tr>
+        <tr><td><code>max_daily_cost</code></td><td>an amount</td><td>tracked from the providers' token counts.</td></tr>
         <tr><td><code>max_case_lines</code></td><td>an integer</td><td>the <code>summarize</code> task runs first when exceeded.</td></tr>
       </tbody>
     </table>
@@ -196,8 +196,8 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
         <button type="button" role="tab" aria-selected="false" data-tab="command">command</button>
         <button type="button" role="tab" aria-selected="false" data-tab="literal">literal</button>
       </div>
-      <div class="tab-panel on" data-tab="keychain" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { keychain = true }</code></pre><p class="card-note">macOS Keychain or Linux secret-service. Stored by <code>kintsu login &lt;model&gt;</code>.</p></div></div>
-      <div class="tab-panel" data-tab="env" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { env = <span class="s">"ANTHROPIC_API_KEY"</span> }</code></pre><p class="card-note">Read from the daemon's environment.</p></div></div>
+      <div class="tab-panel on" data-tab="keychain" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { keychain = true }</code></pre><p class="card-note">macOS Keychain or Linux secret-service, service <code>kintsu</code>, account the model's name. Store it with <code>security add-generic-password -s kintsu -a haiku -w</code> or <code>secret-tool store --label kintsu service kintsu account haiku</code>.</p></div></div>
+      <div class="tab-panel" data-tab="env" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { env = <span class="s">"ANTHROPIC_API_KEY"</span> }</code></pre><p class="card-note">Read from the shell's environment.</p></div></div>
       <div class="tab-panel" data-tab="command" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { command = <span class="s">"op read op://dev/anthropic/key"</span> }</code></pre><p class="card-note">Run once at start; the output, trimmed, is the key.</p></div></div>
       <div class="tab-panel" data-tab="literal" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { literal = <span class="s">"sk-ant-…"</span> }</code></pre><p class="card-note">Works; <code>kintsu doctor</code> warns about it.</p></div></div>
     </div>
@@ -290,7 +290,6 @@ sources    = [<span class="s">"tmux"</span>, <span class="s">"herdr"</span>, <sp
 stderr_tee = false        <span class="c"># zsh only: capture stderr when no source above is available. Opt in.</span>
 max_lines  = 400</code></pre>
     </div>
-    <p class="note"><code>kintsu service install</code> writes a LaunchAgent on macOS and a user unit on Linux so the daemon keeps running after logout and restarts after a crash. Without it, the daemon starts on the first failure after login.</p>
   </section>
 
   <!-- ─────────── project ─────────── -->
@@ -403,13 +402,9 @@ max_daily_cost   = <span class="s">"2.00 USD"</span></code></pre>
     <h2>Commands that touch the configuration</h2>
     <table class="ref">
       <tbody>
-        <tr><td><code>kintsu setup</code></td><td>three questions, writes the file, offers <code>service install</code></td></tr>
-        <tr><td><code>kintsu doctor</code></td><td>parses the file, probes every model, prints what works, what is missing and what an answer would cost</td></tr>
-        <tr><td><code>kintsu models</code></td><td>the table: name, provider, tier, where, health, latency, today's cost</td></tr>
-        <tr><td><code>kintsu models test [name]</code></td><td>sends a tiny prompt and shows the round trip</td></tr>
-        <tr><td><code>kintsu login &lt;name&gt;</code></td><td>stores a key in the keychain for that model</td></tr>
+        <tr><td><code>kintsu doctor</code></td><td>parses the file, checks the hook, each model's program or key, and the routing names; prints what works and what is missing</td></tr>
         <tr><td><code>kintsu default-config</code></td><td>prints the commented default file</td></tr>
-        <tr><td><code>kintsu config path</code></td><td>which files are in effect for the current directory</td></tr>
+        <tr><td><code>kintsu config path</code></td><td>where the configuration and the state files are</td></tr>
       </tbody>
     </table>
   </section>
