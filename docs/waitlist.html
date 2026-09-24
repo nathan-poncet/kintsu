@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Waitlist — Kintsu</title>
+  <meta name="description" content="Be told when Kintsu v0.1 ships: one email, or a GitHub release notification.">
+  <link rel="canonical" href="https://nathan-poncet.github.io/kintsu/waitlist.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://nathan-poncet.github.io/kintsu/waitlist.html">
+  <meta property="og:title" content="Waitlist — Kintsu">
+  <meta property="og:description" content="Be told when Kintsu v0.1 ships: one email, or a GitHub release notification.">
+  <meta property="og:image" content="https://nathan-poncet.github.io/kintsu/media/share-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://nathan-poncet.github.io/kintsu/media/share-card.png">
+  <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="media/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="media/favicon-16.png">
+  <link rel="apple-touch-icon" href="media/apple-touch-icon.png">
+  <meta name="theme-color" content="#0f0d0b">
+  <script>(()=>{try{const t=localStorage.getItem("kintsu-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page waitlist">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="./"><img src="media/mark.svg" alt="" width="26" height="26"><span>Kintsu</span></a>
+  <nav aria-label="Site">
+    <a href="docs.html">Docs</a>
+    <button type="button" class="theme" data-theme-toggle aria-label="Switch theme">◐</button>
+    <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main id="main" class="doc">
+  <header class="doc-head">
+    <h1>Be told when v0.1 ships.</h1>
+    <p class="lede">One message when the first release is out. Nothing before, nothing after unless you ask.</p>
+  </header>
+
+  <section id="email">
+    <h2>By email</h2>
+    <form class="wl" data-endpoint="" method="post" novalidate>
+      <label class="visually-hidden" for="wl-email">Email address</label>
+      <input id="wl-email" type="email" name="email" required placeholder="you@example.com" autocomplete="email" spellcheck="false">
+      <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" class="visually-hidden">
+      <button type="submit" class="btn">Notify me</button>
+    </form>
+    <p class="plain wl-status" aria-live="polite"></p>
+    <p class="plain wl-pending" hidden>The email list is not connected yet. Use the GitHub option below; it works today.</p>
+  </section>
+
+  <section id="github">
+    <h2>On GitHub</h2>
+    <p class="plain">GitHub sends one notification per release, to the address of your account.</p>
+    <ol class="steps-list">
+      <li>Open <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">github.com/nathan-poncet/kintsu</a>.</li>
+      <li>Click <b>Watch</b>, then <b>Custom</b>.</li>
+      <li>Tick <b>Releases</b> only, then <b>Apply</b>.</li>
+    </ol>
+  </section>
+
+  <section id="what">
+    <h2>What you get</h2>
+    <ul class="steps-list">
+      <li>One email at v0.1 with the install line and what works.</li>
+      <li>Your address is stored by the mailing provider only; every email has an unsubscribe link.</li>
+      <li>No tracking on this page, no other use of the address.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-brand"><img src="media/mark.svg" alt="" width="20" height="20"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
+  <nav aria-label="Footer">
+    <a href="./">Home</a>
+    <a href="docs.html">Docs</a>
+    <a href="roadmap.html">Roadmap</a>
+    <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</footer>
+<script src="script.js" defer></script>
+</body>
+</html>

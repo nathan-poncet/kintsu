@@ -301,6 +301,8 @@ section { padding: 60px 0 6px; }
 .brains b { font-weight: 600; font-family: var(--mono); font-size: 13px; }
 .brains .d { font-size: 13px; }
 .band { padding: 96px 0 0; }
+.band-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 860px) { .band-row { grid-template-columns: 1fr; } }
 .band-link { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 22px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 15px; text-decoration: none; transition: background .15s; }
 .band .pill { font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--gold); padding: 3px 9px; }
 .band-link:hover, .band-link:focus-visible { background: var(--bg-2); color: var(--muted); }
@@ -525,3 +527,16 @@ body.notfound main.nf { max-width: 720px; padding: 72px 24px 96px; }
 .nf-links { color: var(--muted); }
 .nf-links a { color: var(--text); text-decoration: none; }
 .nf-links a:hover { color: var(--gold); }
+
+/* waitlist */
+body.waitlist main.doc { max-width: 720px; padding-top: 0; }
+.wl { display: flex; gap: 10px; max-width: 520px; margin: 14px 0 8px; }
+.wl input[type="email"] { flex: 1; min-width: 0; font: 15px var(--sans); padding: 10px 14px; border: 1px solid var(--line); background: var(--bg-2); color: var(--text); outline: none; }
+.wl input[type="email"]:focus { border-color: var(--gold); }
+.wl .btn { padding: 10px 16px; }
+.wl-status:empty { display: none; }
+.steps-list { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: 15.5px; display: grid; gap: 6px; }
+.steps-list b { color: var(--text); font-weight: 600; }
+.steps-list a { color: var(--text); text-decoration: none; }
+.steps-list a:hover { color: var(--gold); }
+@media (max-width: 520px) { .wl { flex-direction: column; } }

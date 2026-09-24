@@ -548,6 +548,28 @@
     paint();
   });
 
+  // ── waitlist form: posts to the endpoint set on the form; hidden until one is set ──
+  const wl = document.querySelector("form.wl");
+  if (wl) {
+    const endpoint = (wl.dataset.endpoint || "").trim(), status = document.querySelector(".wl-status"), pending = document.querySelector(".wl-pending");
+    if (!endpoint) { wl.hidden = true; if (pending) pending.hidden = false; }
+    else {
+      wl.action = endpoint;
+      wl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = wl.email.value.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { status.textContent = "That does not look like an email address."; return; }
+        if (wl._gotcha.value) return;
+        status.textContent = "Sending…";
+        try {
+          const r = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ email }) });
+          if (!r.ok) throw new Error(String(r.status));
+          status.textContent = "Done. One email at v0.1."; wl.reset();
+        } catch { status.textContent = "Sending failed. Use the GitHub option below, or try again later."; }
+      });
+    }
+  }
+
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; } catch { b.textContent = "select it"; }
