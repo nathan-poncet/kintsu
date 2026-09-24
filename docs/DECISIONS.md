@@ -174,6 +174,11 @@ are listed). Dependabot opens the update PRs. `deny.toml` allows MIT,
 Apache-2.0, BSD-3, ISC, Unicode-3.0, Zlib, CDLA-Permissive-2.0 and bans
 `openssl-sys`.
 
+The release workflow has not run yet: it needs a `## [X.Y.Z]` section in
+`CHANGELOG.md` matching the tag (the `[Unreleased]` notes move under it),
+and the aarch64 musl build relies on `setup-cross-toolchain-action`
+providing a linker for `ring`. Expect to adjust it on the first tag.
+
 ## 14. Things noticed on the way
 
 - **The disk of this machine was full** (117 MiB free) during the
