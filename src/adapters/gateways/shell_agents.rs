@@ -129,12 +129,13 @@ mod tests {
         for (name, expected) in cases {
             let record = dir.join(format!("{name}.args"));
             let fake = dir.join(name);
-            // Each argument on its own line; a FILE argument is read at once,
-            // before kintsu removes the brief.
+            // Arguments separated by an octal \037 (dash's printf knows no
+            // \x escapes); a FILE argument is read at once, before kintsu
+            // removes the brief.
             std::fs::write(
                 &fake,
                 format!(
-                    "#!/bin/sh\nfor a in \"$@\"; do if [ -f \"$a\" ]; then printf 'FILE:%s\\x1f' \"$(cat \"$a\")\"; else printf '%s\\x1f' \"$a\"; fi; done > '{}'\n",
+                    "#!/bin/sh\nfor a in \"$@\"; do if [ -f \"$a\" ]; then printf 'FILE:%s\\037' \"$(cat \"$a\")\"; else printf '%s\\037' \"$a\"; fi; done > '{}'\n",
                     record.display()
                 ),
             )
