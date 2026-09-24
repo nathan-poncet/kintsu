@@ -37,7 +37,7 @@ def strip_tags(s: str) -> str:
 
 def header(current: str) -> str:
     def nav(href, label):
-        cur = ' aria-current="page"' if (href == "docs.html" and current != "roadmap.html") or href == current else ""
+        cur = ' aria-current="page"' if href == "docs.html" else ""
         return f'<a href="{href}"{cur}>{label}</a>'
     return f'''<header class="top docs-top">
   <button type="button" class="menu" aria-expanded="false" aria-controls="sidebar">Menu</button>
@@ -49,7 +49,6 @@ def header(current: str) -> str:
   </div>
   <nav aria-label="Site">
     {nav("docs.html", "Docs")}
-    {nav("roadmap.html", "Roadmap")}
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>'''
