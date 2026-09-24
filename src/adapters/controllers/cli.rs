@@ -1,16 +1,57 @@
 //! The `kintsu` command line, turned into something a use case understands.
+//! Only argv is read here; the environment is the composition root's job.
 
-use crate::entities::{CommandLine, CommandLineError, CommandOutcome, ExitStatus, Shell};
 use thiserror::Error;
+
+use crate::entities::{
+    CommandLine, CommandLineError, CommandOutcome, Duration, ExitStatus, SessionId, Shell,
+};
+use crate::use_cases::TriageInput;
+
+/// Which silence `kintsu ignore` asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScopeFlag {
+    /// `--command`, the default: this exact command line, everywhere.
+    Command,
+    /// `--dir`: this program, in the current directory.
+    Dir,
+    /// `--session`: this program, in this shell.
+    Session,
+    /// `--always`: this program, everywhere.
+    Always,
+}
 
 /// What the user or a hook asked the binary to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// `kintsu init <shell>`: print the shell integration.
     Init(Shell),
-    /// `kintsu triage --status <code> --command <text>`: a hook reports a
-    /// finished command line.
-    Triage(CommandOutcome),
+    /// `kintsu triage --status <code> --command <text> …`: a hook reports.
+    Triage(TriageInput),
+    /// `kintsu fix [--raw]`: the corrected command for the last failure.
+    Fix { raw: bool },
+    /// `kintsu why`: an explanation.
+    Why,
+    /// `kintsu agent [--with <name>] [words…]`: hand the case over.
+    Agent {
+        with: Option<String>,
+        words: Option<String>,
+    },
+    /// `kintsu privacy`: what would be sent.
+    Privacy,
+    /// `kintsu ignore [--command|--dir|--session|--always] [program]`.
+    Ignore {
+        program: Option<String>,
+        scope: ScopeFlag,
+    },
+    /// `kintsu mute [duration]`.
+    Mute(Duration),
+    /// `kintsu doctor`.
+    Doctor,
+    /// `kintsu default-config`.
+    DefaultConfig,
+    /// `kintsu config path`.
+    ConfigPath,
     /// `kintsu --version`.
     Version,
     /// `kintsu --help`, or no arguments at all.
@@ -20,27 +61,26 @@ pub enum Command {
 /// Why the arguments did not make a command.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CliError {
-    /// The first argument is not a subcommand.
     #[error("unknown command `{0}`")]
     UnknownCommand(String),
-    /// `init` without a shell.
     #[error("init needs a shell: zsh, bash or fish")]
     MissingShell,
-    /// `init` with a shell Kintsu has no hook for.
     #[error("unsupported shell `{shell}` (expected {expected})", shell = .0, expected = supported_shells())]
     UnsupportedShell(String),
-    /// `triage` without both `--status` and `--command`.
     #[error("triage needs --status <code> --command <text>")]
     IncompleteTriage,
-    /// `--status` with something that is not an integer.
-    #[error("`--status` needs an integer, got `{0}`")]
-    InvalidStatus(String),
-    /// `--command` with blank text.
+    #[error("`{flag}` needs an integer, got `{value}`")]
+    InvalidInteger { flag: String, value: String },
     #[error(transparent)]
     BlankCommand(#[from] CommandLineError),
-    /// A flag `triage` does not know.
     #[error("unknown flag `{0}`")]
     UnknownFlag(String),
+    #[error("`--with` needs an agent name")]
+    MissingAgentName,
+    #[error("cannot read `{0}` as a duration (try 30m, 1h, 90s)")]
+    InvalidDuration(String),
+    #[error("config knows one subcommand: path")]
+    UnknownConfigSubcommand,
 }
 
 fn supported_shells() -> String {
@@ -52,13 +92,28 @@ fn supported_shells() -> String {
 pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command, CliError> {
     let args: Vec<&str> = args.into_iter().collect();
     match args.as_slice() {
-        [] | ["--help" | "-h"] => Ok(Command::Help),
-        ["--version" | "-V"] => Ok(Command::Version),
+        [] | ["--help" | "-h" | "help"] => Ok(Command::Help),
+        ["--version" | "-V" | "version"] => Ok(Command::Version),
         ["init"] => Err(CliError::MissingShell),
         ["init", shell] => Shell::from_name(shell)
             .map(Command::Init)
             .ok_or_else(|| CliError::UnsupportedShell((*shell).to_string())),
         ["triage", flags @ ..] => parse_triage(flags),
+        ["fix"] => Ok(Command::Fix { raw: false }),
+        ["fix", "--raw"] => Ok(Command::Fix { raw: true }),
+        ["fix", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
+        ["why" | "explain"] => Ok(Command::Why),
+        ["agent", rest @ ..] => parse_agent(rest),
+        ["privacy"] => Ok(Command::Privacy),
+        ["ignore", rest @ ..] => parse_ignore(rest),
+        ["mute"] => Ok(Command::Mute(Duration::from_mins(60))),
+        ["mute", text] => parse_duration(text)
+            .map(Command::Mute)
+            .ok_or_else(|| CliError::InvalidDuration((*text).to_string())),
+        ["doctor"] => Ok(Command::Doctor),
+        ["default-config"] => Ok(Command::DefaultConfig),
+        ["config", "path"] => Ok(Command::ConfigPath),
+        ["config", ..] => Err(CliError::UnknownConfigSubcommand),
         [other, ..] => Err(CliError::UnknownCommand((*other).to_string())),
     }
 }
@@ -66,48 +121,125 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
 fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
     let mut status = None;
     let mut command = None;
+    let mut cwd = None;
+    let mut session = None;
+    let mut shell = None;
+    let mut duration = None;
     let mut flags = flags.iter();
     while let Some(flag) = flags.next() {
         let value = *flags.next().ok_or(CliError::IncompleteTriage)?;
         match *flag {
-            "--status" => {
-                let code = value
-                    .parse::<i32>()
-                    .map_err(|_| CliError::InvalidStatus(value.to_string()))?;
-                status = Some(ExitStatus::new(code));
-            }
+            "--status" => status = Some(ExitStatus::new(integer(flag, value)?)),
             "--command" => command = Some(CommandLine::new(value)?),
+            "--cwd" => cwd = Some(value.to_string()).filter(|c| !c.is_empty()),
+            "--session" => session = Some(SessionId::new(value)).filter(|s| !s.as_str().is_empty()),
+            "--shell" => shell = Shell::from_name(value),
+            "--duration-ms" => duration = Some(Duration::from_millis(integer::<u64>(flag, value)?)),
             other => return Err(CliError::UnknownFlag(other.to_string())),
         }
     }
-    match (status, command) {
-        (Some(status), Some(command)) => Ok(Command::Triage(CommandOutcome::new(command, status))),
-        _ => Err(CliError::IncompleteTriage),
+    let (Some(status), Some(command)) = (status, command) else {
+        return Err(CliError::IncompleteTriage);
+    };
+    let mut outcome = CommandOutcome::new(command, status);
+    if let Some(d) = duration {
+        outcome = outcome.lasting(d);
     }
+    Ok(Command::Triage(TriageInput {
+        outcome,
+        cwd,
+        session,
+        shell,
+    }))
+}
+
+fn integer<T: std::str::FromStr>(flag: &str, value: &str) -> Result<T, CliError> {
+    value.parse::<T>().map_err(|_| CliError::InvalidInteger {
+        flag: flag.to_string(),
+        value: value.to_string(),
+    })
+}
+
+fn parse_agent(rest: &[&str]) -> Result<Command, CliError> {
+    let (with, words) = match rest {
+        ["--with"] => return Err(CliError::MissingAgentName),
+        ["--with", name, words @ ..] => (Some((*name).to_string()), words),
+        words => (None, words),
+    };
+    if let Some(flag) = words.iter().find(|w| w.starts_with("--")) {
+        return Err(CliError::UnknownFlag((*flag).to_string()));
+    }
+    let words = words.join(" ");
+    Ok(Command::Agent {
+        with,
+        words: Some(words).filter(|w| !w.trim().is_empty()),
+    })
+}
+
+fn parse_ignore(rest: &[&str]) -> Result<Command, CliError> {
+    let mut scope = ScopeFlag::Command;
+    let mut program = None;
+    for arg in rest {
+        match *arg {
+            "--command" => scope = ScopeFlag::Command,
+            "--dir" => scope = ScopeFlag::Dir,
+            "--session" => scope = ScopeFlag::Session,
+            "--always" => scope = ScopeFlag::Always,
+            flag if flag.starts_with('-') => return Err(CliError::UnknownFlag(flag.to_string())),
+            name => program = Some(name.to_string()),
+        }
+    }
+    Ok(Command::Ignore { program, scope })
+}
+
+/// `90s`, `30m`, `1h`, `1h30m`, or bare minutes.
+pub fn parse_duration(text: &str) -> Option<Duration> {
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if let Ok(minutes) = text.parse::<u64>() {
+        return Some(Duration::from_mins(minutes));
+    }
+    let mut total = 0u64;
+    let mut number = String::new();
+    for c in text.chars() {
+        if c.is_ascii_digit() {
+            number.push(c);
+            continue;
+        }
+        let n: u64 = number.parse().ok()?;
+        number.clear();
+        total += match c {
+            'h' => n * 3_600_000,
+            'm' => n * 60_000,
+            's' => n * 1_000,
+            _ => return None,
+        };
+    }
+    if !number.is_empty() {
+        return None;
+    }
+    Some(Duration::from_millis(total))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn triage(command: &str, code: i32) -> Command {
-        Command::Triage(CommandOutcome::new(
-            CommandLine::new(command).unwrap(),
-            ExitStatus::new(code),
-        ))
-    }
-
-    #[test]
-    fn no_arguments_or_a_help_flag_ask_for_help() {
-        for args in [vec![], vec!["--help"], vec!["-h"]] {
-            assert_eq!(parse_args(args), Ok(Command::Help));
+    fn triage(args: &[&str]) -> TriageInput {
+        match parse_args(args.iter().copied()).unwrap() {
+            Command::Triage(input) => input,
+            other => panic!("expected triage, got {other:?}"),
         }
     }
 
     #[test]
-    fn a_version_flag_asks_for_the_version() {
+    fn no_arguments_or_a_help_flag_ask_for_help() {
+        for args in [vec![], vec!["--help"], vec!["-h"], vec!["help"]] {
+            assert_eq!(parse_args(args), Ok(Command::Help));
+        }
         assert_eq!(parse_args(["--version"]), Ok(Command::Version));
-        assert_eq!(parse_args(["-V"]), Ok(Command::Version));
     }
 
     #[test]
@@ -121,20 +253,44 @@ mod tests {
     }
 
     #[test]
-    fn triage_flags_are_accepted_in_any_order() {
-        let expected = triage("make", 2);
-        assert_eq!(
-            parse_args(["triage", "--status", "2", "--command", "make"]),
-            Ok(expected.clone())
-        );
-        assert_eq!(
-            parse_args(["triage", "--command", "make", "--status", "2"]),
-            Ok(expected)
-        );
+    fn triage_reads_every_flag_in_any_order() {
+        let input = triage(&[
+            "triage",
+            "--cwd",
+            "/w",
+            "--command",
+            "make",
+            "--status",
+            "2",
+            "--session",
+            "42",
+            "--shell",
+            "zsh",
+            "--duration-ms",
+            "12000",
+        ]);
+        assert_eq!(input.outcome.command().as_str(), "make");
+        assert_eq!(input.outcome.status(), ExitStatus::new(2));
+        assert_eq!(input.outcome.duration(), Some(Duration::from_secs(12)));
+        assert_eq!(input.cwd.as_deref(), Some("/w"));
+        assert_eq!(input.session, Some(SessionId::new("42")));
+        assert_eq!(input.shell, Some(Shell::Zsh));
+        let bare = triage(&[
+            "triage",
+            "--status",
+            "0",
+            "--command",
+            "ls",
+            "--cwd",
+            "",
+            "--session",
+            "",
+        ]);
+        assert_eq!((bare.cwd, bare.session, bare.shell), (None, None, None));
     }
 
     #[test]
-    fn triage_refuses_incomplete_arguments() {
+    fn triage_refuses_incomplete_or_wrong_arguments() {
         assert_eq!(
             parse_args(["triage", "--status", "2"]),
             Err(CliError::IncompleteTriage)
@@ -143,26 +299,17 @@ mod tests {
             parse_args(["triage", "--status"]),
             Err(CliError::IncompleteTriage)
         );
-    }
-
-    #[test]
-    fn triage_refuses_a_status_that_is_not_a_number() {
         assert_eq!(
             parse_args(["triage", "--status", "two", "--command", "make"]),
-            Err(CliError::InvalidStatus("two".into()))
+            Err(CliError::InvalidInteger {
+                flag: "--status".into(),
+                value: "two".into()
+            })
         );
-    }
-
-    #[test]
-    fn triage_refuses_a_blank_command() {
         assert_eq!(
             parse_args(["triage", "--status", "1", "--command", "  "]),
             Err(CliError::BlankCommand(CommandLineError::Blank))
         );
-    }
-
-    #[test]
-    fn triage_refuses_a_flag_it_does_not_know() {
         assert_eq!(
             parse_args(["triage", "--bogus", "1"]),
             Err(CliError::UnknownFlag("--bogus".into()))
@@ -170,7 +317,109 @@ mod tests {
     }
 
     #[test]
-    fn anything_else_is_an_unknown_command() {
+    fn the_actions_on_the_last_failure_parse() {
+        assert_eq!(parse_args(["fix"]), Ok(Command::Fix { raw: false }));
+        assert_eq!(parse_args(["fix", "--raw"]), Ok(Command::Fix { raw: true }));
+        assert_eq!(parse_args(["why"]), Ok(Command::Why));
+        assert_eq!(parse_args(["privacy"]), Ok(Command::Privacy));
+        assert_eq!(
+            parse_args(["agent"]),
+            Ok(Command::Agent {
+                with: None,
+                words: None
+            })
+        );
+        assert_eq!(
+            parse_args(["agent", "--with", "codex", "only", "the", "tests"]),
+            Ok(Command::Agent {
+                with: Some("codex".into()),
+                words: Some("only the tests".into())
+            })
+        );
+        assert_eq!(
+            parse_args(["agent", "--with"]),
+            Err(CliError::MissingAgentName)
+        );
+        assert_eq!(
+            parse_args(["agent", "--yolo"]),
+            Err(CliError::UnknownFlag("--yolo".into()))
+        );
+    }
+
+    #[test]
+    fn ignore_defaults_to_the_command_and_takes_a_scope_and_a_program() {
+        assert_eq!(
+            parse_args(["ignore"]),
+            Ok(Command::Ignore {
+                program: None,
+                scope: ScopeFlag::Command
+            })
+        );
+        assert_eq!(
+            parse_args(["ignore", "--dir"]),
+            Ok(Command::Ignore {
+                program: None,
+                scope: ScopeFlag::Dir
+            })
+        );
+        assert_eq!(
+            parse_args(["ignore", "--always", "make"]),
+            Ok(Command::Ignore {
+                program: Some("make".into()),
+                scope: ScopeFlag::Always
+            })
+        );
+        assert_eq!(
+            parse_args(["ignore", "--session"]),
+            Ok(Command::Ignore {
+                program: None,
+                scope: ScopeFlag::Session
+            })
+        );
+        assert_eq!(
+            parse_args(["ignore", "--x"]),
+            Err(CliError::UnknownFlag("--x".into()))
+        );
+    }
+
+    #[test]
+    fn mute_takes_a_duration_and_defaults_to_an_hour() {
+        assert_eq!(
+            parse_args(["mute"]),
+            Ok(Command::Mute(Duration::from_mins(60)))
+        );
+        assert_eq!(
+            parse_args(["mute", "30m"]),
+            Ok(Command::Mute(Duration::from_mins(30)))
+        );
+        assert_eq!(
+            parse_args(["mute", "1h30m"]),
+            Ok(Command::Mute(Duration::from_mins(90)))
+        );
+        assert_eq!(
+            parse_args(["mute", "90s"]),
+            Ok(Command::Mute(Duration::from_secs(90)))
+        );
+        assert_eq!(
+            parse_args(["mute", "15"]),
+            Ok(Command::Mute(Duration::from_mins(15)))
+        );
+        assert_eq!(
+            parse_args(["mute", "soon"]),
+            Err(CliError::InvalidDuration("soon".into()))
+        );
+        assert_eq!(parse_duration("1h30"), None);
+    }
+
+    #[test]
+    fn the_setup_commands_parse() {
+        assert_eq!(parse_args(["doctor"]), Ok(Command::Doctor));
+        assert_eq!(parse_args(["default-config"]), Ok(Command::DefaultConfig));
+        assert_eq!(parse_args(["config", "path"]), Ok(Command::ConfigPath));
+        assert_eq!(
+            parse_args(["config"]),
+            Err(CliError::UnknownConfigSubcommand)
+        );
         assert_eq!(
             parse_args(["dance"]),
             Err(CliError::UnknownCommand("dance".into()))

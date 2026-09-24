@@ -1,0 +1,59 @@
+# Kintsu configuration. Printed by `kintsu default-config`; lives at
+# ~/.config/kintsu/config.toml. Everything is optional: with no file at all,
+# the rules work and nothing leaves the machine.
+
+# ── Models ──────────────────────────────────────────────────────────────
+# A model is a named endpoint: a provider, a model id, how to reach it, what
+# it may be used for. Name them the way you will read them.
+
+# [models.local]
+# provider = "ollama"                    # ollama · openai_compatible · anthropic · gemini · cli_agent
+# model    = "qwen2.5-coder:7b"
+# tier     = "small"                     # tiny · small · large · agent
+# base_url = "http://127.0.0.1:11434"    # the default for ollama
+
+# [models.haiku]
+# provider = "anthropic"
+# model    = "claude-haiku-4-5-20251001"
+# tier     = "small"
+# key      = { env = "ANTHROPIC_API_KEY" }   # { env = … } · { command = "op read …" } · { keychain = true } · { literal = … }
+# max_output_tokens = 800
+# timeout  = "20s"
+
+# [models.router]
+# provider = "openai_compatible"
+# base_url = "https://openrouter.ai/api/v1"
+# model    = "anthropic/claude-sonnet-5"
+# tier     = "large"
+# key      = { env = "OPENROUTER_API_KEY" }
+
+# [models.claude-code]
+# provider = "cli_agent"
+# command  = "claude"                    # a preset: claude · codex · opencode · aider · gemini · copilot
+# tier     = "agent"
+# # or your own: template = "myagent --task-file {brief}"   ({brief} is the path of the brief file)
+
+# ── Routing ─────────────────────────────────────────────────────────────
+# Per task, the models to try in order. Rules always run first and need
+# nothing here.
+
+# [routing]
+# quick_fix   = ["local"]                # `kintsu fix` when no rule knows
+# explain     = ["local", "haiku"]       # `kintsu why`
+# investigate = ["claude-code"]          # `kintsu agent`
+
+[routing.constraints]
+sensitive_output = "local_only"          # a case with a secret never reaches a remote model
+
+# ── Quiet ───────────────────────────────────────────────────────────────
+[quiet]
+# never_triage = ["vim", "nvim", "vi", "nano", "emacs", "less", "more", "man", "ssh", "mosh", "top", "htop", "watch", "tmux", "fzf", "kintsu"]
+# ok_statuses  = []                      # statuses that are never failures, beyond 130, 141 and 148
+# ok_commands  = { grep = [1], rg = [1], diff = [1], test = [1] }
+same_failure   = "once"                  # once · always
+# off_in       = ["~/scratch"]           # directories where no bubble is shown
+
+# ── UI ──────────────────────────────────────────────────────────────────
+[ui]
+mode  = "toast"                          # toast · hint (one dim line) · silent (commands only)
+ascii = false                            # true swaps ▎ ⚠ … for | ! ...

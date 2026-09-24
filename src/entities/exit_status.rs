@@ -12,6 +12,11 @@ impl ExitStatus {
         Self(code)
     }
 
+    /// The raw code.
+    pub const fn code(self) -> i32 {
+        self.0
+    }
+
     /// Zero.
     pub const fn is_success(self) -> bool {
         self.0 == 0
@@ -22,6 +27,17 @@ impl ExitStatus {
     /// (SIGTSTP, 148).
     pub const fn is_interruption(self) -> bool {
         matches!(self.0, 130 | 141 | 148)
+    }
+
+    /// The shell found no such program (127).
+    pub const fn is_command_not_found(self) -> bool {
+        self.0 == 127
+    }
+
+    /// The program exists but could not be run: not executable, or a
+    /// directory (126).
+    pub const fn is_not_executable(self) -> bool {
+        self.0 == 126
     }
 }
 
@@ -53,5 +69,12 @@ mod tests {
         for code in [1, 2, 126, 127, 128, 137, 255] {
             assert!(!ExitStatus::new(code).is_interruption(), "{code}");
         }
+    }
+
+    #[test]
+    fn the_shells_own_codes_are_recognised() {
+        assert!(ExitStatus::new(127).is_command_not_found());
+        assert!(ExitStatus::new(126).is_not_executable());
+        assert!(!ExitStatus::new(1).is_command_not_found());
     }
 }

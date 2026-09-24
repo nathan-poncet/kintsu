@@ -1,12 +1,29 @@
 # kintsu — fish hook. In ~/.config/fish/config.fish:   kintsu init fish | source
 #
 # fish_postexec fires after every command line with its text in $argv and
-# the exit status in $status; empty lines never fire it.
+# the exit status in $status; empty lines never fire it. $CMD_DURATION is
+# the last command's duration in milliseconds. ^K inserts the fix for the
+# last failure in the command line; nothing runs until you press Enter.
+# KINTSU_DISABLE=1 switches the hook off in this shell.
 
-function __kintsu_postexec --on-event fish_postexec
-    set -l kintsu_status $status
-    test $kintsu_status -eq 0; and return 0
-    string match -q 'kintsu*' -- "$argv[1]"; and return $kintsu_status
-    command kintsu triage --status $kintsu_status --command "$argv[1]"
-    return $kintsu_status
+if status is-interactive
+    set -gx KINTSU_SESSION $fish_pid
+
+    function __kintsu_postexec --on-event fish_postexec
+        set -l kintsu_status $status
+        set -q KINTSU_DISABLE; and return $kintsu_status
+        string match -q 'kintsu*' -- "$argv[1]"; and return $kintsu_status
+        command kintsu triage --status $kintsu_status --command "$argv[1]" --cwd "$PWD" \
+            --session "$KINTSU_SESSION" --shell fish --duration-ms "$CMD_DURATION"
+        return $kintsu_status
+    end
+
+    function __kintsu_fix
+        set -l fix (command kintsu fix --raw 2>/dev/null); or return
+        commandline -r -- "$fix"
+        commandline -f end-of-line
+    end
+
+    bind \ck __kintsu_fix
+    bind -M insert \ck __kintsu_fix 2>/dev/null
 end

@@ -30,6 +30,32 @@ impl CommandLine {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// The words, split on whitespace. Quoting is not interpreted: rules
+    /// only need the program and the first arguments.
+    pub fn words(&self) -> Vec<&str> {
+        self.0.split_whitespace().collect()
+    }
+
+    /// The first word: the program the shell resolved, or tried to.
+    pub fn program(&self) -> &str {
+        self.words().first().copied().unwrap_or_default()
+    }
+
+    /// Everything after the program.
+    pub fn arguments(&self) -> Vec<&str> {
+        self.words().into_iter().skip(1).collect()
+    }
+
+    /// The same line with its first word replaced.
+    pub fn with_program(&self, program: &str) -> Self {
+        let rest: Vec<&str> = self.arguments();
+        if rest.is_empty() {
+            Self(program.to_string())
+        } else {
+            Self(format!("{program} {}", rest.join(" ")))
+        }
+    }
 }
 
 impl fmt::Display for CommandLine {
@@ -53,5 +79,25 @@ mod tests {
     fn the_text_is_kept_exactly_as_typed() {
         let line = CommandLine::new("  git   status \n").unwrap();
         assert_eq!(line.as_str(), "  git   status \n");
+    }
+
+    #[test]
+    fn the_program_is_the_first_word_and_the_rest_are_arguments() {
+        let line = CommandLine::new("  gti status --short").unwrap();
+        assert_eq!(line.program(), "gti");
+        assert_eq!(line.arguments(), vec!["status", "--short"]);
+    }
+
+    #[test]
+    fn replacing_the_program_keeps_the_arguments() {
+        let line = CommandLine::new("gti status --short").unwrap();
+        assert_eq!(line.with_program("git").as_str(), "git status --short");
+        assert_eq!(
+            CommandLine::new("gti")
+                .unwrap()
+                .with_program("git")
+                .as_str(),
+            "git"
+        );
     }
 }

@@ -2,4 +2,4 @@
 
 pub mod cli;
 
-pub use cli::{Command, parse_args};
+pub use cli::{Command, ScopeFlag, parse_args};

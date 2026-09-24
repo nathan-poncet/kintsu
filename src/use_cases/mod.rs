@@ -3,7 +3,24 @@
 //! I/O, no executor, no terminal. Async, when it comes, arrives as
 //! `impl Future` on the ports; the runtime stays in the outer rings.
 
+pub mod diagnose;
+pub mod explain;
+pub mod facts;
+pub mod fix_last;
+pub mod hand_off;
+pub mod ignore;
 pub mod ports;
-pub mod triage_outcome;
+pub mod privacy;
+pub mod prompts;
+pub mod routing;
+#[cfg(test)]
+pub mod testing;
+pub mod triage;
 
-pub use triage_outcome::triage_outcome;
+pub use diagnose::{Check, Diagnose, Health};
+pub use explain::{Explain, ExplainError, Explanation};
+pub use fix_last::{FixLast, FixProposal};
+pub use hand_off::{HandOff, HandOffPlan};
+pub use ignore::{Ignore, IgnoreRequest, ScopeChoice};
+pub use privacy::Privacy;
+pub use triage::{Triage, TriageInput};
