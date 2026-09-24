@@ -27,7 +27,7 @@ pub enum ExplainError {
     NoModel,
     #[error("this case holds a secret and only local models may see it; none is configured")]
     SensitiveWithoutLocalModel,
-    #[error("no model answered")]
+    #[error("no model answered ({})", .0.iter().map(|(n, e)| format!("{n}: {e}")).collect::<Vec<_>>().join("; "))]
     AllFailed(Vec<(String, ModelError)>),
     #[error(transparent)]
     Cases(#[from] CaseStoreError),

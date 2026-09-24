@@ -20,7 +20,7 @@ pub enum FollowUpError {
     NoModel,
     #[error("the model had no fix")]
     NoFix,
-    #[error("no model answered")]
+    #[error("no model answered ({})", .0.iter().map(|(n, e)| format!("{n}: {e}")).collect::<Vec<_>>().join("; "))]
     AllFailed(Vec<(String, ModelError)>),
     #[error(transparent)]
     Notify(#[from] NotifyError),
@@ -169,5 +169,20 @@ mod tests {
         );
         assert_eq!(cloud_only.run(&secret).unwrap_err(), FollowUpError::NoModel);
         assert!(notifier.delivered.borrow().is_empty());
+        let down = ScriptedModels::answering(&[(
+            "local",
+            Err(ModelError::MissingKey("$X is not set".into())),
+        )]);
+        let named = FollowUp {
+            models: &down,
+            ..asked
+        };
+        assert_eq!(
+            named
+                .run(&case("make", 2, Some("42")))
+                .unwrap_err()
+                .to_string(),
+            "no model answered (local: no key: $X is not set)"
+        );
     }
 }

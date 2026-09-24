@@ -69,6 +69,11 @@ built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
   verified)"; `kintsu fix` and `^K` then reuse that proposal instead of
   asking again. That is the "message arriving while you work" of the
   landing page; `eager_fix` is off by default, as documented.
+- A key given as `{ env = … }` is read by the daemon, which inherits the
+  environment of the shell that spawned it: set the variable before the
+  first failure of the day, or `kintsu daemon stop` after changing it.
+  `doctor` says when it is missing; the daemon log says which model
+  refused and why. Keychain and command sources are read per call.
 - Not built: the panel, ghost text, clickable `kintsu://` words,
   `kintsu service install`, SQLite (JSON files stay), `session_new`
   (the session is still the shell's pid), `act`/`get_case` frames.

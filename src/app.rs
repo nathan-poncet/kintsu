@@ -20,8 +20,8 @@ use crate::adapters::presenters::{
 use crate::daemon::{self, DaemonConfig};
 use crate::entities::{SessionId, Settings, UiMode};
 use crate::use_cases::{
-    Diagnose, Explain, ExplainError, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
-    Triage, TriageInput,
+    Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice, Triage,
+    TriageInput,
 };
 
 pub const USAGE: &str = "\
@@ -243,16 +243,6 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 Ok(e) => {
                     let _ = writeln!(out, "{}", explanation(&e, &style));
                     ExitCode::SUCCESS
-                }
-                Err(ExplainError::AllFailed(failures)) => {
-                    let detail: Vec<String> =
-                        failures.iter().map(|(n, e)| format!("{n}: {e}")).collect();
-                    failure(
-                        err,
-                        &format!("no model answered ({})", detail.join("; ")),
-                        &style,
-                        false,
-                    )
                 }
                 Err(e) => failure(err, &e.to_string(), &style, false),
             }
