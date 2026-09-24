@@ -107,6 +107,58 @@ mod tests {
         assert_eq!(shell_line("myagent", p), "myagent \"$(cat /tmp/b.md)\"");
     }
 
+    /// Every preset, launched for real against a fake CLI of the same name
+    /// that records its arguments: the brief must arrive the way each CLI
+    /// documents, with its quotes and newlines intact.
+    #[test]
+    fn each_preset_hands_the_brief_to_its_cli_the_documented_way() {
+        use crate::adapters::gateways::toml_settings::agent_preset;
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("kintsu-presets-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let brief = "# A command failed\n\nit said 'no' and \"stopped\"\n";
+        let cases: [(&str, &[&str]); 6] = [
+            ("claude", &["BRIEF"]),
+            ("codex", &["BRIEF"]),
+            ("opencode", &["--prompt", "BRIEF"]),
+            ("gemini", &["-i", "BRIEF"]),
+            ("copilot", &["-i", "BRIEF"]),
+            ("aider", &["--message-file", "FILE"]),
+        ];
+        for (name, expected) in cases {
+            let record = dir.join(format!("{name}.args"));
+            let fake = dir.join(name);
+            // Each argument on its own line; a FILE argument is read at once,
+            // before kintsu removes the brief.
+            std::fs::write(
+                &fake,
+                format!(
+                    "#!/bin/sh\nfor a in \"$@\"; do if [ -f \"$a\" ]; then printf 'FILE:%s\\x1f' \"$(cat \"$a\")\"; else printf '%s\\x1f' \"$a\"; fi; done > '{}'\n",
+                    record.display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+            let template = agent_preset(name).replacen(name, &fake.display().to_string(), 1);
+            ShellAgents::new(dir.join("briefs"))
+                .launch(&agent(&template), brief)
+                .unwrap();
+            let recorded = std::fs::read_to_string(&record).unwrap();
+            let got: Vec<&str> = recorded.split('\x1f').filter(|a| !a.is_empty()).collect();
+            let want: Vec<String> = expected
+                .iter()
+                .map(|a| match *a {
+                    "BRIEF" => brief.trim_end().to_string(),
+                    "FILE" => format!("FILE:{}", brief.trim_end()),
+                    other => other.to_string(),
+                })
+                .collect();
+            assert_eq!(got, want, "{name}");
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn the_brief_reaches_the_agent_and_the_file_is_removed_after() {
         let dir = std::env::temp_dir().join(format!("kintsu-agents-{}", std::process::id()));

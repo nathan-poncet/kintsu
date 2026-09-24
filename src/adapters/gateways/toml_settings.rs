@@ -313,7 +313,9 @@ fn model_spec(name: &str, dto: ModelDto) -> Result<ModelSpec, SettingsError> {
 }
 
 /// How each known CLI takes an initial prompt; `{brief}` is a file path.
-fn agent_preset(command: &str) -> String {
+/// Checked against each CLI's own reference; `shell_agents` launches
+/// every one of them in its tests.
+pub(crate) fn agent_preset(command: &str) -> String {
     match command {
         "claude" => "claude \"$(cat {brief})\"".into(),
         "codex" => "codex \"$(cat {brief})\"".into(),
@@ -443,6 +445,32 @@ investigate = ["claude-code"]
         assert_eq!(s.routing.quick_fix, vec!["local"]);
         assert_eq!(s.routing.explain, vec!["haiku", "local"]);
         assert!(s.sensitive_local_only);
+    }
+
+    #[test]
+    fn every_agent_preset_is_the_flag_its_cli_documents() {
+        let expected = [
+            ("claude", "claude \"$(cat {brief})\""),
+            ("codex", "codex \"$(cat {brief})\""),
+            ("opencode", "opencode --prompt \"$(cat {brief})\""),
+            ("aider", "aider --message-file {brief}"),
+            ("gemini", "gemini -i \"$(cat {brief})\""),
+            ("copilot", "copilot -i \"$(cat {brief})\""),
+            ("my-agent", "my-agent \"$(cat {brief})\""),
+        ];
+        for (command, line) in expected {
+            assert_eq!(agent_preset(command), line, "{command}");
+            let text = format!("[models.a]\nprovider = \"cli_agent\"\ncommand = \"{command}\"");
+            assert_eq!(
+                parse_settings(&text, None)
+                    .unwrap()
+                    .model("a")
+                    .unwrap()
+                    .model,
+                line,
+                "{command} through the file"
+            );
+        }
     }
 
     #[test]
