@@ -14,7 +14,7 @@ use crate::use_cases::routing::{ask_first, model_candidates};
 /// Why nothing was sent.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum FollowUpError {
-    #[error("eager fixes are off")]
+    #[error("eager fixes are off for this model")]
     Disabled,
     #[error("no model is routed for quick fixes, or none may see this case")]
     NoModel,
@@ -41,27 +41,29 @@ pub struct FollowUp<'a> {
 impl FollowUp<'_> {
     /// The model that will be asked first, when one will be.
     pub fn candidate(&self, case: &FailureCase) -> Option<String> {
-        if !self.settings.ui.eager_fix || case.session().is_none() {
-            return None;
-        }
-        model_candidates(self.settings, &self.settings.routing.quick_fix, case)
-            .first()
-            .map(|m| m.name.clone())
+        case.session()?;
+        let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
+        let first = candidates.first()?;
+        self.settings
+            .ui
+            .eager_fix
+            .allows(first)
+            .then(|| first.name.clone())
     }
 
     /// Runs when a case was offered without a rule fix. A model that had
     /// nothing, or failed, is reported to the shell in one line, so the
     /// "asking…" line under the bubble never dangles.
     pub fn run(&self, case: &FailureCase) -> Result<Message, FollowUpError> {
-        if !self.settings.ui.eager_fix {
-            return Err(FollowUpError::Disabled);
-        }
         let session = case
             .session()
             .ok_or_else(|| NotifyError::UnknownSession("none".into()))?;
         let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
         if candidates.is_empty() {
             return Err(FollowUpError::NoModel);
+        }
+        if !self.settings.ui.eager_fix.allows(candidates[0]) {
+            return Err(FollowUpError::Disabled);
         }
         let first = candidates[0].name.clone();
         let (name, answer) = match ask_first(
@@ -109,10 +111,10 @@ impl FollowUp<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{Provider, Routing, SessionId, Tier, UiSettings};
+    use crate::entities::{EagerFix, Provider, Routing, SessionId, Tier, UiSettings};
     use crate::use_cases::testing::*;
 
-    fn settings(eager: bool, quick_fix: &[&str]) -> Settings {
+    fn settings(eager: EagerFix, quick_fix: &[&str]) -> Settings {
         Settings {
             models: vec![
                 spec("local", Provider::Ollama, Tier::Small),
@@ -136,7 +138,7 @@ mod tests {
         let notifier = MemoryNotifier::default();
         let cases = MemoryCases::default();
         let uc = FollowUp {
-            settings: &settings(true, &["local"]),
+            settings: &settings(EagerFix::On, &["local"]),
             clock: &FakeClock::at(5),
             secrets: &MapSecrets::with(&[]),
             models: &models,
@@ -170,7 +172,7 @@ mod tests {
         let declined = ScriptedModels::answering(&[("local", Ok("NONE"))]);
         let cases = MemoryCases::default();
         let off = FollowUp {
-            settings: &settings(false, &["local"]),
+            settings: &settings(EagerFix::Off, &["local"]),
             clock: &clock,
             secrets: &secrets,
             models: &declined,
@@ -182,7 +184,7 @@ mod tests {
             FollowUpError::Disabled
         );
         let unrouted = FollowUp {
-            settings: &settings(true, &[]),
+            settings: &settings(EagerFix::On, &[]),
             ..off
         };
         assert_eq!(
@@ -190,7 +192,7 @@ mod tests {
             FollowUpError::NoModel
         );
         let asked = FollowUp {
-            settings: &settings(true, &["local"]),
+            settings: &settings(EagerFix::On, &["local"]),
             ..off
         };
         assert_eq!(
@@ -198,7 +200,7 @@ mod tests {
             FollowUpError::NoFix
         );
         let cloud_only = FollowUp {
-            settings: &settings(true, &["cloud"]),
+            settings: &settings(EagerFix::On, &["cloud"]),
             ..off
         };
         let secret = case(
@@ -244,5 +246,29 @@ mod tests {
             Some("local")
         );
         assert_eq!(cloud_only.candidate(&secret), None, "sensitive, cloud only");
+        let auto_local = FollowUp {
+            settings: &settings(EagerFix::Auto, &["local"]),
+            ..off
+        };
+        assert_eq!(
+            auto_local
+                .candidate(&case("make", 2, Some("42")))
+                .as_deref(),
+            Some("local"),
+            "auto asks a local model"
+        );
+        let auto_cloud = FollowUp {
+            settings: &settings(EagerFix::Auto, &["cloud", "local"]),
+            ..off
+        };
+        assert_eq!(
+            auto_cloud.candidate(&case("make", 2, Some("42"))),
+            None,
+            "auto never asks a remote model on its own"
+        );
+        assert_eq!(
+            auto_cloud.run(&case("make", 2, Some("42"))).unwrap_err(),
+            FollowUpError::Disabled
+        );
     }
 }

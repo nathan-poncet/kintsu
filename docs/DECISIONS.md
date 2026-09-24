@@ -244,9 +244,14 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 | 3. commands and install methods the site promised | removed from the site until they exist; `kintsu setup` first, after v0.1 |
 | 4. `^K` inserts the fix, shadowing `kill-line` | keep; configurable when the panel arrives |
 | 5. secrets redacted before sending, stored as typed | keep the code; the FAQ now says so |
-| 6. when to tag v0.1 | after the maintainer has tested in daily use |
+| 6. when to tag v0.1 | after the maintainer has tested in daily use; tagged `v0.1.0` on 2026-09-25 |
 
-## Open questions for the maintainer (2026-09-24, evening)
+## Open questions for the maintainer (2026-09-24, evening), answered on 2026-09-25
+
+Answers: 1. `"auto"`, on when the model is local, is the default. 2. The
+landing keeps the vision under the pre-alpha label. 3. Open: the
+maintainer wants `why` asynchronous too and asked what the panel is
+before deciding. 4. `v0.1.0` is tagged; fixes bump the patch number.
 
 1. **`eager_fix` by default.** Off today, so nothing is sent to a model
    without an explicit command. On, every failure no rule can fix goes to

@@ -248,7 +248,7 @@ ascii         = false         <span class="c"># true swaps ▎ ⏎ → … for |
 hints         = <span class="s">"first-three"</span> <span class="c"># first-three · verbose · none</span>
 language      = <span class="s">"auto"</span>        <span class="c"># from the locale; "fr", "en", …</span>
 ghost_text    = true          <span class="c"># zsh and fish</span>
-eager_fix     = false         <span class="c"># ask quick_fix on every offer, not only on Fix</span>
+eager_fix     = "auto"         <span class="c"># ask quick_fix after a failure no rule can fix: auto (only when that model is local) · true · false</span>
 screen_reader = false
 learning_notes = true         <span class="c"># "Fixed. Next time gti will be corrected without asking."</span>
 panel_height  = <span class="s">"auto"</span>        <span class="c"># 6 to 14 lines</span></code></pre>

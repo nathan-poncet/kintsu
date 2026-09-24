@@ -159,6 +159,29 @@ pub enum UiMode {
     Silent,
 }
 
+/// Whether the quick-fix model is asked after every failure no rule can
+/// fix, without being told to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EagerFix {
+    /// When the model that would be asked first is local: nothing leaves
+    /// the machine on its own.
+    #[default]
+    Auto,
+    On,
+    Off,
+}
+
+impl EagerFix {
+    /// Whether this model may be asked without being told to.
+    pub fn allows(self, model: &ModelSpec) -> bool {
+        match self {
+            EagerFix::Off => false,
+            EagerFix::On => true,
+            EagerFix::Auto => model.is_local(),
+        }
+    }
+}
+
 /// Presentation choices.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UiSettings {
@@ -167,7 +190,7 @@ pub struct UiSettings {
     pub ascii: bool,
     /// Ask the quick-fix model after every offer without a rule fix, and
     /// deliver the answer as a message.
-    pub eager_fix: bool,
+    pub eager_fix: EagerFix,
 }
 
 /// Everything the user configured.
@@ -279,6 +302,11 @@ mod tests {
         assert!(s.quiet.same_failure_once);
         assert!(s.sensitive_local_only);
         assert_eq!(s.ui.mode, UiMode::Toast);
+        assert_eq!(s.ui.eager_fix, EagerFix::Auto);
+        assert!(EagerFix::Auto.allows(&spec("t", Provider::Ollama, None)));
+        assert!(!EagerFix::Auto.allows(&spec("a", Provider::Anthropic, None)));
+        assert!(EagerFix::On.allows(&spec("a", Provider::Anthropic, None)));
+        assert!(!EagerFix::Off.allows(&spec("t", Provider::Ollama, None)));
     }
 
     #[test]

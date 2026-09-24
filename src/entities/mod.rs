@@ -35,7 +35,8 @@ pub use redaction::{Redacted, redact};
 pub use rules::{DirEntry, Facts, Os, suggest_fix};
 pub use session::{Session, SessionId};
 pub use settings::{
-    KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
+    EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier, UiMode,
+    UiSettings,
 };
 pub use shell::Shell;
 pub use time::{Duration, Timestamp};

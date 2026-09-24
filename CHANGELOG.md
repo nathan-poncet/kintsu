@@ -6,8 +6,15 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.1.0] - 2026-09-25
+
 ### Added
 
+- The bubble carries an "asking …" line while the quick-fix model is
+  asked, replaced in place by the answer; `ui.eager_fix` defaults to
+  `"auto"`, on only when that model is local.
 - The resident daemon (`kintsu daemon run|status|stop`), started by the
   first hook call, answering `command_finished` within a 40 ms budget with
   a local fallback, and delivering messages into live shells: `zle -F` in

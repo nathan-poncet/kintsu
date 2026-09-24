@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    Duration, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier, UiMode,
-    UiSettings,
+    Duration, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier,
+    UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -96,7 +96,15 @@ struct QuietDto {
 struct UiDto {
     mode: Option<String>,
     ascii: Option<bool>,
-    eager_fix: Option<bool>,
+    eager_fix: Option<EagerDto>,
+}
+
+/// `eager_fix = true`, `false`, or `"auto"`.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum EagerDto {
+    Flag(bool),
+    Word(String),
 }
 
 /// The pseudo-model the documentation allows in routing lists.
@@ -176,7 +184,17 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             }
         },
         ascii: file.ui.ascii.unwrap_or(false),
-        eager_fix: file.ui.eager_fix.unwrap_or(false),
+        eager_fix: match file.ui.eager_fix {
+            None => EagerFix::Auto,
+            Some(EagerDto::Flag(true)) => EagerFix::On,
+            Some(EagerDto::Flag(false)) => EagerFix::Off,
+            Some(EagerDto::Word(w)) if w == "auto" => EagerFix::Auto,
+            Some(EagerDto::Word(other)) => {
+                return Err(SettingsError::Invalid(format!(
+                    "ui.eager_fix: `{other}` (auto, true or false)"
+                )));
+            }
+        },
     };
     Ok(Settings {
         models,
@@ -441,7 +459,7 @@ eager_fix = true
             UiSettings {
                 mode: UiMode::Hint,
                 ascii: true,
-                eager_fix: true
+                eager_fix: EagerFix::On
             }
         );
     }
@@ -467,6 +485,21 @@ eager_fix = true
         assert!(err("[routing]\nexplain = [\"ghost\"]").contains("routing names `ghost`"));
         assert!(err("[quiet]\nsame_failure = \"never\"").contains("quiet.same_failure"));
         assert!(err("[ui]\nmode = \"loud\"").contains("ui.mode"));
+        assert!(err("[ui]\neager_fix = \"sometimes\"").contains("ui.eager_fix"));
+        assert_eq!(
+            parse_settings("[ui]\neager_fix = \"auto\"", None)
+                .unwrap()
+                .ui
+                .eager_fix,
+            EagerFix::Auto
+        );
+        assert_eq!(
+            parse_settings("[ui]\neager_fix = false", None)
+                .unwrap()
+                .ui
+                .eager_fix,
+            EagerFix::Off
+        );
         assert!(err("this is = not toml =").starts_with("config: "));
         assert!(
             err("[models.x]\nprovider = \"ollama\"\nmodel = \"m\"\ntimeout = \"soon\"")
