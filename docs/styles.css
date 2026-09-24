@@ -52,11 +52,11 @@ p { margin: 0 0 14px; }
 /* ── header ── */
 .top { max-width: var(--max); margin: 0 auto; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
-.top nav { display: flex; gap: 18px; font-size: 14.5px; flex-wrap: wrap; justify-content: flex-end; }
+.top nav { display: flex; align-items: center; gap: 18px; font-size: 14.5px; flex-wrap: wrap; justify-content: flex-end; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover, .top nav a.gh, .top nav a[aria-current="page"] { color: var(--text); }
 .top nav a:hover { color: var(--gold); }
-.top nav a.gh { padding: 6px 12px; border: 1px solid var(--line); border-radius: 0; transition: border-color .15s, color .15s; }
+.top nav a.gh { padding: 5px 12px; line-height: 1.4; border: 1px solid var(--line); border-radius: 0; transition: border-color .15s, color .15s; }
 .top nav a.gh:hover { border-color: var(--gold); color: var(--gold); }
 .top nav a[aria-current="page"] { text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 5px; }
 @media (max-width: 760px) { .top nav a:not(.gh):not([href$=".html"]) { display: none; } }
