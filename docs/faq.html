@@ -12,11 +12,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="page">
+<body class="page docs">
 <a class="skip-link" href="#main">Skip to content</a>
 
-<header class="top">
+<header class="top docs-top">
+  <button type="button" class="menu" aria-expanded="false" aria-controls="sidebar">Menu</button>
   <a class="brand" href="./"><img src="media/mark.svg" alt="" width="26" height="26"><span>Kintsu</span></a>
+  <div class="search" role="search">
+    <input type="search" id="docs-search" placeholder="Search the docs" aria-label="Search the documentation" autocomplete="off" spellcheck="false">
+    <kbd aria-hidden="true">/</kbd>
+    <div class="search-results" id="search-results" role="listbox" hidden></div>
+  </div>
   <nav aria-label="Site">
     <a href="docs.html" aria-current="page">Docs</a>
     <a href="roadmap.html">Roadmap</a>
@@ -24,11 +30,42 @@
   </nav>
 </header>
 
+<!-- docs-layout -->
+<div class="docs-layout">
+<nav class="sidebar" id="sidebar" aria-label="Documentation">
+  <details open>
+    <summary>Start here</summary>
+    <ul>
+      <li><a href="docs.html">Overview</a></li>
+      <li><a href="install.html">Install</a></li>
+      <li><a href="keys.html">Keys and commands</a></li>
+    </ul>
+  </details>
+  <details open>
+    <summary>Reference</summary>
+    <ul>
+      <li><a href="configuration.html">Configuration</a></li>
+    </ul>
+  </details>
+  <details open>
+    <summary>Learn</summary>
+    <ul>
+      <li><a href="faq.html" aria-current="page">FAQ</a></li>
+    </ul>
+  </details>
+  <details open>
+    <summary>Project</summary>
+    <ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="https://github.com/nathan-poncet/kintsu/tree/main/docs" target="_blank" rel="noopener">Design documents <span class="ext" aria-hidden="true">↗</span></a></li>
+      <li><a href="https://github.com/nathan-poncet/kintsu/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing <span class="ext" aria-hidden="true">↗</span></a></li>
+    </ul>
+  </details>
+</nav>
 <main id="main" class="doc faq">
   <header class="doc-head">
-    <p class="section-label">Questions</p>
-    <h1>Questions, answered directly.</h1>
-    <p class="lede">Twenty-four questions in five groups. If yours is missing, <a href="https://github.com/nathan-poncet/kintsu/issues" target="_blank" rel="noopener">open an issue</a>: the answer becomes a line here.</p>
+    <h1>FAQ</h1>
+    <p class="lede">Twenty-four questions in five groups. Missing one? <a href="https://github.com/nathan-poncet/kintsu/issues" target="_blank" rel="noopener">Open an issue</a>.</p>
   </header>
   <section>
     <div class="faq-groups">
@@ -77,7 +114,11 @@
       </div>
     </div>
   </section>
+  <footer class="pager"><a class="prev" href="configuration.html"><span>Previous</span><b>Configuration</b></a><a class="next" href="roadmap.html"><span>Next</span><b>Roadmap</b></a></footer>
 </main>
+<aside class="toc" aria-label="On this page"><p class="toc-title">On this page</p><ol id="toc"></ol></aside>
+</div>
+<!-- /docs-layout -->
 
 <footer>
   <div class="foot-brand"><img src="media/mark.svg" alt="" width="20" height="20"><span>Kintsu</span><span class="sep">·</span><span>MIT © 2026 Nathan Poncet</span></div>
@@ -93,5 +134,7 @@
     <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </footer>
+<script src="search-index.js" defer></script>
+<script src="script.js" defer></script>
 </body>
 </html>

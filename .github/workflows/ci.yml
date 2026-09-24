@@ -45,6 +45,8 @@ jobs:
           bash -n shell/kintsu.bash
           if command -v zsh >/dev/null; then zsh -n shell/kintsu.zsh; fi
           if command -v fish >/dev/null; then fish -n shell/kintsu.fish; fi
+      - name: Documentation shell is up to date
+        run: python3 scripts/docs-shell.py --check
       - name: Installer parses, dry-runs, and the website copy matches
         shell: bash
         run: |

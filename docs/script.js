@@ -454,6 +454,72 @@
     else { const wrap = el("div", "codeblock"); pre.replaceWith(wrap); wrap.appendChild(pre); wrap.appendChild(btn); }
   });
 
+  // ── documentation shell: anchors, on this page, mobile menu, search ──
+  const docsMain = document.querySelector("body.docs main");
+  if (docsMain) {
+    // anchors on every h2 that has an id
+    const idOf = (h) => h.id || h.closest("section[id]")?.id || "";
+    const heads = [...docsMain.querySelectorAll("h2")].filter((h) => idOf(h));
+    heads.forEach((h) => { const a = el("a", "anchor", "#"); a.href = `#${idOf(h)}`; a.setAttribute("aria-label", "Link to this section"); h.appendChild(a); });
+    // on this page
+    const toc = document.getElementById("toc"); const tocBox = toc?.closest(".toc");
+    if (toc && heads.length > 1) {
+      tocBox.classList.add("has-items");
+      heads.forEach((h) => { const li = el("li"); const a = el("a", "", esc(h.textContent.replace(/#$/, "").trim())); a.href = `#${idOf(h)}`; li.appendChild(a); toc.appendChild(li); });
+      const links = [...toc.querySelectorAll("a")];
+      const mark = (id) => links.forEach((a) => a.setAttribute("aria-current", String(a.getAttribute("href") === `#${id}`)));
+      if (typeof IntersectionObserver === "function") {
+        let current = idOf(heads[0]);
+        const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting) current = idOf(en.target); mark(current); }, { rootMargin: "-10% 0px -70% 0px", threshold: 0 });
+        heads.forEach((h) => io.observe(h));
+      }
+      mark(idOf(heads[0]));
+    }
+    // mobile menu
+    const menu = document.querySelector(".docs-top .menu");
+    menu?.addEventListener("click", () => { const open = document.body.dataset.menu !== "open"; document.body.dataset.menu = open ? "open" : ""; menu.setAttribute("aria-expanded", String(open)); });
+    // search over the static index
+    const input = document.getElementById("docs-search"), box = document.getElementById("search-results");
+    const index = window.KINTSU_DOCS_INDEX || [];
+    if (input && box && index.length) {
+      let sel = -1;
+      const hi = (text, terms) => { let out = esc(text); for (const term of terms) out = out.replace(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "ig"), "<mark>$1</mark>"); return out; };
+      const search = (q) => {
+        const terms = q.toLowerCase().split(/\s+/).filter(Boolean); if (!terms.length) return [];
+        return index.map((e) => {
+          const head = (e.heading || e.title).toLowerCase(), body = e.text.toLowerCase(), title = e.title.toLowerCase();
+          let score = 0;
+          for (const term of terms) { if (head.includes(term)) score += 6; else if (title.includes(term)) score += 3; else if (body.includes(term)) score += 1; else return null; }
+          if (head.startsWith(terms[0])) score += 2;
+          return { e, score };
+        }).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 8);
+      };
+      const render = (q) => {
+        const hits = search(q); sel = -1;
+        if (!q.trim()) { box.hidden = true; box.innerHTML = ""; return; }
+        box.hidden = false;
+        if (!hits.length) { box.innerHTML = `<p class="none">Nothing for “${esc(q)}”. Try another word, or <a href="https://github.com/nathan-poncet/kintsu/issues" target="_blank" rel="noopener">ask</a>.</p>`; return; }
+        const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+        box.innerHTML = hits.map(({ e }) => {
+          const href = e.id ? `${e.page}#${e.id}` : e.page;
+          const snippet = e.text ? e.text.slice(0, 140) + (e.text.length > 140 ? "…" : "") : "";
+          return `<a href="${href}" role="option" aria-selected="false"><span class="where">${esc(e.title)}${e.heading ? " › " : ""}</span><b>${hi(e.heading || e.title, terms)}</b>${snippet ? `<span class="snip">${hi(snippet, terms)}</span>` : ""}</a>`;
+        }).join("");
+      };
+      const move = (d) => { const items = [...box.querySelectorAll("a")]; if (!items.length) return; sel = (sel + d + items.length) % items.length; items.forEach((a, i) => a.setAttribute("aria-selected", String(i === sel))); items[sel].scrollIntoView?.({ block: "nearest" }); };
+      input.addEventListener("input", () => render(input.value));
+      input.addEventListener("focus", () => { if (input.value.trim()) render(input.value); });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+        else if (e.key === "Enter") { const a = box.querySelector('a[aria-selected="true"]') || box.querySelector("a"); if (a) { e.preventDefault(); location.href = a.getAttribute("href"); } }
+        else if (e.key === "Escape") { box.hidden = true; input.blur(); }
+      });
+      document.addEventListener("click", (e) => { if (!e.target.closest(".search")) box.hidden = true; });
+      document.addEventListener("keydown", (e) => { if (e.key === "/" && !e.target.matches("input, textarea, [contenteditable]") && !e.metaKey && !e.ctrlKey) { e.preventDefault(); input.focus(); } });
+    }
+  }
+
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; } catch { b.textContent = "select it"; }

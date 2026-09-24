@@ -86,6 +86,12 @@ JavaScript and the page still reads without it.
 GitHub Pages serves at the one-liner's URL. Edit the root one and copy it
 over; CI fails when they differ.
 
+The documentation pages share one shell: header with search, sidebar,
+"On this page", previous/next. `scripts/docs-shell.py` writes it into every
+page and builds `docs/search-index.js` from their headings; run it after
+editing a documentation page (CI runs it with `--check`). Edit the content
+inside `<main>`, never the generated parts.
+
 ## Reporting bugs and proposing features
 
 Use the issue templates. Security flaws go through the private channel
