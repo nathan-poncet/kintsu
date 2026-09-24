@@ -63,7 +63,7 @@
 <main id="main" class="doc">
   <header class="doc-head">
     <h1>Roadmap</h1>
-    <p class="lede">No dates. A version ships when its goals work.</p>
+    <p class="lede">No dates. A version ships when every item in its list works.</p>
   </header>
   <section>
     <ol class="timeline">
@@ -73,7 +73,7 @@
         <h2 id="the-skeleton">Hooks and design</h2>
         <ul>
           <li>Hooks for zsh, bash and fish</li>
-          <li>The design, written: architecture, daemon, models, the bubble</li>
+          <li>Design documents: architecture, daemon, models, UI</li>
           <li>The installer and this site</li>
         </ul>
       </li>
@@ -81,44 +81,44 @@
         <span class="node" aria-hidden="true"></span>
         <span class="v v1">v0.1</span>
         <h2>The bubble</h2>
-        <p class="goal">The next failure gets a bubble.</p>
+        <p class="goal">Goal: a suggestion is shown under every failed command.</p>
         <ul>
-          <li>The resident daemon</li>
-          <li>Rules: typos, wrong directory, git, Docker, ports</li>
-          <li>Why, from one provider layer</li>
-          <li>Hand-off to your CLI agent</li>
-          <li>Ignore, mute, quiet by default</li>
+          <li>Daemon: one process per user, Unix socket, started on demand</li>
+          <li>Rule engine: command typos, wrong directory, git, Docker not running, port in use</li>
+          <li>Explanations (Why) through one provider layer: OpenAI-compatible, Anthropic, Ollama</li>
+          <li>Hand-off to a CLI agent: Claude Code, Codex, OpenCode, aider</li>
+          <li>Ignore and mute; no output on success or Ctrl-C</li>
         </ul>
       </li>
       <li>
         <span class="node" aria-hidden="true"></span>
         <span class="v v2">v0.2</span>
         <h2>It reads the output</h2>
-        <p class="goal">It knows what went wrong, and shows what it sends.</p>
+        <p class="goal">Goal: the failed command's output is captured, redacted, and shown before it is sent.</p>
         <ul>
-          <li>Output capture: tmux, Herdr, the terminals' own APIs</li>
-          <li>Redaction, and the Privacy tab</li>
-          <li>Model fixes with a danger guard</li>
-          <li>Messages that arrive later, clickable words</li>
+          <li>Output capture: tmux, Herdr, WezTerm, Kitty, iTerm2</li>
+          <li>Redaction of secrets; the Privacy tab shows the exact payload</li>
+          <li>Model-generated fixes with a confidence score; destructive commands flagged</li>
+          <li>Asynchronous messages in zsh and fish; clickable words (OSC 8)</li>
         </ul>
       </li>
       <li>
         <span class="node" aria-hidden="true"></span>
         <span class="v v3">v0.3</span>
         <h2>Your agent, your keys</h2>
-        <p class="goal">Any model, on your terms.</p>
+        <p class="goal">Goal: any provider, local or cloud, with keys in the keychain and per-task routing.</p>
         <ul>
-          <li>Keychain, and your existing subscriptions</li>
-          <li>Local models first class</li>
-          <li>Routing with constraints and budgets</li>
-          <li>An MCP server for any agent</li>
+          <li>Keys in the OS keychain; reuse of CLI subscriptions</li>
+          <li>Local models: Ollama, LM Studio, llama.cpp</li>
+          <li>Per-task routing with privacy constraints and cost budgets</li>
+          <li>MCP server exposing the last failure to any agent</li>
         </ul>
       </li>
       <li class="later">
         <span class="node" aria-hidden="true"></span>
         <span class="v vl">later</span>
         <h2>Ideas</h2>
-        <p>Learned rules, team runbooks, a CI mode, more shells, more languages, a Herdr plugin.</p>
+        <p>Rules learned from accepted fixes, team runbooks, a CI mode, PowerShell and nushell, explanations in other languages, a Herdr plugin.</p>
       </li>
     </ol>
   </section>

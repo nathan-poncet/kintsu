@@ -117,8 +117,8 @@
         <div class="config"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
       </div>
       <div class="tab-panel" data-tab="remote" role="tabpanel">
-        <div class="config"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes'</code></pre><p class="card-note">The daemon runs per user on the remote host. Your keys stay where you put them.</p></div>
-        <p class="plain">Inside tmux or Herdr, nothing changes: the hook lives in your shell. A Herdr plugin comes later.</p>
+        <div class="config"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes'</code></pre><p class="card-note">The daemon runs per user on the remote host; keys are read there, nothing is sent from your machine.</p></div>
+        <p class="plain">Inside tmux or Herdr, nothing changes: the hook runs in your shell. A Herdr plugin is planned.</p>
       </div>
     </div>
   </section>
@@ -135,7 +135,7 @@
     <table class="ref">
       <tbody>
         <tr><td><code>--dir DIR</code></td><td>install directory; default <code>~/.local/bin</code>, or <code>$KINTSU_INSTALL_DIR</code></td></tr>
-        <tr><td><code>--no-hook</code></td><td>never touch a shell configuration file</td></tr>
+        <tr><td><code>--no-hook</code></td><td>do not edit any shell configuration file</td></tr>
         <tr><td><code>--yes</code></td><td>add the hook without asking; also <code>KINTSU_YES=1</code></td></tr>
         <tr><td><code>--version vX.Y.Z</code></td><td>a specific release instead of the latest</td></tr>
         <tr><td><code>--from-source</code></td><td>skip the release, build with cargo</td></tr>

@@ -64,7 +64,7 @@
 <main id="main" class="doc">
   <header class="doc-head">
     <h1>Configuration</h1>
-    <p class="lede"><code>~/.config/kintsu/config.toml</code>, written by <code>kintsu setup</code>, checked by <code>kintsu doctor</code>, overridden per project by a <code>.kintsu.toml</code> at the root of a repository. This page is the designed schema; it may still move until v0.1 ships, and every change will be listed in the changelog.</p>
+    <p class="lede"><code>~/.config/kintsu/config.toml</code>, written by <code>kintsu setup</code>, checked by <code>kintsu doctor</code>, overridden per project by a <code>.kintsu.toml</code> at the root of a repository. This is the planned schema; it may change until v0.1 ships, and every change will be listed in the changelog.</p>
   </header>
 
   <!-- ─────────── models ─────────── -->
@@ -109,13 +109,13 @@ tier     = <span class="s">"agent"</span></code></pre>
         <tr><td><code>cli_agent</code></td><td>Claude Code, Codex, OpenCode, aider, Gemini CLI, Copilot CLI, or any command template</td><td>the CLI installed and logged in</td><td><span class="where you">your account</span></td></tr>
       </tbody>
     </table>
-    <p class="note">Tiers are what the router uses. <code>tiny</code>: up to about 2B parameters, answers in a few hundred milliseconds, always local. <code>small</code>: 7 to 14B local, or a Haiku-class API. <code>large</code>: a frontier model. <code>agent</code>: a CLI with tools, not a chat completion.</p>
+    <p class="note">The router selects candidates by tier. <code>tiny</code>: up to about 2B parameters, answers in a few hundred milliseconds, always local. <code>small</code>: 7 to 14B local, or a Haiku-class API. <code>large</code>: a large hosted model. <code>agent</code>: a CLI with tools, not a chat completion.</p>
   </section>
 
   <!-- ─────────── routing ─────────── -->
   <section id="routing">
     <h2>Routing</h2>
-    <p>Five tasks. For each, an ordered list of model names. The router takes the first candidate the constraints allow and whose circuit is closed; on a timeout or an error it moves to the next. <code>rules-only</code> is a pseudo-model meaning "do without a model" and every list ends with it whether you write it or not.</p>
+    <p>Five tasks. For each, an ordered list of model names. The router takes the first candidate the constraints allow and that is not in a failed state (circuit breaker); on a timeout or an error it moves to the next. <code>rules-only</code> is a pseudo-model meaning "do without a model" and every list ends with it whether you write it or not.</p>
     <div class="config">
       <div class="config-head"><span>[routing]</span></div>
 <pre><code><span class="k">[routing]</span>
@@ -135,11 +135,11 @@ summarize = <span class="s">"2s"</span></code></pre>
     <table class="ref">
       <thead><tr><th>task</th><th>input</th><th>output</th><th>typical tier</th><th>when</th></tr></thead>
       <tbody>
-        <tr><td><code>classify</code></td><td>command, status, the first lines of output</td><td>category, worth-a-bubble, confidence</td><td>tiny</td><td>after every offer, asynchronously, to enrich or retract the toast</td></tr>
-        <tr><td><code>quick_fix</code></td><td>the case</td><td>one command, confidence, danger</td><td>small</td><td>when no rule knew; on Fix, or eagerly if <code>eager_fix = true</code></td></tr>
+        <tr><td><code>classify</code></td><td>command, status, the first lines of output</td><td>category, show-a-bubble (boolean), confidence</td><td>tiny</td><td>after every offer, asynchronously, to enrich or retract the toast</td></tr>
+        <tr><td><code>quick_fix</code></td><td>the case</td><td>one command, confidence, danger</td><td>small</td><td>when no rule matched; on Fix, or on every offer if <code>eager_fix = true</code></td></tr>
         <tr><td><code>explain</code></td><td>the case</td><td>streamed prose</td><td>small or large</td><td>on Why</td></tr>
-        <tr><td><code>investigate</code></td><td>the hand-off brief</td><td>whatever the agent does</td><td>agent</td><td>on Agent</td></tr>
-        <tr><td><code>summarize</code></td><td>long captured output</td><td>a short paragraph</td><td>tiny or small</td><td>before sending 400 lines to anyone</td></tr>
+        <tr><td><code>investigate</code></td><td>the hand-off brief</td><td>the agent's output</td><td>agent</td><td>on Agent</td></tr>
+        <tr><td><code>summarize</code></td><td>long captured output</td><td>a short paragraph</td><td>tiny or small</td><td>when the captured output exceeds <code>max_case_lines</code></td></tr>
       </tbody>
     </table>
     <p class="note"><code>classify</code> and <code>quick_fix</code> ask for structured output, a JSON object with <code>command</code>, <code>confidence</code>, <code>danger</code> and <code>rationale</code>, so the bubble never parses prose. <code>explain</code> streams. <code>investigate</code> makes no model call from Kintsu at all when an agent is configured: Kintsu writes the brief and launches the agent.</p>
@@ -148,7 +148,7 @@ summarize = <span class="s">"2s"</span></code></pre>
   <!-- ─────────── constraints ─────────── -->
   <section id="constraints">
     <h2>Constraints</h2>
-    <p>Constraints filter the candidate lists before the router looks at them. They are how a case with a secret in it never reaches a cloud model, and how a budget is enforced.</p>
+    <p>Constraints filter the candidate lists before the router selects one. They keep a case containing a secret away from cloud models and enforce the budget.</p>
     <div class="config">
       <div class="config-head"><span>[routing.constraints]</span></div>
 <pre><code><span class="k">[routing.constraints]</span>
@@ -162,7 +162,7 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
       <thead><tr><th>constraint</th><th>value</th><th>effect</th></tr></thead>
       <tbody>
         <tr><td><code>sensitive_output</code></td><td><code>"local_only"</code> · <code>"ask"</code> · <code>"allow"</code></td><td>default <code>local_only</code>. <code>ask</code> shows the Privacy tab before any cloud call.</td></tr>
-        <tr><td><code>offline</code></td><td><code>"local_only"</code></td><td>the only sensible value; here so you can see it.</td></tr>
+        <tr><td><code>offline</code></td><td><code>"local_only"</code></td><td>the only supported value.</td></tr>
         <tr><td><code>private_paths</code></td><td>globs</td><td>a case whose cwd matches is treated as sensitive.</td></tr>
         <tr><td><code>max_daily_cost</code></td><td>an amount</td><td>tracked from the providers' token counts and the prices in <code>kintsu models</code>.</td></tr>
         <tr><td><code>max_case_lines</code></td><td>an integer</td><td>the <code>summarize</code> task runs first when exceeded.</td></tr>
@@ -186,13 +186,13 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
       <div class="tab-panel" data-tab="command" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { command = <span class="s">"op read op://dev/anthropic/key"</span> }</code></pre><p class="card-note">Run once at start; the output, trimmed, is the key.</p></div></div>
       <div class="tab-panel" data-tab="literal" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { literal = <span class="s">"sk-ant-…"</span> }</code></pre><p class="card-note">Works; <code>kintsu doctor</code> warns about it.</p></div></div>
     </div>
-    <p class="note">A <code>cli_agent</code> has no key: the CLI brings its own login. That is how a Claude, ChatGPT or Copilot subscription is reused without an API key.</p>
+    <p class="note">A <code>cli_agent</code> has no key: the CLI uses its own login. That is how a Claude, ChatGPT or Copilot subscription is reused without an API key.</p>
   </section>
 
   <!-- ─────────── agents ─────────── -->
   <section id="agents">
     <h2>Agents</h2>
-    <p>Presets know how to hand a brief to the popular CLIs. A template covers anything else. <code>{brief}</code> is the path of the Markdown brief Kintsu wrote; <code>{brief_text}</code> inlines it.</p>
+    <p>Presets define how the brief is passed to each CLI. A template covers any other command. <code>{brief}</code> is the path of the Markdown brief Kintsu wrote; <code>{brief_text}</code> inlines it.</p>
     <div class="config">
       <div class="config-head"><span>[models.&lt;agent&gt;]</span></div>
 <pre><code><span class="k">[models.claude-code]</span>
@@ -252,7 +252,7 @@ ok_commands      = { grep = [1], diff = [1], test = [1] }   <span class="c"># ex
 same_failure     = <span class="s">"once"</span>             <span class="c"># once · always</span>
 dismiss_cooldown = <span class="s">"10m"</span>
 coalesce         = <span class="s">"10s"</span>              <span class="c"># at most one async message per case per window while collapsed</span>
-off_in           = [<span class="s">"~/scratch/**"</span>]    <span class="c"># directories where Kintsu never speaks</span>
+off_in           = [<span class="s">"~/scratch/**"</span>]    <span class="c"># directories where no bubble is shown</span>
 learn_rules      = true               <span class="c"># an accepted model fix, twice, becomes a rule</span></code></pre>
     </div>
     <p class="note">At the prompt: <code>kintsu ignore</code> with <code>--command</code>, <code>--dir</code>, <code>--session</code> or <code>--always</code>; <code>kintsu mute 1h</code>; <code>KINTSU_DISABLE=1</code> for a shell you want left alone.</p>
@@ -275,7 +275,7 @@ sources    = [<span class="s">"tmux"</span>, <span class="s">"herdr"</span>, <sp
 stderr_tee = false        <span class="c"># zsh only: capture stderr when no source above is available. Opt in.</span>
 max_lines  = 400</code></pre>
     </div>
-    <p class="note"><code>kintsu service install</code> writes a LaunchAgent on macOS and a user unit on Linux so the daemon survives logout and restarts on a crash. Without it, the first failure of the day starts the daemon and that is fine too.</p>
+    <p class="note"><code>kintsu service install</code> writes a LaunchAgent on macOS and a user unit on Linux so the daemon keeps running after logout and restarts after a crash. Without it, the daemon starts on the first failure after login.</p>
   </section>
 
   <!-- ─────────── project ─────────── -->
@@ -310,7 +310,7 @@ sensitive_output = <span class="s">"local_only"</span>                 <span cla
       </div>
       <div class="tab-panel on" data-tab="local" role="tabpanel">
 <div class="config">
-        <div class="config-head"><span>local only: Ollama, nothing leaves</span><span class="where local">local</span></div>
+        <div class="config-head"><span>local only: Ollama, nothing is sent</span><span class="where local">local</span></div>
 <pre><code><span class="k">[models.tiny]</span>
 provider = <span class="s">"ollama"</span>  model = <span class="s">"qwen3:1.7b"</span>  tier = <span class="s">"tiny"</span>
 <span class="k">[models.big]</span>
@@ -328,7 +328,7 @@ offline = <span class="s">"local_only"</span></code></pre>
       </div>
       <div class="tab-panel" data-tab="key" role="tabpanel">
 <div class="config">
-        <div class="config-head"><span>one key: Haiku for words, tiny for triage</span><span class="where cloud">cloud</span> <span class="where local">local</span></div>
+        <div class="config-head"><span>one key: Haiku for explanations, tiny for classification</span><span class="where cloud">cloud</span> <span class="where local">local</span></div>
 <pre><code><span class="k">[models.tiny]</span>
 provider = <span class="s">"ollama"</span>     model = <span class="s">"qwen3:1.7b"</span>  tier = <span class="s">"tiny"</span>
 <span class="k">[models.haiku]</span>
