@@ -49,7 +49,8 @@ def header(current: str) -> str:
   </div>
   <nav aria-label="Site">
     {nav("docs.html", "Docs")}
-    {nav("tour.html", "Guided tour")}
+    {nav("./#tour", "Guided tour")}
+    <button type="button" class="theme" data-theme-toggle aria-label="Switch theme">◐</button>
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>'''

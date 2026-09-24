@@ -165,13 +165,15 @@
     ],
   };
 
-  // ── the player ───────────────────────────────────────────────────────
+  // ── the player: one terminal, two modes (live, tour) ─────────────────
   class Player {
     constructor(root) {
       this.root = root;
-      this.scene = SCENES[root.dataset.scene];
+      this.liveScene = SCENES[root.dataset.scene];
+      this.tourScene = SCENES[root.dataset.tour] || null;
       this.chapters = [];
-      this.scene.forEach((st, i) => { if (st.ch) this.chapters.push({ step: i, ...st.ch }); });
+      (this.tourScene || []).forEach((st, i) => { if (st.ch) this.chapters.push({ step: i, ...st.ch }); });
+      this.mode = "live"; this.scene = this.liveScene;
       this.run = 0; this.driving = false; this.paused = false; this.instant = false; this.playing = false;
       this.current = null; this.prompt = null; this.chapterIndex = -1; this.wake = null; this.keyTimer = null;
       this.render();
@@ -179,22 +181,6 @@
 
     render() {
       const title = esc(this.root.dataset.title);
-      if (!this.chapters.length) {
-        this.root.innerHTML = `
-          <div class="terminal" tabindex="0" aria-label="Kintsu, live. Click a word in the bubble, or use Control K, w, f, a, i, p, Escape, Enter.">
-            <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><span class="badge static">live · click a word · ^K</span></div>
-            <div class="screen"></div>
-            <div class="keycap" aria-hidden="true"></div>
-          </div>`;
-        this.term = this.root.querySelector(".terminal"); this.screen = this.root.querySelector(".screen"); this.badge = this.root.querySelector(".badge"); this.keycap = this.root.querySelector(".keycap");
-        this.items = []; this.ex = null;
-        this.screen.addEventListener("click", (e) => {
-          const a = e.target.closest("[data-act]"); if (a) { this.act(a.dataset.act); return; }
-          const t = e.target.closest("[data-tab]"); if (t) { this.takeWheel(); this.switchTab(t.dataset.tab); }
-        });
-        this.term.addEventListener("keydown", (e) => this.onTerminalKey(e));
-        return;
-      }
       const steps = this.chapters.map((c, k) => `
         <li>
           <button type="button" class="chapter" data-chapter="${k}" aria-label="Chapter ${k + 1}: ${esc(c.title)}">
@@ -213,7 +199,7 @@
           <p class="ch-keys"></p>
         </aside>
         <div class="player-main">
-          <div class="terminal" tabindex="0" aria-label="Kintsu tour. Click a word in the bubble, or use Tab, Control K, w, f, a, i, p, Escape. Space pauses.">
+          <div class="terminal" tabindex="0" aria-label="Kintsu terminal. Click a word in the bubble, or use Tab, Control K, w, f, a, i, p, Escape. Space pauses the tour.">
             <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">${title}</span><button type="button" class="badge playpause" aria-label="Pause">⏸ playing</button></div>
             <div class="screen"></div>
             <div class="keycap" aria-hidden="true"></div>
@@ -222,15 +208,33 @@
         <ol class="chapters" aria-label="Chapters: pick one to play it">${steps}</ol>`;
       const $ = (s) => this.root.querySelector(s);
       this.term = $(".terminal"); this.screen = $(".screen"); this.badge = $(".playpause"); this.keycap = $(".keycap");
+      this.panel = $(".ch-panel"); this.stepper = $(".chapters");
       this.items = [...this.root.querySelectorAll(".chapters > li")];
       this.ex = { count: $(".ch-count"), tag: $(".ch-title .tag"), title: $(".ch-title .t"), text: $(".ch-text"), meta: $(".ch-meta"), keys: $(".ch-keys") };
-      this.badge.addEventListener("click", () => this.togglePause());
+      this.badge.addEventListener("click", () => { if (this.mode === "tour") this.togglePause(); });
       this.root.querySelectorAll(".chapter").forEach((b) => b.addEventListener("click", () => this.play(Number(b.dataset.chapter))));
       this.screen.addEventListener("click", (e) => {
         const a = e.target.closest("[data-act]"); if (a) { this.act(a.dataset.act); return; }
         const t = e.target.closest("[data-tab]"); if (t) { this.takeWheel(); this.switchTab(t.dataset.tab); }
       });
       this.term.addEventListener("keydown", (e) => this.onTerminalKey(e));
+      this.applyMode();
+    }
+
+    // ── modes ──
+    applyMode() {
+      const tour = this.mode === "tour";
+      this.root.classList.toggle("mode-tour", tour); this.root.classList.toggle("mode-live", !tour);
+      this.badge.classList.toggle("static", !tour);
+      if (!tour) { this.badge.textContent = "live · click a word · ^K"; this.badge.setAttribute("aria-label", "Live terminal"); }
+      if (tour) requestAnimationFrame(() => { this.panel.classList.add("in"); this.stepper.classList.add("in"); });
+      else { this.panel.classList.remove("in"); this.stepper.classList.remove("in"); }
+    }
+    setMode(mode, chapter = 0) {
+      if (!this.tourScene) mode = "live";
+      this.mode = mode; this.scene = mode === "tour" ? this.tourScene : this.liveScene;
+      this.applyMode();
+      this.play(mode === "tour" ? chapter : 0);
     }
 
     // ── timing, pause, instant ──
@@ -244,7 +248,7 @@
       if (!v && this.wake) { const w = this.wake; this.wake = null; w(); }
     }
     togglePause() { if (!this.playing) { this.play(Math.max(0, this.chapterIndex)); return; } this.setPaused(!this.paused); }
-    setBadge(text, label) { if (this.badge.classList.contains("static")) return; this.badge.textContent = text; this.badge.setAttribute("aria-label", label || text); }
+    setBadge(text, label) { if (this.mode !== "tour") return; this.badge.textContent = text; this.badge.setAttribute("aria-label", label || text); }
     scrollDown() { this.screen.scrollTop = this.screen.scrollHeight; }
     flashKey(label) {
       if (this.instant || reduced) return;
@@ -255,8 +259,7 @@
     // ── chapters ──
     showChapter(k) {
       this.chapterIndex = k;
-      if (!this.ex) return;
-      const c = this.chapters[k];
+      const c = this.chapters[k]; if (!c) return;
       this.ex.count.textContent = `Chapter ${k + 1} of ${this.chapters.length}`;
       this.ex.tag.textContent = c.tag; this.ex.title.textContent = c.title;
       this.ex.text.innerHTML = c.text;
@@ -265,7 +268,7 @@
       this.items.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); li.querySelector(".fill").style.setProperty("--w", i < k ? "100%" : "0%"); });
     }
     progress(i) {
-      const k = this.chapterIndex; if (k < 0 || !this.items.length) return;
+      const k = this.chapterIndex; if (k < 0 || this.mode !== "tour") return;
       const start = this.chapters[k].step, end = this.chapters[k + 1]?.step ?? this.scene.length;
       this.items[k].querySelector(".fill").style.setProperty("--w", `${Math.round(((i - start) / Math.max(1, end - start)) * 100)}%`);
     }
@@ -364,7 +367,7 @@
     }
     onTerminalKey(e) {
       const k = e.key;
-      if (k === " ") { e.preventDefault(); this.togglePause(); return; }
+      if (k === " " && this.mode === "tour") { e.preventDefault(); this.togglePause(); return; }
       if (k === "Tab") { if (this.acceptGhost()) { e.preventDefault(); this.takeWheel(); } return; }
       if ((e.ctrlKey && k.toLowerCase() === "k") || k === "k") { e.preventDefault(); this.act("more"); return; }
       if (k === "Escape") { e.preventDefault(); this.takeWheel(); this.collapse(); return; }
@@ -381,7 +384,7 @@
       this.setBadge("⏸ playing", "Pause");
       const steps = this.scene;
       const liveAt = steps.findIndex((s) => s.live);
-      const start = this.chapters.length ? (this.chapters[fromChapter]?.step ?? 0) : Math.max(0, liveAt);
+      const start = this.mode === "tour" ? (this.chapters[fromChapter]?.step ?? 0) : Math.max(0, liveAt);
       for (let i = 0; i < steps.length; i++) {
         if (this.stale(id)) return;
         this.instant = i < start;
@@ -392,7 +395,7 @@
         else if (st.e) { await this.sleep(260, id); this.settle(); }
         else if (st.o) { for (const l of st.o) { if (this.stale(id)) return; this.out(l); await this.sleep(28, id); } }
         else if (st.w) await this.sleep(st.w, id);
-        else if (st.s != null) { /* subtitles retired: the chapter text carries the story */ }
+        else if (st.s != null) { /* subtitles retired */ }
         else if (st.live) { /* real time from here */ }
         else if (st.key) this.flashKey(st.key);
         else if (st.toast) this.toast(st.toast);
@@ -406,8 +409,7 @@
         else if (st.msg) this.message(st.msg);
         else if (st.end) {
           this.playing = false; this.instant = false;
-          this.items[this.chapterIndex]?.querySelector(".fill")?.style.setProperty("--w", "100%");
-          this.setBadge("↻ replay", "Replay from the first chapter");
+          if (this.mode === "tour") { this.items[this.chapterIndex]?.querySelector(".fill")?.style.setProperty("--w", "100%"); this.setBadge("↻ replay", "Replay from the first chapter"); }
           return;
         }
         if (!this.instant) this.progress(i);
@@ -420,18 +422,35 @@
   const roots = [...document.querySelectorAll(".player[data-scene]")];
   const players = roots.map((root) => new Player(root));
   window.kintsuPlayers = players;
-  window.kintsuTour = players.find((p) => p.chapters.length) || null;
-  const fromHash = () => { const m = /^#ch-(\d+)$/.exec(location.hash); return m ? Math.max(0, Math.min(8, Number(m[1]) - 1)) : 0; };
-  for (const p of players) {
-    const first = p.chapters.length ? fromHash() : 0;
-    if (typeof IntersectionObserver === "function") {
-      const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !p.playing && p.chapterIndex < 0 && !p.driving) { p.play(first); io.disconnect(); } }, { threshold: 0.2 });
-      io.observe(p.root);
-    } else {
-      p.play(first);
+  const player = players[0] || null;
+  window.kintsuTour = player && player.tourScene ? player : null;
+  const chapterFromHash = () => { const m = /^#ch-(\d+)$/.exec(location.hash); return m ? Math.max(0, Math.min(8, Number(m[1]) - 1)) : null; };
+  const hints = [...document.querySelectorAll(".mock-hint[data-hint]")], modeBtns = [...document.querySelectorAll(".modes [data-mode]")];
+  const switchMode = (mode, chapter = 0) => {
+    if (!player) return;
+    player.setMode(mode, chapter);
+    modeBtns.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
+    hints.forEach((h) => (h.hidden = h.dataset.hint !== mode));
+  };
+  modeBtns.forEach((b) => b.addEventListener("click", () => switchMode(b.dataset.mode)));
+  document.querySelectorAll("[data-mode-link]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); switchMode(a.dataset.modeLink); player?.root.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "start" }); history.replaceState(null, "", "#tour"); }));
+  const fromHash = () => {
+    const ch = chapterFromHash();
+    if (ch !== null) { switchMode("tour", ch); player?.root.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "start" }); return true; }
+    if (location.hash === "#tour") { switchMode("tour", 0); return true; }
+    return false;
+  };
+  if (player) {
+    if (!fromHash()) {
+      if (typeof IntersectionObserver === "function") {
+        const io = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting && !player.playing && player.chapterIndex < 0 && !player.driving && player.mode === "live" && !player.current) { player.play(0); io.disconnect(); } }, { threshold: 0.2 });
+        io.observe(player.root);
+      } else {
+        player.play(0);
+      }
     }
+    window.addEventListener("hashchange", fromHash);
   }
-  if (window.kintsuTour) window.addEventListener("hashchange", () => window.kintsuTour.play(fromHash()));
 
   // ── selectors: one way at a time ─────────────────────────────────────
   document.querySelectorAll(".tabs").forEach((tabs) => {
@@ -519,6 +538,15 @@
       document.addEventListener("keydown", (e) => { if (e.key === "/" && !e.target.matches("input, textarea, [contenteditable]") && !e.metaKey && !e.ctrlKey) { e.preventDefault(); input.focus(); } });
     }
   }
+
+  // ── theme: the system decides until the visitor does ─────────────────
+  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
+    const system = () => (typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    const current = () => document.documentElement.dataset.theme || system();
+    const paint = () => { const next = current() === "dark" ? "light" : "dark"; btn.textContent = current() === "dark" ? "☀" : "☾"; btn.setAttribute("aria-label", `Switch to ${next} mode`); btn.title = `Switch to ${next} mode`; };
+    btn.addEventListener("click", () => { const next = current() === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = next; try { localStorage.setItem("kintsu-theme", next); } catch {} paint(); });
+    paint();
+  });
 
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {

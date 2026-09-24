@@ -5,12 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kintsu — every failed command, handled in place</title>
   <meta name="description" content="Kintsu is an open-source bubble under a failed command, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the case to your agent. Your models, your keys, nothing runs without you.">
-  <meta property="og:title" content="Kintsu — every failed command, handled in place">
-  <meta property="og:description" content="A bubble under the error. Fixes the typo, explains the trace, hands the case to your agent. Your terminal, your shell, your models, your keys. Open source.">
+  <link rel="canonical" href="https://nathan-poncet.github.io/kintsu/">
   <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:url" content="https://nathan-poncet.github.io/kintsu/">
+  <meta property="og:title" content="Kintsu — every failed command, handled in place">
+  <meta property="og:description" content="Kintsu is an open-source bubble under a failed command, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the case to your agent. Your models, your keys, nothing runs without you.">
+  <meta property="og:image" content="https://nathan-poncet.github.io/kintsu/media/share-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://nathan-poncet.github.io/kintsu/media/share-card.png">
   <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="media/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="media/favicon-16.png">
+  <link rel="apple-touch-icon" href="media/apple-touch-icon.png">
   <meta name="theme-color" content="#0f0d0b">
+  <script>(()=>{try{const t=localStorage.getItem("kintsu-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -23,7 +33,8 @@
   <a class="brand" href="./"><img src="media/mark.svg" alt="" width="26" height="26"><span>Kintsu</span></a>
   <nav aria-label="Site">
     <a href="docs.html">Docs</a>
-    <a href="tour.html">Guided tour</a>
+    <a href="#tour" data-mode-link="tour">Guided tour</a>
+    <button type="button" class="theme" data-theme-toggle aria-label="Switch theme">◐</button>
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>
@@ -44,14 +55,19 @@
   </section>
 
   <!-- the product: the terminal, then what it does -->
-  <section class="mock" aria-label="Kintsu, live">
-    <div class="player mock-player" data-scene="landing" data-title="zsh — ~/dev/acme"></div>
-    <p class="mock-hint">Live. Click a word in the bubble, or press <kbd>^K</kbd>. <a href="tour.html">Guided tour <span aria-hidden="true">→</span></a></p>
+  <section class="mock" id="tour" aria-label="Kintsu, live">
+    <div class="player mock-player mode-live" data-scene="landing" data-tour="tour" data-title="zsh — ~/dev/acme"></div>
+    <div class="modes" role="tablist" aria-label="Terminal mode">
+      <button type="button" role="tab" aria-selected="true" data-mode="live">Play with it</button>
+      <button type="button" role="tab" aria-selected="false" data-mode="tour">Guided tour</button>
+    </div>
+    <p class="mock-hint" data-hint="live">Live. Click a word in the bubble, or press <kbd>^K</kbd>.</p>
+    <p class="mock-hint" data-hint="tour" hidden>Pick a chapter below. <kbd>Space</kbd> pauses. Click a word or press a key to take over.</p>
   </section>
 
   <section class="why" aria-label="What Kintsu does">
     <ol class="features">
-      <li class="feature"><a class="feature-link" href="tour.html#ch-2">
+      <li class="feature"><a class="feature-link" href="#ch-2">
         <div class="ftext">
           <span class="fnum">01</span>
           <h2>A short suggestion under the error <span class="arrow" aria-hidden="true">→</span></h2>
@@ -64,7 +80,7 @@
 <span class="p">$</span> <span class="ghost">git status</span></pre>
       </a></li>
 
-      <li class="feature"><a class="feature-link" href="tour.html#ch-7">
+      <li class="feature"><a class="feature-link" href="#ch-7">
         <div class="ftext">
           <span class="fnum">02</span>
           <h2>Your agent, briefed <span class="arrow" aria-hidden="true">→</span></h2>
@@ -91,7 +107,7 @@
         </div>
       </a></li>
 
-      <li class="feature"><a class="feature-link" href="tour.html#ch-5">
+      <li class="feature"><a class="feature-link" href="#ch-5">
         <div class="ftext">
           <span class="fnum">04</span>
           <h2>Never runs a command. Shows what is sent <span class="arrow" aria-hidden="true">→</span></h2>
@@ -147,7 +163,7 @@
     <a href="install.html">Install</a>
     <a href="keys.html">Keys</a>
     <a href="configuration.html">Configuration</a>
-    <a href="tour.html">Tour</a>
+    <a href="#tour" data-mode-link="tour">Guided tour</a>
     <a href="faq.html">FAQ</a>
     <a href="roadmap.html">Roadmap</a>
     <a href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
