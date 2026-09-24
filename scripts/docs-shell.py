@@ -49,7 +49,7 @@ def header(current: str) -> str:
   </div>
   <nav aria-label="Site">
     {nav("docs.html", "Docs")}
-    {nav("tour.html", "Tour")}
+    {nav("tour.html", "Guided tour")}
     <a class="gh" href="https://github.com/nathan-poncet/kintsu" target="_blank" rel="noopener">GitHub</a>
   </nav>
 </header>'''
