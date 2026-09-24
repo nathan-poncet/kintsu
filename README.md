@@ -11,10 +11,11 @@ your choice, right there in your terminal.**
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/S3V726AT7H)
 
-> **Status: pre-alpha, design phase.** The shell hooks work and a
-> placeholder hint is printed after a failure. Nothing talks to a model yet.
-> The plan lives in [docs/VISION.md](docs/VISION.md); pushback is welcome in
-> the issues.
+> **Status: pre-alpha.** The bubble, the rule-based fixes, `why` with your
+> model, the hand-off to a CLI agent, ignore and mute, privacy preview and
+> doctor work today, synchronously, without the daemon. What was decided
+> on the way is in [docs/DECISIONS.md](docs/DECISIONS.md); the plan in
+> [docs/VISION.md](docs/VISION.md). Pushback is welcome in the issues.
 
 ## The itch
 
@@ -27,20 +28,20 @@ Warp's AI.
 kintsu wants the same loop in *your* terminal and *your* shell, with *your*
 model and *your* key.
 
-## How it will work
+## How it works
 
 ```
 $ gti status
 zsh: command not found: gti
 ▎ Did you mean git status?
-▎ Tab to fix · Why · Agent · Ignore · ^K more
+▎ ^K to insert · kintsu why · kintsu agent · kintsu ignore
 $ git status
 ```
 
-A small bubble, one gold seam on the left, one sentence, a line of words.
-The words are links, so they are clickable; `^K` expands the bubble into a
-panel with real buttons, streaming explanations and a mouse; and nothing
-ever steals a keystroke from your prompt.
+A small bubble, one gold seam on the left, one sentence, a line of
+actions. `^K` puts the fix in your prompt; you press Enter. Nothing ever
+steals a keystroke from your prompt, and nothing runs on its own.
+Clickable words and the expanded panel come with the daemon (v0.2).
 
 - **Fix**, the fast path: a one-line correction shown as ghost text you
   accept with Tab. Rules first (in the spirit of
@@ -121,15 +122,33 @@ eval "$(kintsu init bash)"    # ~/.bashrc
 kintsu init fish | source     # ~/.config/fish/config.fish
 ```
 
-Today this prints a one-line hint after a failed command, nothing more.
-Remove the line to uninstall.
+Remove the line to uninstall. With no configuration file, the rules work
+and nothing leaves your machine. To add a model or an agent:
+
+```sh
+kintsu default-config > ~/.config/kintsu/config.toml   # then edit it
+kintsu doctor                                          # checks the hook, the models, the keys
+```
+
+The commands, all about the last failure of the current shell:
+
+| command | does |
+|---|---|
+| `kintsu fix` | the corrected command, from a rule or your quick-fix model; `--raw` is what `^K` uses |
+| `kintsu why` | an explanation from the first configured model that answers; a case holding a secret only reaches local models |
+| `kintsu agent [--with name] [words…]` | writes the brief and launches your CLI agent (Claude Code, Codex, OpenCode, aider, Gemini CLI, Copilot CLI…) |
+| `kintsu privacy` | exactly what a model or an agent would receive, secrets masked |
+| `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |
+| `kintsu mute [1h]` | nothing for a while |
+| `kintsu doctor`, `default-config`, `config path` | setup |
 
 ## Roadmap
 
-1. **v0.1, the bubble**: the daemon and its socket, hooks, context
-   capture, rule-based fixes, one provider layer (OpenAI-compatible,
-   Anthropic, Ollama), `why`, hand-off to a CLI agent by template, config
-   file, noise control.
+1. **v0.1, the bubble**: hooks, rule-based fixes, one provider layer
+   (OpenAI-compatible, Anthropic, Ollama), `why`, hand-off to a CLI agent
+   by template, config file, noise control. Built; the daemon and its
+   socket were moved out of it, see
+   [docs/DECISIONS.md](docs/DECISIONS.md).
 2. **v0.2, it reads the output**: stderr/stdout capture through terminal
    and multiplexer APIs, redaction and "what leaves the machine" preview,
    ghost-text fixes, danger guard, project awareness.
@@ -142,8 +161,8 @@ Details, ideas parking lot and open questions:
 
 ## Website
 
-The site lives in `docs/` as plain static files, the same convention as
-whisk, and is not published yet. Preview it locally:
+<https://nathan-poncet.github.io/kintsu/>, served by GitHub Pages from
+`docs/` as plain static files. Preview it locally:
 
 ```sh
 python3 -m http.server -d docs 8000
@@ -153,9 +172,8 @@ Then open <http://localhost:8000>. The landing page says the minimum: what
 Kintsu is, a live terminal you can click into, five strengths, one line to
 install. Everything else is documentation, one page per subject: `docs.html` the
 hub, `install.html` every install method, `keys.html` the keys and
-commands, `configuration.html` the configuration reference, `tour.html` the
-nine-chapter tour, `faq.html` the twenty-four questions, `roadmap.html` a
-one-screen timeline.
+commands, `configuration.html` the configuration reference, `faq.html` the
+questions, `roadmap.html` a one-screen timeline.
 
 ## Design documents
 
@@ -166,6 +184,7 @@ one-screen timeline.
   how a bubble reaches a live shell.
 - [MODELS.md](docs/MODELS.md): several models, routed per task.
 - [UI.md](docs/UI.md): the bubble, toast and panel, keys and clicks.
+- [DECISIONS.md](docs/DECISIONS.md): what v0.1 built, what it left out, and why.
 
 ## Why "kintsu"
 

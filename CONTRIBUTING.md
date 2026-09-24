@@ -1,8 +1,9 @@
 # Contributing to kintsu
 
-Thanks for helping! kintsu is at the design stage, so the most useful
-contribution today is an opinion on [docs/VISION.md](docs/VISION.md): open
-an issue, disagree, propose. Code contributions follow the rules below.
+Thanks for helping! kintsu is pre-alpha: the bubble and the commands work,
+the daemon does not exist yet. Opinions on [docs/VISION.md](docs/VISION.md)
+and [docs/DECISIONS.md](docs/DECISIONS.md) are as welcome as code. Code
+contributions follow the rules below.
 
 ## Setup
 
@@ -23,7 +24,14 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 cargo build --release --locked
 bash -n shell/kintsu.bash && zsh -n shell/kintsu.zsh && fish -n shell/kintsu.fish
+cargo llvm-cov --all-targets --ignore-filename-regex 'src/main\.rs' --fail-under-lines 90   # cargo install cargo-llvm-cov
+cargo deny check                                                                           # cargo install cargo-deny
 ```
+
+A release is a tag: bump `version` in `Cargo.toml`, move the `[Unreleased]`
+notes under the version in `CHANGELOG.md`, `git tag vX.Y.Z && git push --tags`.
+The release workflow verifies the tag, drafts the release from the
+changelog, builds the four targets and publishes `SHA256SUMS`.
 
 ## Architecture in one minute
 
@@ -35,7 +43,7 @@ Clean Architecture in one crate, the rings are folders; see
 | Entities | `src/entities/` | nothing |
 | Use cases + ports | `src/use_cases/`, `src/use_cases/ports/` | entities |
 | Adapters: controllers, gateways, presenters | `src/adapters/` | entities, use cases |
-| Composition root | `src/main.rs` | everything |
+| Composition root | `src/app.rs`, `src/main.rs` | everything |
 
 `tests/dependency_rule.rs` fails the build when an inner ring reaches
 outward or touches I/O, a runtime, a terminal or the clock. Ground rules:
@@ -71,9 +79,8 @@ TDD is the house style: write the failing test first.
 ## The website
 
 `docs/index.html`, `docs/styles.css` and `docs/script.js` are the site,
-plain static files next to the design documents, ready for GitHub Pages
-(source: `main`, folder `/docs`) the day it is switched on. Preview it
-locally with:
+plain static files next to the design documents, served by GitHub Pages
+(source: `main`, folder `/docs`). Preview it locally with:
 
 ```sh
 python3 -m http.server -d docs 8000    # then open http://localhost:8000

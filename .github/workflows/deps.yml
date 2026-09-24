@@ -1,0 +1,35 @@
+name: Dependencies
+
+# Every Monday: known vulnerabilities fail the run; outdated crates are
+# listed in the summary. Dependabot opens the update pull requests.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  advisories:
+    name: security advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories
+
+  outdated:
+    name: outdated crates (informative)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-outdated
+      - name: List what has a newer version
+        run: |
+          {
+            echo '## Outdated crates'
+            echo
+            echo '```'
+            cargo outdated --root-deps-only || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

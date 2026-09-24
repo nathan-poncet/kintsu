@@ -32,13 +32,27 @@ jobs:
         run: cargo build --release --locked
       - name: Smoke test the binary
         shell: bash
+        env:
+          KINTSU_STATE_DIR: ${{ runner.temp }}/kintsu-state
+          KINTSU_CONFIG: ${{ runner.temp }}/kintsu-config.toml
+          KINTSU_SESSION: ci
         run: |
-          ./target/release/kintsu --version
-          ./target/release/kintsu init zsh | grep -q add-zsh-hook
-          ./target/release/kintsu init bash | grep -q PROMPT_COMMAND
-          ./target/release/kintsu init fish | grep -q fish_postexec
-          test -z "$(./target/release/kintsu triage --status 0 --command ls 2>&1)"
-          ./target/release/kintsu triage --status 127 --command 'gti status' 2>&1 | grep -q 127
+          k=./target/release/kintsu
+          $k --version
+          $k init zsh | grep -q add-zsh-hook
+          $k init bash | grep -q PROMPT_COMMAND
+          $k init fish | grep -q fish_postexec
+          test -z "$($k triage --status 0 --command ls --session ci 2>&1)"
+          $k triage --status 127 --command 'gti status' --session ci 2>&1 | grep -q 'Did you mean git status?'
+          test "$($k fix --raw)" = 'git status'
+          $k triage --status 2 --command 'make test' --session ci --duration-ms 12000 2>&1 | grep -q 'exited 2 after 12 s'
+          $k ignore --always make | grep -q 'stays quiet'
+          test -z "$($k triage --status 2 --command 'make' --session ci 2>&1)"
+          $k privacy | grep -q 'would receive'
+          $k doctor | grep -q 'shell hook'
+          $k default-config > "$KINTSU_CONFIG"
+          $k config path | grep -q kintsu-config.toml
+          $k doctor | grep -q 'Everything Kintsu needs is here'
       - name: Shell hooks parse
         shell: bash
         run: |
@@ -54,3 +68,33 @@ jobs:
           diff install.sh docs/install.sh
           sh install.sh --dry-run --no-hook --dir "$RUNNER_TEMP/kintsu-bin"
           if command -v shellcheck >/dev/null; then shellcheck -s sh install.sh; fi
+
+  coverage:
+    name: coverage ≥ 90 % of lines
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Measure
+        run: |
+          cargo llvm-cov --all-targets --locked --ignore-filename-regex 'src/main\.rs' \
+            --fail-under-lines 90 --lcov --output-path lcov.info
+          cargo llvm-cov report --ignore-filename-regex 'src/main\.rs' --summary-only >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info
+
+  dependencies:
+    name: advisories · licences · bans · sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features

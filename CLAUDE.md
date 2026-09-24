@@ -21,8 +21,12 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   results to toast, panel, plain and JSON view states; `gateways/` implement the
   ports over models, agents, terminals, storage, secrets), `src/main.rs` and
   later `app.rs` / `daemon.rs` / `service.rs` as the composition root.
-- The website is static HTML/CSS/JS in `docs/` next to the design documents
-  (GitHub Pages convention, not switched on yet). No framework, no build step.
+- The website is static HTML/CSS/JS in `docs/` next to the design documents,
+  served by GitHub Pages (source `main`, folder `/docs`). No framework, no
+  build step. `scripts/docs-shell.py` regenerates the documentation shell.
+- `docs/DECISIONS.md` records what v0.1 built differently from the design
+  documents (no daemon yet, hooks report every command, `^K` inserts the
+  fix…). Update it when a decision changes.
 - A new side effect gets a port, an in-memory fake and a contract test first;
   every gateway passes the same contract suite.
 - Design references before proposing anything: `docs/DAEMON.md` (process model,
@@ -48,4 +52,5 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
 - Deterministic always: fake providers, fake agents, fake output sources,
   temp dirs. No real network, no real terminal, no sleeps.
 - Before pushing: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`,
-  `cargo test --locked`, and `bash -n` / `zsh -n` / `fish -n` on the hooks.
+  `cargo test --locked`, `bash -n` / `zsh -n` / `fish -n` on the hooks; CI also
+  requires ≥ 90 % line coverage (`cargo llvm-cov`) and a clean `cargo deny check`.

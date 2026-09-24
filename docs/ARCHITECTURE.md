@@ -24,49 +24,65 @@ routing in [MODELS.md](MODELS.md), the bubble in [UI.md](UI.md).*
 ```
 kintsu/
 ├── Cargo.toml                    one package, one binary
+├── config/default.toml           the commented default configuration (`kintsu default-config`)
 ├── shell/                        kintsu.zsh · kintsu.bash · kintsu.fish   (the hooks, plain assets)
 ├── tests/
 │   └── dependency_rule.rs        the rings may only reach inward; the inner two do no I/O
-├── docs/                         the design documents and the website (index.html, styles.css, script.js)
+├── docs/                         the design documents, DECISIONS.md, and the website
 │
 └── src/
-    ├── main.rs                   composition root: wires controllers, use cases, presenters
-    ├── (planned)                 app.rs (one function per subcommand) · daemon.rs (runtime, socket
-    │                             listener, session supervisor) · service.rs (launchd, systemd, URL scheme)
+    ├── main.rs                   reads the environment once (paths, session, colour) and calls app::run
+    ├── app.rs                    composition root: one arm per subcommand, builds gateways, calls a
+    │                             use case, hands the result to a presenter
+    ├── (planned)                 daemon.rs (runtime, socket listener, session supervisor) ·
+    │                             service.rs (launchd, systemd, URL scheme)
     │
     ├── entities/                 enterprise rules, no I/O, depends on nothing else in the crate
     │   ├── command.rs                CommandLine
-    │   ├── exit_status.rs            ExitStatus
-    │   ├── outcome.rs                CommandOutcome
+    │   ├── exit_status.rs            ExitStatus (interruptions, 126, 127)
+    │   ├── outcome.rs                CommandOutcome, its fingerprint
+    │   ├── time.rs                   Timestamp · Duration, as values
+    │   ├── session.rs                Session · SessionId (the last 20 outcomes of a shell)
+    │   ├── case.rs                   FailureCase · CaseId (outcome, cwd, session, recent, output)
+    │   ├── fix.rs                    Fix · Confidence · FixSource
+    │   ├── danger.rs                 Danger · classify_danger
+    │   ├── distance.rs               edit distance, closest candidate with tie rules
+    │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the five instant rules)
+    │   ├── redaction.rs              redact · Redacted · SecretKind
+    │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
+    │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
+    │   ├── brief.rs                  case_document · hand_off_brief (output fenced as data)
     │   ├── triage.rs                 TriageDecision · QuietReason
     │   ├── shell.rs                  Shell
-    │   └── (planned)                 Session · FailureCase · Context (cwd, git, history) · CapturedOutput ·
-    │                                 Redaction · Rule · Fix · Danger · Task · ModelTier · RoutingPolicy ·
-    │                                 Bubble · Action · Budget
+    │   └── (planned)                 CapturedOutput · Task · Budget · Bubble · Action
     │
     ├── use_cases/                application rules, depends on the entities only
-    │   ├── triage_outcome.rs         the one interactor that exists today
-    │   ├── (planned)                 register_session · record_command_start · classify_failure · propose_fix ·
-    │   │                             explain_failure · hand_off_to_agent · ignore_failure · recall_case ·
-    │   │                             route_task · redact_case · install_shell_hook · diagnose
+    │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
+    │   ├── fix_last.rs               rules first, then the quick-fix model
+    │   ├── explain.rs                routed models, sensitive ⇒ local only
+    │   ├── hand_off.rs               prepare the brief, then launch the agent
+    │   ├── ignore.rs                 ignore and mute
+    │   ├── privacy.rs                what would be sent
+    │   ├── diagnose.rs               doctor's checks
+    │   ├── facts.rs · prompts.rs · routing.rs
+    │   ├── testing.rs                in-memory fakes of every port (cfg(test))
+    │   ├── (planned)                 register_session · classify_failure · recall_case · learn_rule
     │   └── ports/                    one trait per file, role nouns, each owning its error type
-    │       └── (planned)             SessionRegistry · CaseStore · Clock · Notifier · OutputSource ·
-    │                                 ModelGateway · AgentLauncher · SecretStore · ConfigSource ·
-    │                                 RuleBook · CostLedger · Randomness
+    │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
+    │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs
+    │       └── (planned)             Notifier · OutputSource · RuleBook · CostLedger
     │
     └── adapters/                 depends on the entities and the use cases
-        ├── controllers/              cli.rs (argv → Command)
-        │   └── (planned)             socket.rs (daemon frames → use cases) · url_scheme.rs (kintsu:// → use cases)
-        ├── presenters/               hint.rs · shell_hook.rs
-        │   └── (planned)             toast.rs · panel/ (ratatui, inline viewport) · ghost_text.rs ·
-        │                             handoff_brief.rs · plain.rs · json.rs
-        └── gateways/
-            └── (planned)             models/{openai_compatible,anthropic,gemini,ollama,cli_agent}.rs ·
-                                      agents/{claude_code,codex,opencode,aider,gemini_cli,copilot,template}.rs ·
-                                      output_sources/{tmux,herdr,wezterm,kitty,iterm2,stderr_tee}.rs ·
-                                      sessions/in_memory.rs · store/sqlite.rs · config/toml.rs ·
-                                      secrets/{keychain,secret_service,env,command}.rs ·
-                                      notify/{zle_fd,signal,next_prompt}.rs · clock.rs · rules/builtin.rs
+        ├── controllers/              cli.rs (argv → Command; the environment is main's job)
+        │   └── (planned)             socket.rs (daemon frames) · url_scheme.rs (kintsu://)
+        ├── presenters/               style.rs (the seam) · toast.rs · plain.rs · doctor.rs · shell_hook.rs
+        │   └── (planned)             panel/ (ratatui, inline viewport) · ghost_text.rs · json.rs
+        └── gateways/                 json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
+            │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
+            │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
+            │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs
+            └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2,stderr_tee}.rs ·
+                                      store/sqlite.rs · notify/{zle_fd,signal,next_prompt}.rs
 ```
 
 ## The rings
@@ -84,9 +100,10 @@ kintsu/
    application policy: when to stay quiet, what context to collect, which
    task to route where, what must never run without confirmation.
    - **Ports** live in `use_cases/ports/`: role-noun traits, one per file,
-     each owning its error type (`SessionRegistry`, `CaseStore`, `Clock`,
-     `Notifier`, `OutputSource`, `ModelGateway`, `AgentLauncher`,
-     `SecretStore`, `ConfigSource`, `RuleBook`, `CostLedger`).
+     each owning its error type. Today: `Clock`, `IdGenerator`,
+     `Environment`, `SessionRegistry`, `CaseStore`, `IgnoreStore`,
+     `Secrets`, `ModelGateway`, `AgentLauncher`. Planned: `Notifier`,
+     `OutputSource`, `RuleBook`, `CostLedger`.
    - Async-agnostic: a port that waits on the world returns `impl Future`.
      No executor, no `tokio`, no channel type from a runtime crate. The
      daemon decides how futures are driven.
