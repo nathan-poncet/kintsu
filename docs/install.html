@@ -26,68 +26,93 @@
 <main id="main" class="doc">
   <header class="doc-head">
     <p class="section-label">Install</p>
-    <h1>One line, <em>or step by step.</em></h1>
-    <p class="lede">One static binary, no runtime, no account. The installer does everything; the other methods are here for people who like to see each step.</p>
+    <h1>Install</h1>
+    <p class="lede">One static binary. No runtime, no account.</p>
   </header>
-  <section id="install">
-    
-    <div class="install-card wide">
-      <div class="config-head"><span>the installer</span><span class="now">today</span></div>
-      <pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh
 
-<span class="c"># the same script, with options</span>
-curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --dir ~/bin --no-hook
-curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --uninstall</code></pre>
-      <p class="card-note">Options: <code>--dir</code>, <code>--version</code>, <code>--from-source</code>, <code>--no-hook</code>, <code>--yes</code>, <code>--dry-run</code>, <code>--uninstall</code>. Release archives are checked against the published SHA256SUMS. <a href="https://github.com/nathan-poncet/kintsu/blob/main/install.sh" target="_blank" rel="noopener">Read it before you run it</a>; it is 130 lines of plain sh.</p>
+  <section id="one-line">
+    <h2>One line</h2>
+    <div class="config"><div class="config-head"><span>macOS · Linux · zsh, bash, fish</span><span class="now">today</span></div><pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code></pre></div>
+    <p class="plain">Installs the binary in <code>~/.local/bin</code> and asks before adding one line to your shell configuration. Open a new shell. Done.</p>
+  </section>
+
+  <section id="hook">
+    <h2>If you skipped the hook</h2>
+    <p class="plain">Add the line yourself, then open a new shell.</p>
+    <div class="tabs">
+      <div class="tab-list" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-tab="zsh">zsh</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="bash">bash</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="fish">fish</button>
+      </div>
+      <div class="tab-panel on" data-tab="zsh" role="tabpanel"><div class="config"><div class="config-head"><span>~/.zshrc</span></div><pre><code>eval "$(kintsu init zsh)"</code></pre></div></div>
+      <div class="tab-panel" data-tab="bash" role="tabpanel"><div class="config"><div class="config-head"><span>~/.bashrc</span></div><pre><code>eval "$(kintsu init bash)"</code></pre><p class="card-note">In bash, messages arrive at the next prompt and there is no ghost text. Everything else is the same.</p></div></div>
+      <div class="tab-panel" data-tab="fish" role="tabpanel"><div class="config"><div class="config-head"><span>~/.config/fish/config.fish</span></div><pre><code>kintsu init fish | source</code></pre></div></div>
     </div>
-    <h3 class="step-title"><span class="step-n">or</span> by hand</h3>
-    <div class="tabs" role="presentation">
-      <input type="radio" name="os" id="os-mac" checked><label for="os-mac">macOS</label>
-      <input type="radio" name="os" id="os-linux"><label for="os-linux">Linux</label>
-      <input type="radio" name="os" id="os-src"><label for="os-src">From source</label>
-      <input type="radio" name="os" id="os-more"><label for="os-more">Other ways</label>
+  </section>
 
-      <div class="tab-panel" data-for="os-mac">
-        <div class="install-card"><div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div><pre><code>brew install nathan-poncet/tap/kintsu</code></pre></div>
-        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz
-tar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>. Signed and notarized.</p></div>
+  <section id="other">
+    <h2>Other ways</h2>
+    <p class="plain">Package managers arrive with v0.1. Building from source works today.</p>
+    <div class="tabs">
+      <div class="tab-list" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-tab="mac">macOS</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="linux">Linux</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="source">From source</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="remote">Servers, tmux, Herdr</button>
       </div>
-      <div class="tab-panel" data-for="os-linux">
-        <div class="install-card"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz
-tar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static musl build, any distribution, <code>aarch64</code> too. No <code>curl | sh</code>: you download, you look, you install.</p></div>
-        <div class="install-card"><div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div><pre><code>cargo binstall kintsu</code></pre></div>
-        <div class="install-card"><div class="config-head"><span>Nix, AUR</span><span class="soon">later, help welcome</span></div><pre><code>nix run github:nathan-poncet/kintsu
-yay -S kintsu-bin</code></pre></div>
+      <div class="tab-panel on" data-tab="mac" role="tabpanel">
+        <div class="config"><div class="config-head"><span>Homebrew</span><span class="soon">with v0.1</span></div><pre><code>brew install nathan-poncet/tap/kintsu</code></pre></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
+        <div class="config"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz\ntar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>.</p></div>
       </div>
-      <div class="tab-panel" data-for="os-src">
-        <div class="install-card"><div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div><pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre><p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>. Builds in a second; there are no dependencies yet.</p></div>
-        <div class="install-card"><div class="config-head"><span>clone and build</span><span class="now">today</span></div><pre><code>git clone https://github.com/nathan-poncet/kintsu.git
-cd kintsu &amp;&amp; cargo install --path .</code></pre></div>
-        <div class="install-card"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
+      <div class="tab-panel" data-tab="linux" role="tabpanel">
+        <div class="config"><div class="config-head"><span>prebuilt binary</span><span class="soon">with v0.1</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz\ntar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static build, any distribution. <code>aarch64</code> too.</p></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
+        <div class="config"><div class="config-head"><span>cargo binstall</span><span class="soon">with v0.1</span></div><pre><code>cargo binstall kintsu</code></pre></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
+        <div class="config"><div class="config-head"><span>Nix, AUR</span><span class="soon">later, help welcome</span></div><pre><code>nix run github:nathan-poncet/kintsu</code></pre></div>
       </div>
-      <div class="tab-panel" data-for="os-more">
-        <div class="install-card"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'cargo install --git https://github.com/nathan-poncet/kintsu'
-<span class="c"># the daemon runs per user on the remote host; your keys stay where you put them</span></code></pre></div>
-        <div class="install-card"><div class="config-head"><span>inside tmux or Herdr</span><span class="now">today</span></div><pre><code><span class="c"># nothing special: the hook lives in your shell; the multiplexer is where</span>
-<span class="c"># Kintsu reads the actual output best</span></code></pre></div>
-        <div class="install-card"><div class="config-head"><span>as a Herdr plugin</span><span class="soon">later</span></div><pre><code>herdr plugin install nathan-poncet/kintsu</code></pre></div>
+      <div class="tab-panel" data-tab="source" role="tabpanel">
+        <div class="config"><div class="config-head"><span>cargo, from the repository</span><span class="now">today</span></div><pre><code>cargo install --git https://github.com/nathan-poncet/kintsu</code></pre><p class="card-note">Needs a Rust toolchain: <a href="https://rustup.rs" target="_blank" rel="noopener">rustup.rs</a>.</p></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
+        <div class="config"><div class="config-head"><span>clone and build</span><span class="now">today</span></div><pre><code>git clone https://github.com/nathan-poncet/kintsu.git\ncd kintsu &amp;&amp; cargo install --path .</code></pre></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
+        <div class="config"><div class="config-head"><span>cargo, from crates.io</span><span class="soon">with v0.1</span></div><pre><code>cargo install kintsu</code></pre></div>
+      </div>
+      <div class="tab-panel" data-tab="remote" role="tabpanel">
+        <div class="config"><div class="config-head"><span>on a server, over SSH</span><span class="now">today</span></div><pre><code>ssh box 'curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes'</code></pre><p class="card-note">The daemon runs per user on the remote host. Your keys stay where you put them.</p></div>
+        <p class="plain">Inside tmux or Herdr, nothing changes: the hook lives in your shell. A Herdr plugin comes later.</p>
       </div>
     </div>
+  </section>
 
-    <h3 class="step-title"><span class="step-n">2</span> Hook your shell</h3>
-    <div class="tabs" role="presentation">
-      <input type="radio" name="sh" id="sh-zsh" checked><label for="sh-zsh">zsh</label>
-      <input type="radio" name="sh" id="sh-bash"><label for="sh-bash">bash</label>
-      <input type="radio" name="sh" id="sh-fish"><label for="sh-fish">fish</label>
-      <div class="tab-panel" data-for="sh-zsh"><div class="install-card"><div class="config-head"><span>~/.zshrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init zsh)"</code></pre></div></div>
-      <div class="tab-panel" data-for="sh-bash"><div class="install-card"><div class="config-head"><span>~/.bashrc</span><span class="now">today</span></div><pre><code>eval "$(kintsu init bash)"</code></pre><p class="card-note">Messages arrive at the next prompt and there is no ghost text: bash has no safe way to draw while readline waits. Everything else is the same.</p></div></div>
-      <div class="tab-panel" data-for="sh-fish"><div class="install-card"><div class="config-head"><span>~/.config/fish/config.fish</span><span class="now">today</span></div><pre><code>kintsu init fish | source</code></pre></div></div>
-    </div>
+  <section id="uninstall">
+    <h2>Uninstall</h2>
+    <div class="config"><div class="config-head"><span>removes the binary and the hook line</span></div><pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --uninstall</code></pre></div>
+    <p class="plain">Nothing else was touched.</p>
+  </section>
 
-    <h3 class="step-title"><span class="step-n">3</span> Make it yours, when v0.1 lands</h3>
-    <div class="install-card wide"><div class="config-head"><span>three commands</span><span class="soon">with v0.1</span></div><pre><code>kintsu setup            <span class="c"># Ollama? a key? a CLI agent? Writes ~/.config/kintsu/config.toml</span>
-kintsu doctor           <span class="c"># what works, what is missing, what an answer would cost</span>
-kintsu service install  <span class="c"># the daemon survives logout and restarts on crash</span></code></pre><p class="card-note">Uninstall: remove the line from your rc file, <code>kintsu service uninstall</code>, delete the binary. Nothing else was touched.</p></div>
+  <section id="options" class="subtle">
+    <h2>Installer options</h2>
+    <p class="plain">For automation, a custom directory, or a shell you manage yourself.</p>
+    <table class="ref">
+      <tbody>
+        <tr><td><code>--dir DIR</code></td><td>install directory; default <code>~/.local/bin</code>, or <code>$KINTSU_INSTALL_DIR</code></td></tr>
+        <tr><td><code>--no-hook</code></td><td>never touch a shell configuration file</td></tr>
+        <tr><td><code>--yes</code></td><td>add the hook without asking; also <code>KINTSU_YES=1</code></td></tr>
+        <tr><td><code>--version vX.Y.Z</code></td><td>a specific release instead of the latest</td></tr>
+        <tr><td><code>--from-source</code></td><td>skip the release, build with cargo</td></tr>
+        <tr><td><code>--dry-run</code></td><td>print what would happen</td></tr>
+      </tbody>
+    </table>
+    <div class="config"><div class="config-head"><span>example: a CI job, no prompt, no rc change</span></div><pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh -s -- --yes --no-hook --dir /usr/local/bin</code></pre></div>
+    <p class="plain">Release archives are checked against the published SHA256SUMS. The script is <a href="https://github.com/nathan-poncet/kintsu/blob/main/install.sh" target="_blank" rel="noopener">130 lines of plain sh</a>.</p>
+  </section>
+
+  <section id="next" class="subtle">
+    <h2>After v0.1</h2>
+    <p class="plain">Three commands come with the first release: <code>kintsu setup</code> writes the configuration, <code>kintsu doctor</code> checks it, <code>kintsu service install</code> keeps the daemon running after logout.</p>
   </section>
 </main>
 

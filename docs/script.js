@@ -433,6 +433,27 @@
   }
   if (window.kintsuTour) window.addEventListener("hashchange", () => window.kintsuTour.play(fromHash()));
 
+  // ── selectors: one way at a time ─────────────────────────────────────
+  document.querySelectorAll(".tabs").forEach((tabs) => {
+    const btns = [...tabs.querySelectorAll(":scope > .tab-list > [role=tab]")];
+    const panels = [...tabs.querySelectorAll(":scope > .tab-panel")];
+    if (!btns.length) return;
+    const show = (id) => { btns.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === id))); panels.forEach((p) => p.classList.toggle("on", p.dataset.tab === id)); };
+    btns.forEach((b) => b.addEventListener("click", () => show(b.dataset.tab)));
+    show((btns.find((b) => b.getAttribute("aria-selected") === "true") || btns[0]).dataset.tab);
+  });
+
+  // ── every code block in the docs can be copied ───────────────────────
+  const copyText = (pre) => pre.innerText ?? pre.textContent;
+  document.querySelectorAll("main.doc pre, main.tour-page pre").forEach((pre) => {
+    if (pre.closest(".snippet")) return;
+    const btn = el("button", "copy", "copy"); btn.type = "button"; btn.setAttribute("aria-label", "Copy this block");
+    btn.addEventListener("click", async () => { try { await navigator.clipboard.writeText(copyText(pre).replace(/\n+$/, "")); btn.textContent = "copied"; } catch { btn.textContent = "select it"; } setTimeout(() => (btn.textContent = "copy"), 1400); });
+    const head = pre.previousElementSibling;
+    if (head && head.classList.contains("config-head")) head.appendChild(btn);
+    else { const wrap = el("div", "codeblock"); pre.replaceWith(wrap); wrap.appendChild(pre); wrap.appendChild(btn); }
+  });
+
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; } catch { b.textContent = "select it"; }

@@ -161,12 +161,17 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
   <section id="keys">
     <h2>Keys</h2>
     <p>A key source, per model, in order of preference. The daemon reads keys once, keeps them in memory, never logs them, never puts them in the protocol.</p>
-    <div class="config">
-      <div class="config-head"><span>key = { … }</span></div>
-<pre><code>key = { keychain = true }                                  <span class="c"># macOS Keychain or Linux secret-service; stored by `kintsu login haiku`</span>
-key = { env = <span class="s">"ANTHROPIC_API_KEY"</span> }                       <span class="c"># read from the daemon's environment</span>
-key = { command = <span class="s">"op read op://dev/anthropic/key"</span> }      <span class="c"># run once, output trimmed</span>
-key = { literal = <span class="s">"sk-ant-…"</span> }                            <span class="c"># works; kintsu doctor warns about it</span></code></pre>
+    <div class="tabs">
+      <div class="tab-list" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-tab="keychain">keychain</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="env">environment variable</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="command">command</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="literal">literal</button>
+      </div>
+      <div class="tab-panel on" data-tab="keychain" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { keychain = true }</code></pre><p class="card-note">macOS Keychain or Linux secret-service. Stored by <code>kintsu login &lt;model&gt;</code>.</p></div></div>
+      <div class="tab-panel" data-tab="env" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { env = <span class="s">"ANTHROPIC_API_KEY"</span> }</code></pre><p class="card-note">Read from the daemon's environment.</p></div></div>
+      <div class="tab-panel" data-tab="command" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { command = <span class="s">"op read op://dev/anthropic/key"</span> }</code></pre><p class="card-note">Run once at start; the output, trimmed, is the key.</p></div></div>
+      <div class="tab-panel" data-tab="literal" role="tabpanel"><div class="config"><div class="config-head"><span>key = { … }</span></div><pre><code>key = { literal = <span class="s">"sk-ant-…"</span> }</code></pre><p class="card-note">Works; <code>kintsu doctor</code> warns about it.</p></div></div>
     </div>
     <p class="note">A <code>cli_agent</code> has no key: the CLI brings its own login. That is how a Claude, ChatGPT or Copilot subscription is reused without an API key.</p>
   </section>
@@ -283,8 +288,15 @@ sensitive_output = <span class="s">"local_only"</span>                 <span cla
   <!-- ─────────── examples ─────────── -->
   <section id="examples">
     <h2>Complete examples</h2>
-    <div class="examples">
-      <div class="config">
+    <div class="tabs">
+      <div class="tab-list" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-tab="local">Local only</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="key">One key</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="sub">Your subscription</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="work">At work</button>
+      </div>
+      <div class="tab-panel on" data-tab="local" role="tabpanel">
+<div class="config">
         <div class="config-head"><span>local only: Ollama, nothing leaves</span><span class="where local">local</span></div>
 <pre><code><span class="k">[models.tiny]</span>
 provider = <span class="s">"ollama"</span>  model = <span class="s">"qwen3:1.7b"</span>  tier = <span class="s">"tiny"</span>
@@ -300,7 +312,9 @@ summarize = [<span class="s">"tiny"</span>]
 <span class="k">[routing.constraints]</span>
 offline = <span class="s">"local_only"</span></code></pre>
       </div>
-      <div class="config">
+      </div>
+      <div class="tab-panel" data-tab="key" role="tabpanel">
+<div class="config">
         <div class="config-head"><span>one key: Haiku for words, tiny for triage</span><span class="where cloud">cloud</span> <span class="where local">local</span></div>
 <pre><code><span class="k">[models.tiny]</span>
 provider = <span class="s">"ollama"</span>     model = <span class="s">"qwen3:1.7b"</span>  tier = <span class="s">"tiny"</span>
@@ -318,7 +332,9 @@ summarize = [<span class="s">"tiny"</span>]
 sensitive_output = <span class="s">"local_only"</span>
 max_daily_cost   = <span class="s">"0.50 USD"</span></code></pre>
       </div>
-      <div class="config">
+      </div>
+      <div class="tab-panel" data-tab="sub" role="tabpanel">
+<div class="config">
         <div class="config-head"><span>no key at all: your Claude Code subscription</span><span class="where you">your account</span></div>
 <pre><code><span class="k">[models.claude-code]</span>
 provider = <span class="s">"cli_agent"</span>  command = <span class="s">"claude"</span>  tier = <span class="s">"agent"</span>
@@ -330,7 +346,9 @@ quick_fix   = [<span class="s">"claude-code"</span>]
 explain     = [<span class="s">"claude-code"</span>]
 investigate = [<span class="s">"claude-code"</span>]</code></pre>
       </div>
-      <div class="config">
+      </div>
+      <div class="tab-panel" data-tab="work" role="tabpanel">
+<div class="config">
         <div class="config-head"><span>at work: an approved endpoint, private paths, a budget</span><span class="where cloud">cloud</span></div>
 <pre><code><span class="k">[models.approved]</span>
 provider = <span class="s">"openai_compatible"</span>
@@ -347,6 +365,7 @@ explain   = [<span class="s">"approved"</span>]
 private_paths    = [<span class="s">"~/work/**"</span>]
 sensitive_output = <span class="s">"local_only"</span>    <span class="c"># with no local model configured, a sensitive case gets rules only</span>
 max_daily_cost   = <span class="s">"2.00 USD"</span></code></pre>
+      </div>
       </div>
     </div>
   </section>

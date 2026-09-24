@@ -267,32 +267,33 @@ section { padding: 60px 0 6px; }
 .tiles li { padding: 20px 20px 8px; border-top: 2px solid var(--gold); background: var(--bg-2); border-radius: 0 0 12px 12px; }
 .tiles p { color: var(--muted); font-size: 15.5px; }
 
-/* install */
-.tabs { position: relative; margin: 6px 0 22px; }
-.tabs > input { position: absolute; opacity: 0; pointer-events: none; }
-.tabs > label { display: inline-block; padding: 7px 14px; margin: 0 6px 10px 0; border: 1px solid var(--line); border-radius: 999px; font-size: 14px; color: var(--muted); cursor: pointer; user-select: none; }
-.tabs > label:hover { color: var(--text); }
-.tabs > input:focus-visible + label { outline: 2px solid var(--gold); outline-offset: 2px; }
-.tab-panel { display: none; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-#os-mac:checked ~ label[for="os-mac"], #os-linux:checked ~ label[for="os-linux"], #os-src:checked ~ label[for="os-src"], #os-more:checked ~ label[for="os-more"],
-#sh-zsh:checked ~ label[for="sh-zsh"], #sh-bash:checked ~ label[for="sh-bash"], #sh-fish:checked ~ label[for="sh-fish"] { color: var(--text); border-color: var(--gold); background: rgba(217,164,65,.08); }
-#os-mac:checked ~ .tab-panel[data-for="os-mac"], #os-linux:checked ~ .tab-panel[data-for="os-linux"], #os-src:checked ~ .tab-panel[data-for="os-src"], #os-more:checked ~ .tab-panel[data-for="os-more"],
-#sh-zsh:checked ~ .tab-panel[data-for="sh-zsh"], #sh-bash:checked ~ .tab-panel[data-for="sh-bash"], #sh-fish:checked ~ .tab-panel[data-for="sh-fish"] { display: grid; }
-.config, .install-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #0b0a09; min-width: 0; }
-.config { margin: 12px 0; }
-.config-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px; font: 12.5px var(--mono); color: #8d8478; border-bottom: 1px solid #1f1b17; background: #110f0d; }
+/* selectors: one way at a time; without the script, every panel shows, stacked */
+.tabs { margin: 18px 0 8px; }
+.tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.tab-list [role="tab"] { font: 14px var(--sans); padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+.tab-list [role="tab"]:hover { color: var(--text); }
+.tab-list [role="tab"][aria-selected="true"] { color: var(--text); border-color: var(--gold); background: rgba(217,164,65,.08); }
+.tab-list [role="tab"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.js .tab-panel:not(.on) { display: none; }
+.tab-panel > .config:first-child { margin-top: 0; }
+.or { display: flex; align-items: center; gap: 14px; margin: 18px 0; color: var(--dim); font: 11.5px var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.config, .install-card { position: relative; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #0b0a09; min-width: 0; }
+.config { margin: 22px 0; }
+.config-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; font: 12.5px var(--mono); color: #8d8478; border-bottom: 1px solid #1f1b17; background: #110f0d; }
+.config-head > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.config-head .copy { margin-left: 6px; }
+.codeblock { position: relative; }
+.codeblock > .copy { position: absolute; top: 8px; right: 8px; }
 .config-head .soon, .config-head .now { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
 .config-head .soon { color: #d9a441; border-color: rgba(217,164,65,.45); }
 .config-head .now { color: #8fbf7f; border-color: rgba(143,191,127,.45); }
-.config pre, .install-card pre { margin: 0; padding: 16px 18px; font-size: 13.5px; line-height: 1.6; color: #d8d1c4; overflow-x: auto; }
+.config pre, .install-card pre { margin: 0; padding: 18px 20px; font-size: 13.5px; line-height: 1.65; color: #d8d1c4; overflow-x: auto; }
 .install-card pre { color: #e8e2d6; }
 .config .k { color: #d9a441; } .config .s { color: #cfe3b6; } .c { color: #6d665c; }
-.card-note { margin: 0; padding: 0 16px 14px; font-size: 13.5px; color: #8d8478; }
+.card-note { margin: 0; padding: 2px 20px 16px; font-size: 13.5px; color: #8d8478; }
 .card-note code { background: #1a1613; border-color: #2a2521; color: #d8d1c4; }
 .card-note a { color: #cfc6b8; }
-.step-title { display: flex; align-items: center; gap: 10px; margin: 26px 0 12px; font-size: 20px; }
-.step-n { width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: #1a1408; font-size: 13px; font-weight: 700; display: grid; place-items: center; }
-.install-card.wide { margin-top: 6px; }
 .providers { margin-top: 16px; color: var(--dim); font-size: 14px; }
 
 /* faq */
@@ -320,18 +321,19 @@ body.page main.faq section { padding-top: 26px; }
 .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
 .toc a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; }
 .toc a:hover { color: var(--text); border-color: var(--gold); }
-.doc section { padding: 64px 0 0; scroll-margin-top: 24px; }
+.doc section { padding: 72px 0 0; scroll-margin-top: 24px; }
+.doc section.subtle h2 { font-size: 20px; color: var(--muted); }
+.doc section.subtle { padding-top: 56px; }
+.doc .plain { color: var(--muted); font-size: 15.5px; max-width: 720px; margin: 10px 0 0; }
+.doc .plain code { color: var(--text); }
 .doc h2 { font-size: 28px; margin-bottom: 10px; }
 .doc section > p { color: var(--muted); }
 .doc .note { font-size: 14.5px; color: var(--muted); border-left: 2px solid var(--gold); padding-left: 12px; margin-top: 12px; }
 .doc .note code, .doc td code, .doc p code { color: var(--text); }
-.ref { width: 100%; border-collapse: collapse; font-size: 14px; margin: 14px 0; }
+.ref { width: 100%; border-collapse: collapse; font-size: 14px; margin: 22px 0; }
 .ref th, .ref td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .ref thead th { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .ref td:first-child code { white-space: nowrap; }
-.examples { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 860px) { .examples { grid-template-columns: 1fr; } }
-.examples .config { margin: 0; }
 .config-head .where { font-size: 10px; }
 
 /* roadmap: a simple timeline */
