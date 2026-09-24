@@ -96,6 +96,7 @@ struct QuietDto {
 struct UiDto {
     mode: Option<String>,
     ascii: Option<bool>,
+    eager_fix: Option<bool>,
 }
 
 /// The pseudo-model the documentation allows in routing lists.
@@ -175,6 +176,7 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             }
         },
         ascii: file.ui.ascii.unwrap_or(false),
+        eager_fix: file.ui.eager_fix.unwrap_or(false),
     };
     Ok(Settings {
         models,
@@ -425,6 +427,7 @@ off_in = ["~/scratch/**", "/tmp/x/"]
 [ui]
 mode = "hint"
 ascii = true
+eager_fix = true
 "#;
         let s = parse_settings(text, Some("/home/me")).unwrap();
         assert!(!s.sensitive_local_only);
@@ -437,7 +440,8 @@ ascii = true
             s.ui,
             UiSettings {
                 mode: UiMode::Hint,
-                ascii: true
+                ascii: true,
+                eager_fix: true
             }
         );
     }

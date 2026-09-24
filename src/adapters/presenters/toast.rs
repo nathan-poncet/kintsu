@@ -1,6 +1,6 @@
 //! The bubble under a failed command: one sentence, one line of actions.
 
-use crate::entities::{Danger, Fix, TriageDecision, UiMode};
+use crate::entities::{Danger, Fix, Message, MessageBody, TriageDecision, UiMode};
 
 use super::Style;
 
@@ -54,6 +54,38 @@ pub fn toast(decision: &TriageDecision, style: &Style) -> Option<String> {
     })
 }
 
+/// A message that arrives later: a model's fix or explanation for a case
+/// the shell already moved past.
+pub fn message_toast(message: &Message, style: &Style) -> String {
+    let dot = style.dot();
+    match message.body() {
+        MessageBody::Fix(fix) => {
+            let who = match fix.source() {
+                crate::entities::FixSource::Model(name) => format!("{name}{dot}not verified"),
+                crate::entities::FixSource::Rule(name) => format!("rule{dot}{name}"),
+            };
+            let sentence = format!(
+                "Try {}?{} {}",
+                style.bold(fix.command().as_str()),
+                danger_note(fix, style),
+                style.dim(&format!("({who})"))
+            );
+            let actions = format!("^K to insert{dot}kintsu why{dot}kintsu agent");
+            format!(
+                "{}\n{}",
+                style.line(&sentence),
+                style.line(&style.dim(&actions))
+            )
+        }
+        MessageBody::Explanation { model, text } => {
+            let mut out = style.lines(text.trim());
+            out.push('\n');
+            out.push_str(&style.line(&style.dim(&format!("— {model}"))));
+            out
+        }
+    }
+}
+
 fn danger_note(fix: &Fix, style: &Style) -> String {
     match fix.danger() {
         Danger::None => String::new(),
@@ -84,7 +116,7 @@ mod tests {
             Fix::new(
                 CommandLine::new(f).unwrap(),
                 Confidence::new(0.9),
-                FixSource::Rule("typo"),
+                FixSource::Rule("typo".into()),
                 "because",
             )
         });
@@ -166,6 +198,37 @@ mod tests {
         assert_eq!(
             toast(&offer("make", 2, None, None), &hint).unwrap(),
             "| make exited 2."
+        );
+    }
+
+    #[test]
+    fn a_message_reads_as_a_late_suggestion_or_an_explanation() {
+        let fix = Fix::new(
+            CommandLine::new("nvm use 22").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "",
+        );
+        let m = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Fix(fix),
+        );
+        assert_eq!(
+            message_toast(&m, &Style::PLAIN),
+            "| Try nvm use 22? (local - not verified)\n| ^K to insert - kintsu why - kintsu agent"
+        );
+        let e = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Explanation {
+                model: "haiku".into(),
+                text: "Node is too old.\n".into(),
+            },
+        );
+        assert_eq!(
+            message_toast(&e, &Style::PLAIN),
+            "| Node is too old.\n| — haiku"
         );
     }
 

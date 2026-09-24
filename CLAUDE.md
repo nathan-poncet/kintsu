@@ -27,8 +27,13 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   served by GitHub Pages (source `main`, folder `/docs`). No framework, no
   build step. `scripts/docs-shell.py` regenerates the documentation shell.
 - `docs/DECISIONS.md` records what v0.1 built differently from the design
-  documents (no daemon yet, hooks report every command, `^K` inserts the
-  fix…). Update it when a decision changes.
+  documents (hooks report every command, `^K` inserts the fix, JSON state
+  instead of SQLite, the daemon's actual scope…). Update it when a decision
+  changes.
+- `src/daemon.rs` is the resident process (composition root, like `app.rs`);
+  `daemon::os` is the only module allowed `unsafe` (`libc` calls). Tests and
+  the CI smoke run set `KINTSU_NO_DAEMON=1` unless they test the daemon;
+  `tests/daemon.rs` drives a real daemon over a scratch socket.
 - A new side effect gets a port, an in-memory fake and a contract test first;
   every gateway passes the same contract suite.
 - Design references before proposing anything: `docs/DAEMON.md` (process model,

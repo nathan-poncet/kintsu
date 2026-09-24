@@ -1,5 +1,11 @@
 # The daemon
 
+*Status (2026-09-24): built as described below for the frames `hello`,
+`command_finished`, `subscribe`, `pending` and `shutdown`, the delivery
+into zsh, fish and bash, the on-demand start and the version handshake.
+Not yet: `session_new`, `act`, `get_case`, SQLite, `service install`, the
+idle exit. See [DECISIONS.md](DECISIONS.md), section 2.*
+
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and
 the `kintsu` commands are thin clients that talk to it over a Unix socket.

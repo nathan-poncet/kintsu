@@ -147,7 +147,7 @@ mod tests {
         let fix = Fix::new(
             CommandLine::new("npm test -- refresh").unwrap(),
             Confidence::new(0.5),
-            FixSource::Rule("x"),
+            FixSource::Rule("x".into()),
             "narrow it down",
         );
         let brief = hand_off_brief(

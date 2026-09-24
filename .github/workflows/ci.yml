@@ -36,6 +36,7 @@ jobs:
           KINTSU_STATE_DIR: ${{ runner.temp }}/kintsu-state
           KINTSU_CONFIG: ${{ runner.temp }}/kintsu-config.toml
           KINTSU_SESSION: ci
+          KINTSU_NO_DAEMON: "1"
         run: |
           k=./target/release/kintsu
           $k --version
@@ -53,6 +54,19 @@ jobs:
           $k default-config > "$KINTSU_CONFIG"
           $k config path | grep -q kintsu-config.toml
           $k doctor | grep -q 'Everything Kintsu needs is here'
+      - name: Smoke test the daemon
+        shell: bash
+        env:
+          KINTSU_STATE_DIR: ${{ runner.temp }}/kintsu-state
+          KINTSU_CONFIG: ${{ runner.temp }}/kintsu-config.toml
+          KINTSU_SOCKET: ${{ runner.temp }}/kintsu.sock
+        run: |
+          k=./target/release/kintsu
+          $k daemon status && exit 1 || true
+          $k triage --status 127 --command 'gti status' --session ci2 2>&1 | grep -q 'Did you mean git status?'
+          $k daemon status | grep -q running
+          test "$(KINTSU_SESSION=ci2 $k fix --raw)" = 'git status'
+          $k daemon stop | grep -q stopped
       - name: Shell hooks parse
         shell: bash
         run: |

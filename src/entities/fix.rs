@@ -14,6 +14,11 @@ impl Confidence {
         Self(value.clamp(0.0, 1.0))
     }
 
+    /// The value.
+    pub fn value(self) -> f32 {
+        self.0
+    }
+
     /// Sure enough to be typed on the next prompt as ghost text.
     pub fn is_high(self) -> bool {
         self.0 >= 0.8
@@ -24,7 +29,7 @@ impl Confidence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FixSource {
     /// A built-in rule, by name.
-    Rule(&'static str),
+    Rule(String),
     /// A model, by its configured name.
     Model(String),
 }
@@ -109,13 +114,13 @@ mod tests {
         let safe = Fix::new(
             CommandLine::new("git status").unwrap(),
             Confidence::new(0.95),
-            FixSource::Rule("typo"),
+            FixSource::Rule("typo".into()),
             "gti is not on PATH",
         );
         let rough = Fix::new(
             CommandLine::new("rm -rf ./build").unwrap(),
             Confidence::new(0.95),
-            FixSource::Rule("typo"),
+            FixSource::Rule("typo".into()),
             "",
         );
         assert_eq!(safe.danger(), &Danger::None);

@@ -8,7 +8,14 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
-- The application, synchronously and without the daemon: `kintsu triage`
+- The resident daemon (`kintsu daemon run|status|stop`), started by the
+  first hook call, answering `command_finished` within a 40 ms budget with
+  a local fallback, and delivering messages into live shells: `zle -F` in
+  zsh, SIGUSR1 in fish, next prompt in bash. With `ui.eager_fix = true`
+  the quick-fix model is asked in the background after any failure no rule
+  could fix, and its answer arrives above the prompt; `kintsu fix` and
+  `^K` reuse it.
+- The application: `kintsu triage`
   records every command line of a shell session and decides whether to
   show the bubble; `kintsu fix [--raw]` from five rules (command typo,
   git/cargo subcommand typo, missing `./`, `cd` typo, apt→brew on macOS)

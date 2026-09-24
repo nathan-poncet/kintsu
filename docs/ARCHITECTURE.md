@@ -34,8 +34,9 @@ kintsu/
     ├── main.rs                   reads the environment once (paths, session, colour) and calls app::run
     ├── app.rs                    composition root: one arm per subcommand, builds gateways, calls a
     │                             use case, hands the result to a presenter
-    ├── (planned)                 daemon.rs (runtime, socket listener, session supervisor) ·
-    │                             service.rs (launchd, systemd, URL scheme)
+    ├── daemon.rs                 the resident process: socket listener, sessions and subscribers,
+    │                             follow-up workers; `daemon::os` holds the few libc calls
+    ├── (planned)                 service.rs (launchd, systemd, URL scheme)
     │
     ├── entities/                 enterprise rules, no I/O, depends on nothing else in the crate
     │   ├── command.rs                CommandLine
@@ -52,13 +53,15 @@ kintsu/
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
     │   ├── brief.rs                  case_document · hand_off_brief (output fenced as data)
+    │   ├── message.rs                Message · MessageBody (what arrives later)
     │   ├── triage.rs                 TriageDecision · QuietReason
     │   ├── shell.rs                  Shell
     │   └── (planned)                 CapturedOutput · Task · Budget · Bubble · Action
     │
     ├── use_cases/                application rules, depends on the entities only
     │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
-    │   ├── fix_last.rs               rules first, then the quick-fix model
+    │   ├── fix_last.rs               rules first, then a stored proposal, then the quick-fix model
+    │   ├── follow_up.rs              eager fix: ask the model after the bubble, deliver a message
     │   ├── explain.rs                routed models, sensitive ⇒ local only
     │   ├── hand_off.rs               prepare the brief, then launch the agent
     │   ├── ignore.rs                 ignore and mute
@@ -69,15 +72,18 @@ kintsu/
     │   ├── (planned)                 register_session · classify_failure · recall_case · learn_rule
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
-    │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs
-    │       └── (planned)             Notifier · OutputSource · RuleBook · CostLedger
+    │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
+    │       └── (planned)             OutputSource · RuleBook · CostLedger
     │
     └── adapters/                 depends on the entities and the use cases
-        ├── controllers/              cli.rs (argv → Command; the environment is main's job)
-        │   └── (planned)             socket.rs (daemon frames) · url_scheme.rs (kintsu://)
-        ├── presenters/               style.rs (the seam) · toast.rs · plain.rs · doctor.rs · shell_hook.rs
+        ├── controllers/              cli.rs (argv → Command; the environment is main's job) ·
+        │   │                         socket.rs (daemon frames → Request)
+        │   └── (planned)             url_scheme.rs (kintsu://)
+        ├── presenters/               style.rs (the seam) · toast.rs (toast, message_toast) · plain.rs ·
+        │   │                         doctor.rs · shell_hook.rs · frames.rs (daemon → client frames)
         │   └── (planned)             panel/ (ratatui, inline viewport) · ghost_text.rs · json.rs
-        └── gateways/                 json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
+        └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
+            │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs
@@ -102,7 +108,7 @@ kintsu/
    - **Ports** live in `use_cases/ports/`: role-noun traits, one per file,
      each owning its error type. Today: `Clock`, `IdGenerator`,
      `Environment`, `SessionRegistry`, `CaseStore`, `IgnoreStore`,
-     `Secrets`, `ModelGateway`, `AgentLauncher`. Planned: `Notifier`,
+     `Secrets`, `ModelGateway`, `AgentLauncher`, `Notifier`. Planned:
      `OutputSource`, `RuleBook`, `CostLedger`.
    - Async-agnostic: a port that waits on the world returns `impl Future`.
      No executor, no `tokio`, no channel type from a runtime crate. The

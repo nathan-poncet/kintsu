@@ -1,6 +1,6 @@
 //! A failure worth attention, with everything a helper needs to know.
 
-use crate::entities::{CommandLine, CommandOutcome, Redacted, SessionId, Timestamp, redact};
+use crate::entities::{CommandLine, CommandOutcome, Fix, Redacted, SessionId, Timestamp, redact};
 
 /// The unguessable identity of a case; clickable links and `act` frames
 /// carry it, so it is never sequential.
@@ -21,7 +21,7 @@ impl CaseId {
 
 /// A failed command and its context: where it ran, what ran before, what
 /// it printed when that was captured.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FailureCase {
     id: CaseId,
     at: Timestamp,
@@ -30,6 +30,7 @@ pub struct FailureCase {
     session: Option<SessionId>,
     recent: Vec<CommandLine>,
     output: Option<String>,
+    proposal: Option<Fix>,
 }
 
 impl FailureCase {
@@ -43,7 +44,14 @@ impl FailureCase {
             session: None,
             recent: Vec::new(),
             output: None,
+            proposal: None,
         }
+    }
+
+    /// The same case with a fix someone already proposed for it.
+    pub fn with_proposal(mut self, proposal: Option<Fix>) -> Self {
+        self.proposal = proposal;
+        self
     }
 
     /// The same case knowing which shell session it happened in.
@@ -97,6 +105,11 @@ impl FailureCase {
     /// What the command printed, when captured.
     pub fn output(&self) -> Option<&str> {
         self.output.as_deref()
+    }
+
+    /// The fix a rule or a model already proposed, if any.
+    pub fn proposal(&self) -> Option<&Fix> {
+        self.proposal.as_ref()
     }
 
     /// Everything that could leave the machine, with secrets redacted:

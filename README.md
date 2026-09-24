@@ -12,10 +12,11 @@ your choice, right there in your terminal.**
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/S3V726AT7H)
 
 > **Status: pre-alpha.** The bubble, the rule-based fixes, `why` with your
-> model, the hand-off to a CLI agent, ignore and mute, privacy preview and
-> doctor work today, synchronously, without the daemon. What was decided
-> on the way is in [docs/DECISIONS.md](docs/DECISIONS.md); the plan in
-> [docs/VISION.md](docs/VISION.md). Pushback is welcome in the issues.
+> model, the hand-off to a CLI agent, ignore and mute, privacy preview,
+> doctor, and the resident daemon that delivers a model's answer above
+> your prompt while you keep working: all of it runs today. What was
+> decided on the way is in [docs/DECISIONS.md](docs/DECISIONS.md); the
+> plan in [docs/VISION.md](docs/VISION.md). Pushback is welcome in the issues.
 
 ## The itch
 
@@ -40,8 +41,11 @@ $ git status
 
 A small bubble, one gold seam on the left, one sentence, a line of
 actions. `^K` puts the fix in your prompt; you press Enter. Nothing ever
-steals a keystroke from your prompt, and nothing runs on its own.
-Clickable words and the expanded panel come with the daemon (v0.2).
+steals a keystroke from your prompt, and nothing runs on its own. When no
+rule knows and you switched `eager_fix` on, a resident daemon asks your
+model in the background and the answer lands above your prompt a moment
+later, without interrupting what you type. Clickable words and the
+expanded panel come next.
 
 - **Fix**, the fast path: a one-line correction shown as ghost text you
   accept with Tab. Rules first (in the spirit of
@@ -141,13 +145,14 @@ The commands, all about the last failure of the current shell:
 | `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |
 | `kintsu mute [1h]` | nothing for a while |
 | `kintsu doctor`, `default-config`, `config path` | setup |
+| `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |
 
 ## Roadmap
 
-1. **v0.1, the bubble**: hooks, rule-based fixes, one provider layer
-   (OpenAI-compatible, Anthropic, Ollama), `why`, hand-off to a CLI agent
-   by template, config file, noise control. Built; the daemon and its
-   socket were moved out of it, see
+1. **v0.1, the bubble**: the daemon and its socket, hooks, rule-based
+   fixes, one provider layer (OpenAI-compatible, Anthropic, Ollama),
+   `why`, hand-off to a CLI agent by template, config file, noise
+   control. Built; what differs from the design documents is in
    [docs/DECISIONS.md](docs/DECISIONS.md).
 2. **v0.2, it reads the output**: stderr/stdout capture through terminal
    and multiplexer APIs, redaction and "what leaves the machine" preview,

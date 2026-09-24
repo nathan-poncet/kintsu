@@ -96,6 +96,7 @@ impl Triage<'_> {
             .with_recent(recent);
         let facts = gather_facts(self.environment, case.outcome(), case.cwd());
         let fix = suggest_fix(case.outcome(), &facts);
+        let case = case.with_proposal(fix.clone());
         self.cases.save(&case)?;
         Ok(TriageDecision::Offer {
             case: Box::new(case),
@@ -272,7 +273,7 @@ mod tests {
         };
         let fix = fix.unwrap();
         assert_eq!(fix.command().as_str(), "git status");
-        assert_eq!(fix.source(), &FixSource::Rule("command typo"));
+        assert_eq!(fix.source(), &FixSource::Rule("command typo".into()));
         assert_eq!(w.environment.path_reads.get(), 1);
     }
 

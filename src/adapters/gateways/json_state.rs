@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::entities::{
-    CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, FailureCase, IgnoreEntry,
-    IgnoreScope, IgnoreTarget, Session, SessionId, Shell, Timestamp,
+    CaseId, CommandLine, CommandOutcome, Confidence, Duration, ExitStatus, FailureCase, Fix,
+    FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, Session, SessionId, Shell, Timestamp,
 };
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, IgnoreStore, IgnoreStoreError, RegistryError, SessionRegistry,
@@ -142,6 +142,44 @@ impl SessionRegistry for JsonState {
 }
 
 #[derive(Serialize, Deserialize)]
+struct FixDto {
+    command: String,
+    confidence: f32,
+    source_kind: String,
+    source_name: String,
+    rationale: String,
+}
+
+impl FixDto {
+    fn from(f: &Fix) -> Self {
+        let (source_kind, source_name) = match f.source() {
+            FixSource::Rule(name) => ("rule", name.clone()),
+            FixSource::Model(name) => ("model", name.clone()),
+        };
+        Self {
+            command: f.command().as_str().to_string(),
+            confidence: f.confidence().value(),
+            source_kind: source_kind.to_string(),
+            source_name,
+            rationale: f.rationale().to_string(),
+        }
+    }
+
+    fn into_fix(self) -> Option<Fix> {
+        let source = match self.source_kind.as_str() {
+            "rule" => FixSource::Rule(self.source_name),
+            _ => FixSource::Model(self.source_name),
+        };
+        Some(Fix::new(
+            CommandLine::new(self.command).ok()?,
+            Confidence::new(self.confidence),
+            source,
+            self.rationale,
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 struct CaseDto {
     id: String,
     at_ms: u64,
@@ -150,6 +188,8 @@ struct CaseDto {
     session: Option<String>,
     recent: Vec<String>,
     output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    proposal: Option<FixDto>,
 }
 
 impl CaseDto {
@@ -162,6 +202,7 @@ impl CaseDto {
             session: c.session().map(|s| s.as_str().to_string()),
             recent: c.recent().iter().map(|l| l.as_str().to_string()).collect(),
             output: c.output().map(String::from),
+            proposal: c.proposal().map(FixDto::from),
         }
     }
 
@@ -173,6 +214,7 @@ impl CaseDto {
             self.cwd,
         )
         .with_session(self.session.map(SessionId::new))
+        .with_proposal(self.proposal.and_then(FixDto::into_fix))
         .with_recent(
             self.recent
                 .into_iter()
@@ -323,7 +365,13 @@ mod tests {
         )
         .with_session(Some(SessionId::new("s1")))
         .with_recent(vec![CommandLine::new("ls").unwrap()])
-        .with_output("boom".into());
+        .with_output("boom".into())
+        .with_proposal(Some(Fix::new(
+            CommandLine::new("make -j4").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "suggested by local",
+        )));
         let b = FailureCase::new(
             CaseId::new("b"),
             Timestamp::from_millis(2),

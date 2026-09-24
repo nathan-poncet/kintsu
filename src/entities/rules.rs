@@ -134,7 +134,7 @@ fn command_typo(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
     Some(Fix::new(
         outcome.command().with_program(found),
         Confidence::new(if max == 1 { 0.9 } else { 0.85 }),
-        FixSource::Rule("command typo"),
+        FixSource::Rule("command typo".into()),
         format!("`{program}` is not on your PATH; `{found}` is."),
     ))
 }
@@ -160,7 +160,7 @@ fn subcommand_typo(outcome: &CommandOutcome, _facts: &Facts) -> Option<Fix> {
     Some(Fix::new(
         CommandLine::new(fixed.join(" ")).ok()?,
         Confidence::new(0.85),
-        FixSource::Rule("subcommand typo"),
+        FixSource::Rule("subcommand typo".into()),
         format!("`{program} {sub}` is not a {program} command; `{program} {found}` is."),
     ))
 }
@@ -181,7 +181,7 @@ fn missing_dot_slash(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
     Some(Fix::new(
         outcome.command().with_program(&format!("./{}", here.name)),
         Confidence::new(0.9),
-        FixSource::Rule("missing ./"),
+        FixSource::Rule("missing ./".into()),
         format!("`{program}` is in this directory, not on your PATH."),
     ))
 }
@@ -209,7 +209,7 @@ fn cd_into_file(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
     Some(Fix::new(
         CommandLine::new(format!("cd {found}")).ok()?,
         Confidence::new(0.8),
-        FixSource::Rule("directory typo"),
+        FixSource::Rule("directory typo".into()),
         format!("There is no `{target}` here; `{found}` is a directory."),
     ))
 }
@@ -249,7 +249,7 @@ fn package_manager(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
     Some(Fix::new(
         CommandLine::new(command).ok()?,
         Confidence::new(0.8),
-        FixSource::Rule("package manager"),
+        FixSource::Rule("package manager".into()),
         format!("`{program}` is not on macOS; Homebrew is."),
     ))
 }
@@ -286,7 +286,7 @@ mod tests {
         .unwrap();
         assert_eq!(fix.command().as_str(), "git status --short");
         assert!(fix.confidence().is_high());
-        assert_eq!(fix.source(), &FixSource::Rule("command typo"));
+        assert_eq!(fix.source(), &FixSource::Rule("command typo".into()));
         assert_eq!(fix.danger(), &Danger::None);
     }
 

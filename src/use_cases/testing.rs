@@ -203,6 +203,18 @@ impl AgentLauncher for RecordingLauncher {
     }
 }
 
+#[derive(Default)]
+pub struct MemoryNotifier {
+    pub delivered: RefCell<Vec<(SessionId, Message)>>,
+}
+
+impl Notifier for MemoryNotifier {
+    fn deliver(&self, session: &SessionId, message: Message) -> Result<(), NotifyError> {
+        self.delivered.borrow_mut().push((session.clone(), message));
+        Ok(())
+    }
+}
+
 pub fn spec(name: &str, provider: Provider, tier: Tier) -> ModelSpec {
     ModelSpec {
         name: name.into(),

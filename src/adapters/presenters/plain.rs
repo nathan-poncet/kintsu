@@ -171,7 +171,7 @@ mod tests {
     fn a_fix_report_names_the_command_the_source_and_the_danger() {
         let p = FixProposal {
             case: case("gti status"),
-            fix: Some(fix("git status", FixSource::Rule("typo"))),
+            fix: Some(fix("git status", FixSource::Rule("typo".into()))),
             failures: vec![],
         };
         let text = fix_report(&p, &Style::PLAIN);

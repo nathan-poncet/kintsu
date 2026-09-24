@@ -9,7 +9,7 @@ use crate::use_cases::prompts::explain_prompt;
 use crate::use_cases::routing::{ask_first, excluded_for_sensitivity, model_candidates};
 
 /// An explanation and where it came from.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Explanation {
     pub case: FailureCase,
     pub model: String,

@@ -57,3 +57,4 @@ same_failure   = "once"                  # once · always
 [ui]
 mode  = "toast"                          # toast · hint (one dim line) · silent (commands only)
 ascii = false                            # true swaps ▎ ⚠ … for | ! ...
+eager_fix = false                        # true: after a failure no rule can fix, ask the quick_fix model and deliver the answer as a message

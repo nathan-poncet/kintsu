@@ -2,10 +2,11 @@
 //! AI agent, in the user's own terminal and shell. `main` reads the
 //! environment once and hands over to the composition root in `app`.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 mod adapters;
 mod app;
+mod daemon;
 mod entities;
 mod use_cases;
 
@@ -17,18 +18,29 @@ use entities::SessionId;
 
 fn main() -> ExitCode {
     let home = std::env::var("HOME").ok().filter(|h| !h.is_empty());
-    let dir_from = |explicit: &str, xdg: &str, fallback: &str, tail: &str| -> PathBuf {
-        if let Some(p) = std::env::var_os(explicit).filter(|p| !p.is_empty()) {
-            return PathBuf::from(p);
-        }
-        let base = std::env::var_os(xdg)
+    let var_path = |name: &str| {
+        std::env::var_os(name)
             .filter(|p| !p.is_empty())
             .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(home.clone().unwrap_or_else(|| ".".into())).join(fallback)
-            });
-        base.join("kintsu").join(tail)
     };
+    let under_home =
+        |fallback: &str| PathBuf::from(home.clone().unwrap_or_else(|| ".".into())).join(fallback);
+    let config_path = var_path("KINTSU_CONFIG").unwrap_or_else(|| {
+        var_path("XDG_CONFIG_HOME")
+            .unwrap_or_else(|| under_home(".config"))
+            .join("kintsu")
+            .join("config.toml")
+    });
+    let state_dir = var_path("KINTSU_STATE_DIR").unwrap_or_else(|| {
+        var_path("XDG_STATE_HOME")
+            .unwrap_or_else(|| under_home(".local/state"))
+            .join("kintsu")
+    });
+    let socket_path = var_path("KINTSU_SOCKET").unwrap_or_else(|| {
+        var_path("XDG_RUNTIME_DIR")
+            .map(|d| d.join("kintsu").join("daemon.sock"))
+            .unwrap_or_else(|| state_dir.join("daemon.sock"))
+    });
     let runtime = app::Runtime {
         args: std::env::args().skip(1).collect(),
         session: std::env::var("KINTSU_SESSION")
@@ -38,15 +50,20 @@ fn main() -> ExitCode {
         cwd: std::env::current_dir()
             .ok()
             .map(|p| p.display().to_string()),
-        config_path: dir_from("KINTSU_CONFIG", "XDG_CONFIG_HOME", ".config", "config.toml"),
-        state_dir: dir_from("KINTSU_STATE_DIR", "XDG_STATE_HOME", ".local/state", ""),
+        log_path: state_dir.join("daemon.log"),
+        exe: std::env::current_exe().unwrap_or_else(|_| PathBuf::from("kintsu")),
+        config_path,
+        state_dir,
+        socket_path,
         home,
         path_var: std::env::var("PATH").unwrap_or_default(),
         color: std::env::var_os("NO_COLOR").is_none()
             && std::io::stderr().is_terminal()
             && std::io::stdout().is_terminal(),
         debug: std::env::var_os("KINTSU_DEBUG").is_some(),
+        daemon: std::env::var_os("KINTSU_NO_DAEMON").is_none(),
     };
-    let (stdout, stderr) = (std::io::stdout(), std::io::stderr());
-    app::run(&runtime, &mut stdout.lock(), &mut stderr.lock())
+    // Unlocked handles: the daemon's threads log from outside `main`, and a
+    // lock held here for the whole run would block them.
+    app::run(&runtime, &mut std::io::stdout(), &mut std::io::stderr())
 }

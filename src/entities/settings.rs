@@ -165,6 +165,9 @@ pub struct UiSettings {
     pub mode: UiMode,
     /// `| Enter ->` instead of `▎ ⏎ →`.
     pub ascii: bool,
+    /// Ask the quick-fix model after every offer without a rule fix, and
+    /// deliver the answer as a message.
+    pub eager_fix: bool,
 }
 
 /// Everything the user configured.

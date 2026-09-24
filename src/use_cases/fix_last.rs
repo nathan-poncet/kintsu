@@ -50,6 +50,13 @@ impl FixLast<'_> {
                 failures: Vec::new(),
             });
         }
+        if let Some(fix) = case.proposal().cloned() {
+            return Ok(FixProposal {
+                case,
+                fix: Some(fix),
+                failures: Vec::new(),
+            });
+        }
         let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, &case);
         if candidates.is_empty() {
             return Ok(FixProposal {
@@ -81,7 +88,7 @@ impl FixLast<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{FixSource, Provider, Tier};
+    use crate::entities::{CommandLine, Confidence, Fix, FixSource, Provider, Tier};
     use crate::use_cases::testing::*;
 
     fn settings(quick_fix: &[&str]) -> Settings {
@@ -160,6 +167,34 @@ mod tests {
             proposal.failures,
             vec![("local".to_string(), ModelError::Unreachable("down".into()))]
         );
+    }
+
+    #[test]
+    fn a_fix_a_message_already_proposed_is_reused_without_asking_again() {
+        let cases = MemoryCases::default();
+        let proposed = Fix::new(
+            CommandLine::new("nvm use 22").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "suggested by local",
+        );
+        cases
+            .save(&case("npm test", 1, Some("42")).with_proposal(Some(proposed.clone())))
+            .unwrap();
+        let models = ScriptedModels::answering(&[("local", Ok("something else"))]);
+        let env = FakeEnvironment::with_executables(&["npm"]);
+        let uc = FixLast {
+            settings: &settings(&["local"]),
+            cases: &cases,
+            environment: &env,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+        };
+        assert_eq!(
+            uc.run(Some(&SessionId::new("42"))).unwrap().fix,
+            Some(proposed)
+        );
+        assert!(models.asked().is_empty());
     }
 
     #[test]

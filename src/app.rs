@@ -2,24 +2,26 @@
 //! gateways, calls a use case and hands the result to a presenter. Nothing
 //! here decides anything a test would want to check.
 
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Duration;
 
-use crate::adapters::controllers::{Command, ScopeFlag, parse_args};
+use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
-    DEFAULT_CONFIG, EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds, ShellAgents,
-    SystemClock, load_settings,
+    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds,
+    ShellAgents, SystemClock, load_settings,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
     Style, doctor_report, error_line, explanation, fix_report, hand_off_notice, ignored,
     privacy_report, raw_fix, shell_hook, toast,
 };
+use crate::daemon::{self, DaemonConfig};
 use crate::entities::{SessionId, Settings, UiMode};
 use crate::use_cases::{
     Diagnose, Explain, ExplainError, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
-    Triage,
+    Triage, TriageInput,
 };
 
 pub const USAGE: &str = "\
@@ -37,10 +39,15 @@ Usage:
   kintsu doctor                   check the hook, the models, the keys
   kintsu default-config           the commented default configuration
   kintsu config path              where the files are
+  kintsu daemon [run|stop|status] the resident process the hooks talk to
   kintsu --version | --help
 
-Environment: KINTSU_CONFIG, KINTSU_STATE_DIR, KINTSU_DISABLE=1, NO_COLOR.
+Environment: KINTSU_CONFIG, KINTSU_STATE_DIR, KINTSU_SOCKET, KINTSU_NO_DAEMON,
+KINTSU_DISABLE=1, NO_COLOR.
 ";
+
+/// The sync budget: how long a hook waits for the daemon's decision.
+const SYNC_BUDGET: Duration = Duration::from_millis(40);
 
 /// What the process knows about its surroundings; read once in `main`.
 pub struct Runtime {
@@ -50,9 +57,20 @@ pub struct Runtime {
     pub home: Option<String>,
     pub config_path: PathBuf,
     pub state_dir: PathBuf,
+    pub socket_path: PathBuf,
+    pub log_path: PathBuf,
+    pub exe: PathBuf,
     pub path_var: String,
     pub color: bool,
     pub debug: bool,
+    /// Whether hooks may talk to, and start, the daemon.
+    pub daemon: bool,
+}
+
+impl Runtime {
+    fn client(&self) -> DaemonClient {
+        DaemonClient::new(&self.socket_path, &self.exe, &self.log_path)
+    }
 }
 
 pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
@@ -62,6 +80,11 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             let _ = writeln!(err, "kintsu: {e}\n\n{USAGE}");
             return ExitCode::from(2);
         }
+    };
+    let plain = Style {
+        color: rt.color,
+        ascii: false,
+        mode: UiMode::Toast,
     };
     match command {
         Command::Help => {
@@ -88,25 +111,78 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             };
             let _ = writeln!(
                 out,
-                "config  {}{exists}\nstate   {}",
+                "config  {}{exists}\nstate   {}\nsocket  {}",
                 rt.config_path.display(),
-                rt.state_dir.display()
+                rt.state_dir.display(),
+                rt.socket_path.display()
             );
+            return ExitCode::SUCCESS;
+        }
+        Command::Daemon(DaemonAction::Run) => {
+            return daemon::run(DaemonConfig {
+                socket: rt.socket_path.clone(),
+                state_dir: rt.state_dir.clone(),
+                config_path: rt.config_path.clone(),
+                home: rt.home.clone(),
+                path_var: rt.path_var.clone(),
+            });
+        }
+        Command::Daemon(DaemonAction::Stop) => {
+            return match rt.client().shutdown() {
+                Ok(true) => {
+                    let _ = writeln!(out, "{}", plain.line("daemon stopped"));
+                    ExitCode::SUCCESS
+                }
+                Ok(false) => {
+                    let _ = writeln!(out, "{}", plain.line("no daemon was running"));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => failure(err, &e.to_string(), &plain, false),
+            };
+        }
+        Command::Daemon(DaemonAction::Status) => {
+            return match rt.client().hello() {
+                Ok(version) => {
+                    let _ = writeln!(
+                        out,
+                        "{}",
+                        plain.line(&format!(
+                            "daemon {version} running on {}",
+                            rt.socket_path.display()
+                        ))
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(_) => {
+                    let _ = writeln!(
+                        out,
+                        "{}",
+                        plain.line(
+                            "no daemon running; the next failure in a hooked shell starts it"
+                        )
+                    );
+                    ExitCode::from(1)
+                }
+            };
+        }
+        Command::Subscribe { session } => return subscribe(rt, session, out),
+        Command::Pending { session } => {
+            let Some(session) = session.or_else(|| rt.session.clone()) else {
+                return ExitCode::SUCCESS;
+            };
+            for text in rt.client().pending(&session, rt.color).unwrap_or_default() {
+                let _ = writeln!(err, "{text}");
+            }
             return ExitCode::SUCCESS;
         }
         _ => {}
     }
 
-    let plain = Style {
-        color: rt.color,
-        ascii: false,
-        mode: UiMode::Toast,
-    };
     let settings = match load_settings(&rt.config_path, rt.home.as_deref()) {
         Ok(settings) => settings,
         Err(e) => {
             let _ = writeln!(err, "{}", error_line(&e.to_string(), &plain));
-            if matches!(command, Command::Triage(_)) {
+            if matches!(command, Command::Triage { .. }) {
                 Settings::default()
             } else {
                 return ExitCode::from(2);
@@ -123,29 +199,16 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     let session = rt.session.as_ref();
 
     match command {
-        Command::Triage(input) => {
-            let triage = Triage {
-                settings: &settings,
-                clock: &SystemClock,
-                ids: &RandomIds,
-                sessions: &state,
-                cases: &state,
-                ignores: &state,
-                environment: &environment,
-            };
-            match triage.run(input) {
-                Ok(decision) => {
-                    if let Some(text) = toast(&decision, &style) {
-                        let _ = writeln!(err, "{text}");
-                    }
-                }
-                Err(e) if rt.debug => {
-                    let _ = writeln!(err, "{}", error_line(&e.to_string(), &style));
-                }
-                Err(_) => {}
-            }
-            ExitCode::SUCCESS
-        }
+        Command::Triage { input, signal_pid } => triage(
+            rt,
+            &settings,
+            &state,
+            &environment,
+            &style,
+            input,
+            signal_pid,
+            err,
+        ),
         Command::Fix { raw } => {
             let fix_last = FixLast {
                 settings: &settings,
@@ -267,7 +330,97 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         | Command::Version
         | Command::Init(_)
         | Command::DefaultConfig
-        | Command::ConfigPath => ExitCode::SUCCESS,
+        | Command::ConfigPath
+        | Command::Daemon(_)
+        | Command::Subscribe { .. }
+        | Command::Pending { .. } => ExitCode::SUCCESS,
+    }
+}
+
+/// The hook's call: the daemon within the budget when it may, the local
+/// path otherwise. The prompt never waits longer than the budget.
+#[allow(clippy::too_many_arguments)]
+fn triage(
+    rt: &Runtime,
+    settings: &Settings,
+    state: &JsonState,
+    environment: &FsEnvironment,
+    style: &Style,
+    input: TriageInput,
+    signal_pid: Option<u32>,
+    err: &mut dyn Write,
+) -> ExitCode {
+    if rt.daemon {
+        if let Some(view) = rt
+            .client()
+            .command_finished(&input, rt.color, signal_pid, SYNC_BUDGET)
+        {
+            for text in view.toast.iter().chain(view.bubbles.iter()) {
+                let _ = writeln!(err, "{text}");
+            }
+            return ExitCode::SUCCESS;
+        }
+    }
+    let triage = Triage {
+        settings,
+        clock: &SystemClock,
+        ids: &RandomIds,
+        sessions: state,
+        cases: state,
+        ignores: state,
+        environment,
+    };
+    match triage.run(input) {
+        Ok(decision) => {
+            if let Some(text) = toast(&decision, style) {
+                let _ = writeln!(err, "{text}");
+            }
+        }
+        Err(e) if rt.debug => {
+            let _ = writeln!(err, "{}", error_line(&e.to_string(), style));
+        }
+        Err(_) => {}
+    }
+    ExitCode::SUCCESS
+}
+
+/// `kintsu subscribe`: prints every bubble the daemon sends for the session
+/// until the daemon or the parent shell goes away.
+fn subscribe(rt: &Runtime, session: Option<SessionId>, out: &mut dyn Write) -> ExitCode {
+    let Some(session) = session.or_else(|| rt.session.clone()) else {
+        return ExitCode::from(2);
+    };
+    if !rt.daemon {
+        return ExitCode::from(1);
+    }
+    let Ok(stream) = rt.client().subscribe(&session, rt.color) else {
+        return ExitCode::from(1);
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
+    let mut reader = BufReader::new(stream);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match reader.read_line(&mut line) {
+            Ok(0) => return ExitCode::SUCCESS,
+            Ok(_) => {
+                if let Some(text) = DaemonClient::bubble_text(&line) {
+                    let _ = writeln!(out, "{text}");
+                    let _ = out.flush();
+                }
+            }
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                if std::os::unix::process::parent_id() == 1 {
+                    return ExitCode::SUCCESS;
+                }
+            }
+            Err(_) => return ExitCode::SUCCESS,
+        }
     }
 }
 
@@ -326,9 +479,13 @@ mod tests {
                 home: None,
                 config_path: self.dir.join("config.toml"),
                 state_dir: self.dir.join("state"),
+                socket_path: self.dir.join("d.sock"),
+                log_path: self.dir.join("d.log"),
+                exe: PathBuf::from("/definitely/not/kintsu"),
                 path_var: self.dir.join("bin").display().to_string(),
                 color: false,
                 debug: true,
+                daemon: false,
             };
             let (mut out, mut err) = (Vec::new(), Vec::new());
             let code = run(&rt, &mut out, &mut err);
@@ -524,12 +681,32 @@ mod tests {
             "{out}"
         );
         let (_, out, _) = b.run(&["config", "path"], None);
-        assert!(out.contains("config.toml  (missing"));
+        assert!(out.contains("config.toml  (missing") && out.contains("socket  "));
         let (_, out, _) = b.run(&["default-config"], None);
         assert_eq!(out, DEFAULT_CONFIG);
         let (code, _, err) = b.run(&["agent"], Some("7"));
         assert_eq!(code, ExitCode::from(1));
         assert!(err.contains("no agent is configured"));
+    }
+
+    #[test]
+    fn without_a_daemon_status_stop_and_pending_say_so_and_subscribe_leaves() {
+        let b = Bench::new("nodaemon");
+        let (code, out, _) = b.run(&["daemon", "status"], None);
+        assert_eq!(code, ExitCode::from(1));
+        assert!(out.contains("no daemon running"));
+        let (code, out, _) = b.run(&["daemon", "stop"], None);
+        assert_eq!(
+            (code, out.as_str()),
+            (ExitCode::SUCCESS, "▎ no daemon was running\n")
+        );
+        let (code, out, err) = b.run(&["pending"], Some("7"));
+        assert_eq!(
+            (code, out.as_str(), err.as_str()),
+            (ExitCode::SUCCESS, "", "")
+        );
+        let (code, _, _) = b.run(&["subscribe", "--session", "7"], None);
+        assert_eq!(code, ExitCode::from(1));
     }
 
     #[test]

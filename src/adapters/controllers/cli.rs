@@ -21,13 +21,31 @@ pub enum ScopeFlag {
     Always,
 }
 
+/// What `kintsu daemon` should do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DaemonAction {
+    Run,
+    Stop,
+    Status,
+}
+
 /// What the user or a hook asked the binary to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     /// `kintsu init <shell>`: print the shell integration.
     Init(Shell),
     /// `kintsu triage --status <code> --command <text> …`: a hook reports.
-    Triage(TriageInput),
+    /// `--signal-pid` names a shell to poke with SIGUSR1 when a message arrives.
+    Triage {
+        input: TriageInput,
+        signal_pid: Option<u32>,
+    },
+    /// `kintsu subscribe [--session <id>]`: print bubbles as they come.
+    Subscribe { session: Option<SessionId> },
+    /// `kintsu pending [--session <id>]`: print the bubbles not yet seen.
+    Pending { session: Option<SessionId> },
+    /// `kintsu daemon [run|stop|status]`.
+    Daemon(DaemonAction),
     /// `kintsu fix [--raw]`: the corrected command for the last failure.
     Fix { raw: bool },
     /// `kintsu why`: an explanation.
@@ -81,6 +99,8 @@ pub enum CliError {
     InvalidDuration(String),
     #[error("config knows one subcommand: path")]
     UnknownConfigSubcommand,
+    #[error("daemon knows run, stop and status")]
+    UnknownDaemonAction,
 }
 
 fn supported_shells() -> String {
@@ -99,6 +119,16 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
             .map(Command::Init)
             .ok_or_else(|| CliError::UnsupportedShell((*shell).to_string())),
         ["triage", flags @ ..] => parse_triage(flags),
+        ["subscribe", flags @ ..] => {
+            parse_session_flag(flags).map(|session| Command::Subscribe { session })
+        }
+        ["pending", flags @ ..] => {
+            parse_session_flag(flags).map(|session| Command::Pending { session })
+        }
+        ["daemon"] | ["daemon", "run"] => Ok(Command::Daemon(DaemonAction::Run)),
+        ["daemon", "stop"] => Ok(Command::Daemon(DaemonAction::Stop)),
+        ["daemon", "status"] => Ok(Command::Daemon(DaemonAction::Status)),
+        ["daemon", ..] => Err(CliError::UnknownDaemonAction),
         ["fix"] => Ok(Command::Fix { raw: false }),
         ["fix", "--raw"] => Ok(Command::Fix { raw: true }),
         ["fix", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
@@ -125,6 +155,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
     let mut session = None;
     let mut shell = None;
     let mut duration = None;
+    let mut signal_pid = None;
     let mut flags = flags.iter();
     while let Some(flag) = flags.next() {
         let value = *flags.next().ok_or(CliError::IncompleteTriage)?;
@@ -135,6 +166,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
             "--session" => session = Some(SessionId::new(value)).filter(|s| !s.as_str().is_empty()),
             "--shell" => shell = Shell::from_name(value),
             "--duration-ms" => duration = Some(Duration::from_millis(integer::<u64>(flag, value)?)),
+            "--signal-pid" => signal_pid = Some(integer::<u32>(flag, value)?),
             other => return Err(CliError::UnknownFlag(other.to_string())),
         }
     }
@@ -145,12 +177,24 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
     if let Some(d) = duration {
         outcome = outcome.lasting(d);
     }
-    Ok(Command::Triage(TriageInput {
-        outcome,
-        cwd,
-        session,
-        shell,
-    }))
+    Ok(Command::Triage {
+        input: TriageInput {
+            outcome,
+            cwd,
+            session,
+            shell,
+        },
+        signal_pid,
+    })
+}
+
+fn parse_session_flag(flags: &[&str]) -> Result<Option<SessionId>, CliError> {
+    match flags {
+        [] => Ok(None),
+        ["--session", id] => Ok(Some(SessionId::new(*id)).filter(|s| !s.as_str().is_empty())),
+        ["--session"] => Err(CliError::IncompleteTriage),
+        [other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
+    }
 }
 
 fn integer<T: std::str::FromStr>(flag: &str, value: &str) -> Result<T, CliError> {
@@ -229,9 +273,60 @@ mod tests {
 
     fn triage(args: &[&str]) -> TriageInput {
         match parse_args(args.iter().copied()).unwrap() {
-            Command::Triage(input) => input,
+            Command::Triage { input, .. } => input,
             other => panic!("expected triage, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn triage_can_name_a_shell_to_signal_and_the_daemon_commands_parse() {
+        let Command::Triage { signal_pid, .. } = parse_args([
+            "triage",
+            "--status",
+            "1",
+            "--command",
+            "x",
+            "--signal-pid",
+            "4242",
+        ])
+        .unwrap() else {
+            panic!()
+        };
+        assert_eq!(signal_pid, Some(4242));
+        assert_eq!(
+            parse_args(["daemon"]),
+            Ok(Command::Daemon(DaemonAction::Run))
+        );
+        assert_eq!(
+            parse_args(["daemon", "stop"]),
+            Ok(Command::Daemon(DaemonAction::Stop))
+        );
+        assert_eq!(
+            parse_args(["daemon", "status"]),
+            Ok(Command::Daemon(DaemonAction::Status))
+        );
+        assert_eq!(
+            parse_args(["daemon", "dance"]),
+            Err(CliError::UnknownDaemonAction)
+        );
+        assert_eq!(
+            parse_args(["subscribe"]),
+            Ok(Command::Subscribe { session: None })
+        );
+        assert_eq!(
+            parse_args(["subscribe", "--session", "7"]),
+            Ok(Command::Subscribe {
+                session: Some(SessionId::new("7"))
+            })
+        );
+        assert_eq!(
+            parse_args(["pending", "--session", ""]),
+            Ok(Command::Pending { session: None })
+        );
+        assert_eq!(
+            parse_args(["pending", "--x"]),
+            Err(CliError::UnknownFlag("--x".into()))
+        );
     }
 
     #[test]

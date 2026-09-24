@@ -38,27 +38,51 @@ wording and the use case decides only *whether*), and `Shell::ALL` used for
 the CLI error message (still an entity constant, used by the controller,
 which is allowed).
 
-## 2. No daemon in v0.1 ⚑ review
+## 2. The daemon: built for v0.1, after the maintainer asked for it
 
-`docs/DAEMON.md` and the roadmap put the resident daemon in v0.1. It is
-not built. `kintsu triage` runs synchronously after each command line and
-keeps its state in small JSON files under `~/.local/state/kintsu`.
+The first night shipped everything synchronously, without the daemon,
+and left the question open. The maintainer answered "in v0.1", so it is
+built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
 
-Why: everything a user can see in v0.1 (toast, `fix`, `why`, `agent`,
-`ignore`, `privacy`, `doctor`) works without a resident process, and the
-daemon is the single biggest chunk of risk (socket, supervision, delivery
-into a live shell). Building the product first shows what the daemon must
-carry; building the daemon first would have shipped nothing usable.
+- `kintsu daemon run` is started by the first hook call that finds nobody
+  on the socket (`$XDG_RUNTIME_DIR/kintsu/daemon.sock`, else
+  `~/.local/state/kintsu/daemon.sock`), detaches with `setsid`, ignores
+  SIGHUP, refuses connections from another uid, and logs to
+  `~/.local/state/kintsu/daemon.log`. `kintsu daemon status|stop`.
+- Frames as in the design: `hello`, `command_finished`, `subscribe`,
+  `pending`, `shutdown` in; `welcome`/`outdated`, `decision`, `bubble`,
+  `ping`, `done`, `ack`, `bye`, `error` out. Every client frame carries
+  the client's version; a mismatch makes the daemon answer `outdated` and
+  exit, so the next call restarts the new binary.
+- The hooks call `command_finished` with a 40 ms budget and fall back to
+  the local, synchronous path when nothing answers in time. Both paths
+  share the same JSON state, so nothing is lost either way.
+- Messages that arrive later reach the shell three ways: zsh keeps a
+  `kintsu subscribe` child whose output `zle -F` watches, prints the
+  message above the line being edited and redraws it; fish passes its pid
+  with every `command_finished`, the daemon sends SIGUSR1, the handler
+  runs `kintsu pending`; bash receives what is pending with the next
+  decision, at the next prompt. All three verified in real shells.
+- What the daemon sends today: with `ui.eager_fix = true` and a model in
+  `routing.quick_fix`, every failure no rule could fix is sent to the
+  model in the background and the answer lands as "Try …? (model, not
+  verified)"; `kintsu fix` and `^K` then reuse that proposal instead of
+  asking again. That is the "message arriving while you work" of the
+  landing page; `eager_fix` is off by default, as documented.
+- Not built: the panel, ghost text, clickable `kintsu://` words,
+  `kintsu service install`, SQLite (JSON files stay), `session_new`
+  (the session is still the shell's pid), `act`/`get_case` frames.
 
-Consequence: no asynchronous messages ("while you were away"), no ghost
-text, no panel, no clickable words in v0.1. The toast shows commands
-instead of links. The roadmap page and `DAEMON.md` still describe the
-daemon as v0.1; **decide whether to move it to v0.2 in the documents** or
-to build it before tagging v0.1.
+Two things learned building it: a lock on stdout held in `main` for the
+whole run deadlocked every daemon thread that logged (fixed by passing
+unlocked handles), and the crate now says `#![deny(unsafe_code)]` with one
+`#[allow]` on `daemon::os`, the module that calls `setsid`, `getpeereid`
+or `SO_PEERCRED`, and `kill` through `libc`.
 
-Cost measured: a `kintsu triage` call is one process start plus one JSON
-read/write, well under the 5 ms budget on this machine; the PATH is
-scanned only when the shell answered 127 or 126.
+Cost measured: a `kintsu triage` call through the daemon answers in about
+a millisecond on a warm daemon; the first call of a session pays the
+spawn once, capped at 400 ms, and never retries a failing spawn more than
+once a minute.
 
 ## 3. Hooks report every command line, not only failures ⚑ review
 
@@ -197,6 +221,7 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 
 | decision | answer |
 |---|---|
+| 1. the daemon | in v0.1; built the same day, see section 2 |
 | 2. hooks report every command line | keep |
 | 3. commands and install methods the site promised | removed from the site until they exist; `kintsu setup` first, after v0.1 |
 | 4. `^K` inserts the fix, shadowing `kill-line` | keep; configurable when the panel arrives |
@@ -205,8 +230,8 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 
 ## What is not built, by priority
 
-1. The daemon and everything it unlocks (async messages, panel, ghost
-   text, clickable words).
+1. What the daemon unlocks next: the panel, ghost text, clickable words,
+   `kintsu service install`.
 2. Output capture (tmux/WezTerm/Kitty/iTerm2 APIs, opt-in stderr tee).
 3. `kintsu setup`, `kintsu models`, `kintsu login`, `kintsu service`.
 4. Learning rules from accepted fixes; the cost ledger; budgets.

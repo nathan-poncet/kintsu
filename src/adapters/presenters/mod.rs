@@ -2,6 +2,7 @@
 //! Pure functions of a value and a style; they never read the terminal.
 
 pub mod doctor;
+pub mod frames;
 pub mod plain;
 pub mod shell_hook;
 pub mod style;
@@ -13,4 +14,4 @@ pub use plain::{
 };
 pub use shell_hook::shell_hook;
 pub use style::Style;
-pub use toast::toast;
+pub use toast::{message_toast, toast};
