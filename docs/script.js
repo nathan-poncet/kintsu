@@ -433,36 +433,6 @@
   }
   if (window.kintsuTour) window.addEventListener("hashchange", () => window.kintsuTour.play(fromHash()));
 
-  // ── art direction: reveals, the tilted glazed terminal, the seam that joins the five ──
-  const revealables = [...document.querySelectorAll(".reveal")];
-  if (typeof IntersectionObserver === "function" && !reduced) {
-    const ro = new IntersectionObserver((entries) => { for (const en of entries) if (en.isIntersecting) { en.target.classList.add("in"); ro.unobserve(en.target); } }, { threshold: 0.18 });
-    revealables.forEach((el) => ro.observe(el));
-  } else {
-    revealables.forEach((el) => el.classList.add("in"));
-  }
-  const tilt = document.getElementById("tilt");
-  const canHover = typeof matchMedia === "function" && matchMedia("(hover: hover)").matches;
-  if (tilt && canHover && !reduced) {
-    const card = tilt.querySelector(".mock-player");
-    tilt.addEventListener("pointermove", (e) => {
-      const r = tilt.getBoundingClientRect(); if (!r.width || !r.height) return;
-      const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-      card.style.setProperty("--ry", `${((x - 0.5) * 5).toFixed(2)}deg`); card.style.setProperty("--rx", `${((0.5 - y) * 4).toFixed(2)}deg`);
-      tilt.style.setProperty("--mx", `${(x * 100).toFixed(1)}%`); tilt.style.setProperty("--my", `${(y * 100).toFixed(1)}%`);
-    });
-    tilt.addEventListener("pointerleave", () => { card.style.removeProperty("--rx"); card.style.removeProperty("--ry"); });
-  }
-  const seamPath = document.getElementById("features-path"), seamWrap = document.querySelector(".features-wrap");
-  if (seamPath && seamWrap) {
-    if (reduced) seamPath.style.setProperty("--seam-progress", "1");
-    else {
-      const update = () => { const r = seamWrap.getBoundingClientRect(); if (!r.height) { seamPath.style.setProperty("--seam-progress", "1"); return; }
-        const p = Math.min(1, Math.max(0, (innerHeight * 0.78 - r.top) / r.height)); seamPath.style.setProperty("--seam-progress", p.toFixed(3)); };
-      addEventListener("scroll", update, { passive: true }); addEventListener("resize", update); update();
-    }
-  }
-
   // ── copy buttons ─────────────────────────────────────────────────────
   document.querySelectorAll(".copy[data-copy]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "copied"; } catch { b.textContent = "select it"; }

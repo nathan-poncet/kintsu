@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kintsu — the command failed. Kintsu picks it up.</title>
-  <meta name="description" content="Kintsu is an open-source bubble under a failed command, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the case to the AI agent you already pay for. Your models, your keys, nothing runs without you.">
+  <meta name="description" content="Kintsu is an open-source bubble under a failed command, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the case to your agent. Your models, your keys, nothing runs without you.">
   <meta property="og:title" content="Kintsu — the command failed. Kintsu picks it up.">
-  <meta property="og:description" content="A small bubble under the error. Fixes the typo, explains the trace, hands the case to your agent. Your terminal, your shell, your models, your keys. Open source.">
+  <meta property="og:description" content="A bubble under the error. Fixes the typo, explains the trace, hands the case to your agent. Your terminal, your shell, your models, your keys. Open source.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
   <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
   <meta name="theme-color" content="#0f0d0b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="landing">
@@ -29,43 +29,34 @@
 </header>
 
 <main id="main">
+  <svg class="defs" aria-hidden="true" width="0" height="0"><defs><linearGradient id="seam-gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a651e"/><stop offset=".5" stop-color="#f3d78a"/><stop offset="1" stop-color="#b8862b"/></linearGradient></defs></svg>
 
   <!-- hero -->
   <section class="hero">
-    <svg class="hero-seam" viewBox="0 0 1200 420" preserveAspectRatio="none" aria-hidden="true">
-      <defs><linearGradient id="seam-gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a651e"/><stop offset=".5" stop-color="#f3d78a"/><stop offset="1" stop-color="#b8862b"/></linearGradient></defs>
-      <path pathLength="1" d="M-10 300 C 120 280, 190 330, 300 290 S 470 210, 560 250 S 700 340, 820 300 S 980 200, 1100 260 S 1180 300, 1215 285"/>
-      <path pathLength="1" class="branch" d="M560 250 C 590 200, 640 190, 690 150"/>
-      <path pathLength="1" class="branch" d="M820 300 C 850 350, 900 360, 960 400"/>
-    </svg>
     <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha</p>
     <h1>The command failed.<br><em>Kintsu picks it up.</em></h1>
-    <p class="sub">A small bubble under the error, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the whole case to the AI agent you already pay for. Your models, your keys, and nothing runs without you.</p>
+    <p class="sub">A bubble under the error. It fixes the typo, explains the trace, or hands the case to your agent. Your terminal, your models, your keys.</p>
     <div class="oneliner">
       <span class="dollar" aria-hidden="true">$</span>
       <code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code>
       <button type="button" class="copy" data-copy="curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh">copy</button>
     </div>
-    <p class="hero-meta">macOS · Linux · zsh, bash, fish · MIT <span class="sep">—</span> the script installs the binary and hooks your shell; <a href="install.html">Homebrew, cargo and the other ways <span aria-hidden="true">→</span></a></p>
+    <p class="hero-meta">macOS · Linux · zsh, bash, fish · MIT <span class="sep">—</span> <a href="install.html">other ways to install <span aria-hidden="true">→</span></a></p>
   </section>
 
-  <!-- the live terminal -->
+  <!-- the product: the terminal, then what it does -->
   <section class="mock" aria-label="Kintsu, live">
-    <div class="tilt" id="tilt"><div class="player mock-player" data-scene="landing" data-title="zsh — ~/dev/acme"></div><div class="glaze" aria-hidden="true"></div></div>
-    <p class="mock-hint">It's live. Click a word in the bubble, or focus the terminal and press <kbd>^K</kbd>, <kbd>w</kbd>, <kbd>f</kbd>, <kbd>a</kbd>, <kbd>i</kbd>, <kbd>Esc</kbd>. <a href="tour.html">The guided tour <span aria-hidden="true">→</span></a></p>
+    <div class="player mock-player" data-scene="landing" data-title="zsh — ~/dev/acme"></div>
+    <p class="mock-hint">Live. Click a word in the bubble, or press <kbd>^K</kbd>. <a href="tour.html">Guided tour <span aria-hidden="true">→</span></a></p>
   </section>
 
-  <!-- five things -->
-  <section class="why" aria-label="Why Kintsu">
-    <p class="why-intro reveal"><em>Kintsugi</em> repairs broken pottery with gold. The crack becomes the strongest, most visible line of the piece. A failed command is a crack.</p>
-    <div class="features-wrap">
-      <svg class="features-seam" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 24 1000"><path id="features-path" pathLength="1" d="M12 0 C 6 120, 20 200, 12 300 S 4 480, 12 560 S 22 720, 12 800 S 6 940, 12 1000"/></svg>
+  <section class="why" aria-label="What Kintsu does">
     <ol class="features">
-      <li class="feature reveal">
+      <li class="feature">
         <div class="ftext">
-          <span class="fnum"><em>01</em></span>
-          <h2><a href="tour.html#ch-2">A bubble, not a wall. <span aria-hidden="true">→</span></a></h2>
-          <p>Under the failure: one gold seam, one sentence, a line of words. <kbd>Tab</kbd> accepts the fix already typed for you; <kbd>^K</kbd> unfolds a panel with Why, Fix, Agent, Ignore and Privacy. The words are clickable. Nothing ever steals a keystroke from your prompt.</p>
+          <span class="fnum">01</span>
+          <h2><a href="tour.html#ch-2">A bubble, not a wall <span aria-hidden="true">→</span></a></h2>
+          <p>One sentence under the failure, a line of words you can click. <kbd>Tab</kbd> takes the fix, <kbd>^K</kbd> opens the panel. Nothing steals a keystroke.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="p">$</span> gti status
 <span class="e">zsh: command not found: gti</span>
@@ -74,11 +65,11 @@
 <span class="p">$</span> <span class="ghost">git status</span></pre>
       </li>
 
-      <li class="feature reveal">
+      <li class="feature">
         <div class="ftext">
-          <span class="fnum"><em>02</em></span>
-          <h2><a href="tour.html#ch-7">Your agent, briefed. <span aria-hidden="true">→</span></a></h2>
-          <p>Three test failures, one cause. Kintsu writes the case, command, output, directory, branch, last commands, secrets redacted, and launches Claude Code, Codex, OpenCode or aider in your terminal with it. Then it steps aside. No API key if the CLI already has one.</p>
+          <span class="fnum">02</span>
+          <h2><a href="tour.html#ch-7">Your agent, briefed <span aria-hidden="true">→</span></a></h2>
+          <p>Command, output, directory, branch, last commands, secrets redacted. Handed to Claude Code, Codex, OpenCode or aider, in your terminal.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="s">▎</span> 3 failures, one cause: the fixture token expired on Sep 1.
 <span class="s">▎</span> Handing to <b>Claude Code</b> · 48 lines · cwd · branch feat/refresh
@@ -87,38 +78,38 @@
 <span class="d">claude-code ·</span> npm test → <span class="ok">48 passed</span> · diff ready. Commit?</pre>
       </li>
 
-      <li class="feature reveal">
+      <li class="feature">
         <div class="ftext">
-          <span class="fnum"><em>03</em></span>
-          <h2><a href="configuration.html">Your models. Your keys. Local when it must. <span aria-hidden="true">→</span></a></h2>
-          <p>A rule for the typo. A tiny model on your machine to read the output. The cloud model you chose to explain. Your agent to fix. One file decides who answers what, and a secret spotted in the output forces local for that case. Automatically.</p>
+          <span class="fnum">03</span>
+          <h2><a href="configuration.html">Your models, your keys <span aria-hidden="true">→</span></a></h2>
+          <p>A rule, a tiny local model, the cloud model you chose, your agent. One file decides who answers what. A secret in the output forces local.</p>
         </div>
         <div class="brains" aria-hidden="true">
           <div><span class="where local">local</span><b>rules</b><span class="d">under a millisecond</span></div>
           <div><span class="where local">local</span><b>tiny · ollama</b><span class="d">reads the output</span></div>
-          <div><span class="where cloud">cloud</span><b>haiku, or yours</b><span class="d">explains, streams</span></div>
+          <div><span class="where cloud">cloud</span><b>haiku, or yours</b><span class="d">explains</span></div>
           <div><span class="where you">your account</span><b>claude code</b><span class="d">fixes the code</span></div>
         </div>
       </li>
 
-      <li class="feature reveal">
+      <li class="feature">
         <div class="ftext">
-          <span class="fnum"><em>04</em></span>
-          <h2><a href="tour.html#ch-5">Never runs anything. Shows what leaves. <span aria-hidden="true">→</span></a></h2>
-          <p>A fix is inserted in your line; you press Enter. Destructive commands are red first. The Privacy tab is the exact payload that went out, redactions highlighted. No telemetry, no account, no server of ours.</p>
+          <span class="fnum">04</span>
+          <h2><a href="tour.html#ch-5">Never runs anything. Shows what leaves <span aria-hidden="true">→</span></a></h2>
+          <p>A fix is inserted in your line; you press Enter. The Privacy tab is the exact payload that went out. No telemetry, no account.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="s">▎</span> What left the machine, to <b>haiku</b>:
 <span class="s">▎</span> <span class="ok">✓</span> command · exit status · 14 lines of output
 <span class="s">▎</span> <span class="ok">✓</span> <span class="r">NPM_TOKEN=npm_••••••••</span> redacted
 <span class="s">▎</span> <span class="ok">✓</span> cwd · branch main, clean · last 10 commands
-<span class="s">▎</span> <span class="d">✗ environment · files · anything you did not see here</span></pre>
+<span class="s">▎</span> <span class="d">✗ environment · files · anything you did not see</span></pre>
       </li>
 
-      <li class="feature reveal">
+      <li class="feature">
         <div class="ftext">
-          <span class="fnum"><em>05</em></span>
-          <h2><a href="docs.html">Quiet. Fast. Everywhere you already are. <span aria-hidden="true">→</span></a></h2>
-          <p>Under a millisecond on success, nothing on Ctrl-C, one bubble for the same failure twice. A resident daemon per user remembers across every tab, and answers that take longer arrive later, above your prompt, without touching the line you type. zsh, bash, fish. Any terminal. SSH, tmux, Herdr.</p>
+          <span class="fnum">05</span>
+          <h2><a href="docs.html">Quiet, fast, everywhere <span aria-hidden="true">→</span></a></h2>
+          <p>Under a millisecond on success, one bubble for the same failure twice. Slow answers arrive later, above your prompt. zsh, bash, fish. Any terminal, SSH, tmux, Herdr.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="p">$</span> vim scripts/build.js
 <span class="p">$</span>
@@ -127,25 +118,26 @@
 <span class="p">$</span> <span class="cur"></span></pre>
       </li>
     </ol>
-    </div>
   </section>
+
+  <svg class="seam-sep" viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" style="--d: .3s" d="M0 24 C 140 16, 220 34, 360 22 S 600 6, 720 24 S 960 40, 1080 20 S 1170 22, 1200 26"/></svg>
 
   <!-- status -->
-  <section class="band reveal">
-    <p><span class="pill">pre-alpha</span> The hooks work today; the bubble is designed and comes with v0.1. <a href="roadmap.html">The roadmap <span aria-hidden="true">→</span></a></p>
+  <section class="band">
+    <p><span class="pill">pre-alpha</span> The hooks work; the bubble comes with v0.1. <a href="roadmap.html">Roadmap <span aria-hidden="true">→</span></a></p>
   </section>
 
+  <svg class="seam-sep" viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" style="--d: .9s" d="M0 18 C 160 30, 260 8, 420 20 S 660 36, 780 16 S 1000 4, 1110 24 S 1180 30, 1200 20"/></svg>
+
   <!-- install -->
-  <section class="end reveal" id="install">
-    <svg class="end-seam" viewBox="0 0 800 60" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M0 40 C 90 20, 150 50, 240 30 S 400 10, 480 35 S 640 55, 800 25"/></svg>
+  <section class="end" id="install">
     <h2>One line to try.<br><em>One line to remove.</em></h2>
-    <p class="sub">Nothing else about your setup changes. Your shell, your terminal, your agents keep working exactly as they did, except the next failure gets a bubble.</p>
     <div class="oneliner">
       <span class="dollar" aria-hidden="true">$</span>
       <code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code>
       <button type="button" class="copy" data-copy="curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh">copy</button>
     </div>
-    <p class="hero-meta">it asks before touching your rc file; <code>--uninstall</code> takes it all back <span class="sep">—</span> <a href="install.html">all install methods <span aria-hidden="true">→</span></a></p>
+    <p class="hero-meta">It asks before touching your rc file. <code>--uninstall</code> takes it all back. <span class="sep">—</span> <a href="install.html">all install methods <span aria-hidden="true">→</span></a></p>
   </section>
 
 </main>
