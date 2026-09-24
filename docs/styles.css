@@ -312,8 +312,6 @@ body.page main.faq section { padding-top: 26px; }
 .doc-head { padding: 56px 0 8px; }
 .doc-head h1 { font-size: clamp(38px, 5.6vw, 60px); line-height: 1.02; letter-spacing: -.025em; margin: 8px 0 16px; }
 .toc { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; padding: 44px 0 24px; font-size: 13.5px; }
-.toc a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: 0; }
-.toc a:hover { color: var(--text); border-color: var(--gold); }
 .doc section { padding: 72px 0 0; scroll-margin-top: 24px; }
 .doc section.subtle h2 { font-size: 20px; color: var(--muted); }
 .doc section.subtle { padding-top: 56px; }
