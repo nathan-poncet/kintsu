@@ -39,7 +39,19 @@ pub struct FollowUp<'a> {
 }
 
 impl FollowUp<'_> {
-    /// Runs when a case was offered without a rule fix.
+    /// The model that will be asked first, when one will be.
+    pub fn candidate(&self, case: &FailureCase) -> Option<String> {
+        if !self.settings.ui.eager_fix || case.session().is_none() {
+            return None;
+        }
+        model_candidates(self.settings, &self.settings.routing.quick_fix, case)
+            .first()
+            .map(|m| m.name.clone())
+    }
+
+    /// Runs when a case was offered without a rule fix. A model that had
+    /// nothing, or failed, is reported to the shell in one line, so the
+    /// "asking…" line under the bubble never dangles.
     pub fn run(&self, case: &FailureCase) -> Result<Message, FollowUpError> {
         if !self.settings.ui.eager_fix {
             return Err(FollowUpError::Disabled);
@@ -51,19 +63,46 @@ impl FollowUp<'_> {
         if candidates.is_empty() {
             return Err(FollowUpError::NoModel);
         }
-        let (name, answer) = ask_first(
+        let first = candidates[0].name.clone();
+        let (name, answer) = match ask_first(
             self.models,
             self.secrets,
             &candidates,
             &quick_fix_prompt(case),
-        )
-        .map_err(FollowUpError::AllFailed)?;
-        let fix = parse_quick_fix(&answer, &name).ok_or(FollowUpError::NoFix)?;
+        ) {
+            Ok(answered) => answered,
+            Err(failures) => {
+                let detail: Vec<String> =
+                    failures.iter().map(|(n, e)| format!("{n}: {e}")).collect();
+                self.note(
+                    session,
+                    case,
+                    format!("{first} did not answer ({})", detail.join("; ")),
+                )?;
+                return Err(FollowUpError::AllFailed(failures));
+            }
+        };
+        let Some(fix) = parse_quick_fix(&answer, &name) else {
+            self.note(session, case, format!("{name} had no fix for this one."))?;
+            return Err(FollowUpError::NoFix);
+        };
         self.cases
             .save(&case.clone().with_proposal(Some(fix.clone())))?;
         let message = Message::new(case.id().clone(), self.clock.now(), MessageBody::Fix(fix));
         self.notifier.deliver(session, message.clone())?;
         Ok(message)
+    }
+
+    fn note(
+        &self,
+        session: &crate::entities::SessionId,
+        case: &FailureCase,
+        text: String,
+    ) -> Result<(), NotifyError> {
+        self.notifier.deliver(
+            session,
+            Message::new(case.id().clone(), self.clock.now(), MessageBody::Note(text)),
+        )
     }
 }
 
@@ -168,7 +207,6 @@ mod tests {
             Some("42"),
         );
         assert_eq!(cloud_only.run(&secret).unwrap_err(), FollowUpError::NoModel);
-        assert!(notifier.delivered.borrow().is_empty());
         let down = ScriptedModels::answering(&[(
             "local",
             Err(ModelError::MissingKey("$X is not set".into())),
@@ -184,5 +222,27 @@ mod tests {
                 .to_string(),
             "no model answered (local: no key: $X is not set)"
         );
+        let notes: Vec<String> = notifier
+            .delivered
+            .borrow()
+            .iter()
+            .map(|(_, m)| match m.body() {
+                MessageBody::Note(t) => t.clone(),
+                other => panic!("expected a note, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            notes,
+            vec![
+                "local had no fix for this one.",
+                "local did not answer (local: no key: $X is not set)"
+            ]
+        );
+        assert_eq!(off.candidate(&case("make", 2, Some("42"))), None, "off");
+        assert_eq!(
+            asked.candidate(&case("make", 2, Some("42"))).as_deref(),
+            Some("local")
+        );
+        assert_eq!(cloud_only.candidate(&secret), None, "sensitive, cloud only");
     }
 }

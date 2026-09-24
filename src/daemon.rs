@@ -19,7 +19,7 @@ use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::{
     EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds, SystemClock, load_settings,
 };
-use crate::adapters::presenters::{Style, frames, message_toast, toast};
+use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
 use crate::entities::{Message, SessionId, Settings, TriageDecision, UiMode};
 use crate::use_cases::ports::{Notifier, NotifyError};
 use crate::use_cases::{FollowUp, Triage};
@@ -190,33 +190,50 @@ fn handle(daemon: &Arc<Daemon>, mut stream: UnixStream) {
                     return;
                 }
             };
-            let text = toast(&decision, &style);
+            let pending = match &decision {
+                TriageDecision::Offer { case, fix: None } => {
+                    let state = JsonState::new(&daemon.cfg.state_dir);
+                    let follow_up = FollowUp {
+                        settings: &settings,
+                        clock: &SystemClock,
+                        secrets: &EnvSecrets,
+                        models: &HttpModels,
+                        notifier: &daemon.sessions,
+                        cases: &state,
+                    };
+                    follow_up.candidate(case)
+                }
+                _ => None,
+            };
+            let mut text = toast(&decision, &style);
+            if let (Some(t), Some(model)) = (text.as_mut(), pending.as_deref()) {
+                t.push('\n');
+                t.push_str(&pending_line(model, &style));
+            }
             let bubbles = session
                 .as_ref()
                 .map(|s| daemon.sessions.drain(s, color))
                 .unwrap_or_default();
             let _ = send(
                 &mut stream,
-                &frames::decision(&decision, text.as_deref(), &bubbles),
+                &frames::decision(&decision, text.as_deref(), &bubbles, pending.as_deref()),
             );
-            if let TriageDecision::Offer { case, fix: None } = decision {
-                if settings.ui.eager_fix && case.session().is_some() {
-                    let daemon = Arc::clone(daemon);
-                    std::thread::spawn(move || {
-                        let state = JsonState::new(&daemon.cfg.state_dir);
-                        let follow_up = FollowUp {
-                            settings: &settings,
-                            clock: &SystemClock,
-                            secrets: &EnvSecrets,
-                            models: &HttpModels,
-                            notifier: &daemon.sessions,
-                            cases: &state,
-                        };
-                        if let Err(e) = follow_up.run(&case) {
-                            log(&format!("follow-up for {}: {e}", case.outcome().command()));
-                        }
-                    });
-                }
+            if let (TriageDecision::Offer { case, fix: None }, Some(_)) = (decision, &pending) {
+                let daemon = Arc::clone(daemon);
+                std::thread::spawn(move || {
+                    let state = JsonState::new(&daemon.cfg.state_dir);
+                    let follow_up = FollowUp {
+                        settings: &settings,
+                        clock: &SystemClock,
+                        secrets: &EnvSecrets,
+                        models: &HttpModels,
+                        notifier: &daemon.sessions,
+                        cases: &state,
+                    };
+                    if let Err(e) = follow_up.run(&case) {
+                        log(&format!("follow-up for {}: {e}", case.outcome().command()));
+                    }
+                });
             }
         }
         Request::Subscribe { session, color } => {

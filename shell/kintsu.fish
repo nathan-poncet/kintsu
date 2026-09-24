@@ -9,6 +9,12 @@
 
 if status is-interactive
     set -gx KINTSU_SESSION $fish_pid
+    set -g __kintsu_seq 0
+    set -g __kintsu_pending_seq -1
+
+    function __kintsu_count_prompt --on-event fish_prompt
+        set -g __kintsu_seq (math $__kintsu_seq + 1)
+    end
 
     function __kintsu_postexec --on-event fish_postexec
         set -l kintsu_status $status
@@ -16,6 +22,9 @@ if status is-interactive
         string match -q 'kintsu*' -- "$argv[1]"; and return $kintsu_status
         command kintsu triage --status $kintsu_status --command "$argv[1]" --cwd "$PWD" \
             --session "$KINTSU_SESSION" --shell fish --duration-ms "$CMD_DURATION" --signal-pid $fish_pid
+        # 3: a model is being asked and an "asking…" line was printed; the
+        # answer may replace it if the next prompt is still the current one.
+        test $status -eq 3; and set -g __kintsu_pending_seq (math $__kintsu_seq + 1)
         return $kintsu_status
     end
 
@@ -28,10 +37,14 @@ if status is-interactive
         set -l prompt_lines (fish_prompt 2>/dev/null | string collect | string split \n | count)
         set -l buffer_lines (commandline | count)
         test $buffer_lines -lt 1; and set buffer_lines 1
-        set -l up (math "$prompt_lines + $buffer_lines - 2")
+        set -l replace 0
+        test "$__kintsu_pending_seq" = "$__kintsu_seq"; and set replace 1
+        set -g __kintsu_pending_seq -1
+        set -l down (math "$prompt_lines + $buffer_lines - 2")
+        set -l up (math "$down + $replace")
         test $up -gt 0; and printf '\e[%dA' $up
         printf '\r\e[J%s\n' "$text"
-        for i in (seq $up); printf '\n'; end
+        for i in (seq $down); printf '\n'; end
         commandline -f repaint
     end
 

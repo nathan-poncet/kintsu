@@ -348,7 +348,13 @@ fn triage(
             for text in view.toast.iter().chain(view.bubbles.iter()) {
                 let _ = writeln!(err, "{text}");
             }
-            return ExitCode::SUCCESS;
+            // 3 tells the hook a model is being asked, so it can let the answer
+            // replace the "asking…" line.
+            return if view.pending.is_some() {
+                ExitCode::from(3)
+            } else {
+                ExitCode::SUCCESS
+            };
         }
     }
     let triage = Triage {

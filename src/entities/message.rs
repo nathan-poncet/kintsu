@@ -10,6 +10,8 @@ pub enum MessageBody {
     Fix(Fix),
     /// A model explained the failure.
     Explanation { model: String, text: String },
+    /// One line of news about the case: a model that had nothing, or failed.
+    Note(String),
 }
 
 /// A message about a case, sent to the shell it happened in.

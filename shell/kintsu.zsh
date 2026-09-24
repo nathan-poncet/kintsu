@@ -14,6 +14,7 @@ if [[ -o interactive ]]; then
 
   export KINTSU_SESSION="$$"
   typeset -g __kintsu_command="" __kintsu_started="" __kintsu_fd="" __kintsu_last_subscribe=0
+  typeset -gi __kintsu_seq=0 __kintsu_pending_seq=-1
 
   __kintsu_preexec() {
     __kintsu_command="$1"
@@ -24,6 +25,7 @@ if [[ -o interactive ]]; then
     local __kintsu_status=$?
     local cmdline="$__kintsu_command" started="$__kintsu_started" duration=""
     local -a timing
+    (( __kintsu_seq++ ))
     __kintsu_command=""
     __kintsu_started=""
     [[ -n "${KINTSU_DISABLE:-}" ]] && return $__kintsu_status
@@ -35,6 +37,9 @@ if [[ -o interactive ]]; then
     fi
     command kintsu triage --status "$__kintsu_status" --command "$cmdline" --cwd "$PWD" \
       --session "$KINTSU_SESSION" --shell zsh "${timing[@]}"
+    # 3: a model is being asked and an "asking…" line was printed; the answer
+    # may replace it if no other prompt is drawn before it arrives.
+    (( $? == 3 )) && __kintsu_pending_seq=$__kintsu_seq
     return $__kintsu_status
   }
 
@@ -64,10 +69,12 @@ if [[ -o interactive ]]; then
     zle -I
     local rendered="${(%%)PROMPT}"
     local -a prompt_rows=("${(@f)rendered}") buffer_rows=("${(@f)BUFFER}")
-    local prompt_lines=${#prompt_rows} buffer_lines=${#buffer_rows}
+    local prompt_lines=${#prompt_rows} buffer_lines=${#buffer_rows} replace=0
     (( prompt_lines < 1 )) && prompt_lines=1
     (( buffer_lines < 1 )) && buffer_lines=1
-    local up=$(( prompt_lines + buffer_lines - 1 ))
+    (( __kintsu_pending_seq == __kintsu_seq )) && replace=1
+    __kintsu_pending_seq=-1
+    local up=$(( prompt_lines + buffer_lines - 1 + replace ))
     (( up > 0 )) && print -n -- $'\e['"$up"'A'
     print -n -- $'\r\e[J'
     print -rn -- "$text"

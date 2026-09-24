@@ -16,7 +16,12 @@ pub fn outdated(version: &str) -> String {
 
 /// The answer to `command_finished`: the decision, the toast already
 /// rendered for the client's terminal, and the bubbles it has not seen.
-pub fn decision(decision: &TriageDecision, toast: Option<&str>, bubbles: &[String]) -> String {
+pub fn decision(
+    decision: &TriageDecision,
+    toast: Option<&str>,
+    bubbles: &[String],
+    pending: Option<&str>,
+) -> String {
     match decision {
         TriageDecision::Quiet(reason) => {
             json!({"v": V, "type": "decision", "quiet": quiet_name(reason), "bubbles": bubbles}).to_string()
@@ -27,6 +32,7 @@ pub fn decision(decision: &TriageDecision, toast: Option<&str>, bubbles: &[Strin
             "offer": {"case": case.id().as_str(), "fix": fix.as_ref().map(|f| f.command().as_str())},
             "toast": toast,
             "bubbles": bubbles,
+            "pending": pending,
         })
         .to_string(),
     }
@@ -86,6 +92,7 @@ mod tests {
             &TriageDecision::Quiet(QuietReason::NeverTriaged("vim".into())),
             None,
             &[],
+            None,
         ));
         assert_eq!(quiet["type"], "decision");
         assert_eq!(quiet["quiet"], "never_triaged:vim");
@@ -103,8 +110,10 @@ mod tests {
             &offer,
             Some("▎ make exited 2."),
             &["▎ old".into()],
+            Some("haiku"),
         ));
         assert_eq!(v["offer"]["case"], "c1");
+        assert_eq!(v["pending"], "haiku");
         assert_eq!(v["offer"]["fix"], Value::Null);
         assert_eq!(v["toast"], "▎ make exited 2.");
         assert_eq!(v["bubbles"][0], "▎ old");

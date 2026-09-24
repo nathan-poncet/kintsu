@@ -14,4 +14,4 @@ pub use plain::{
 };
 pub use shell_hook::shell_hook;
 pub use style::Style;
-pub use toast::{message_toast, toast};
+pub use toast::{message_toast, pending_line, toast};

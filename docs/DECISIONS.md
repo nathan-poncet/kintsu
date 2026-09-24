@@ -73,8 +73,15 @@ built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
   `routing.quick_fix`, every failure no rule could fix is sent to the
   model in the background and the answer lands as "Try …? (model, not
   verified)"; `kintsu fix` and `^K` then reuse that proposal instead of
-  asking again. That is the "message arriving while you work" of the
-  landing page; `eager_fix` is off by default, as documented.
+  asking again. While the model is being asked, the bubble carries a third
+  dim line, "asking haiku…"; the answer replaces it in place when no other
+  prompt was drawn in between (the hooks count prompts, and the client's
+  exit status 3 tells them a line is waiting), and a model that failed or
+  had nothing says so in one line instead of leaving it dangling. An
+  animated spinner was considered and rejected: every frame would redraw
+  the prompt under the user's fingers. That is the "message arriving while
+  you work" of the landing page; `eager_fix` is off by default, as
+  documented.
 - A key given as `{ env = … }` is read by the daemon, which inherits the
   environment of the shell that spawned it: set the variable before the
   first failure of the day, or `kintsu daemon stop` after changing it.

@@ -43,8 +43,8 @@ A small bubble, one gold seam on the left, one sentence, a line of
 actions. `^K` puts the fix in your prompt; you press Enter. Nothing ever
 steals a keystroke from your prompt, and nothing runs on its own. When no
 rule knows and you switched `eager_fix` on, a resident daemon asks your
-model in the background and the answer lands above your prompt a moment
-later, without interrupting what you type. Clickable words and the
+model in the background; the bubble says "asking haiku…" and the answer
+takes that line's place a moment later, without interrupting what you type. Clickable words and the
 expanded panel come next.
 
 - **Fix**, the fast path: a one-line correction shown as ghost text you

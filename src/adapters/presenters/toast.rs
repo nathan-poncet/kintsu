@@ -83,7 +83,14 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
             out.push_str(&style.line(&style.dim(&format!("— {model}"))));
             out
         }
+        MessageBody::Note(text) => style.line(&style.dim(text)),
     }
+}
+
+/// The dim line under the bubble while a model is being asked; the answer
+/// replaces it.
+pub fn pending_line(model: &str, style: &Style) -> String {
+    style.line(&style.dim(&format!("asking {model}{}", style.ellipsis())))
 }
 
 fn danger_note(fix: &Fix, style: &Style) -> String {
@@ -230,6 +237,16 @@ mod tests {
             message_toast(&e, &Style::PLAIN),
             "| Node is too old.\n| — haiku"
         );
+        let n = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Note("haiku had no fix for this one.".into()),
+        );
+        assert_eq!(
+            message_toast(&n, &Style::PLAIN),
+            "| haiku had no fix for this one."
+        );
+        assert_eq!(pending_line("haiku", &Style::PLAIN), "| asking haiku...");
     }
 
     #[test]

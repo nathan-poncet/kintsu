@@ -18,6 +18,8 @@ use crate::use_cases::TriageInput;
 pub struct DecisionView {
     pub toast: Option<String>,
     pub bubbles: Vec<String>,
+    /// The model being asked in the background, when one is.
+    pub pending: Option<String>,
 }
 
 pub struct DaemonClient {
@@ -79,6 +81,7 @@ impl DaemonClient {
         Some(DecisionView {
             toast: answer["toast"].as_str().map(String::from),
             bubbles: texts(&answer["bubbles"]),
+            pending: answer["pending"].as_str().map(String::from),
         })
     }
 

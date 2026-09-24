@@ -283,6 +283,18 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
 
     let decision = f.exchange(r#"{"v":1,"type":"command_finished","session":"s3","command":"make test","status":2,"cwd":"/"}"#);
     assert_eq!(decision[0]["offer"]["fix"], serde_json::Value::Null);
+    assert_eq!(
+        decision[0]["pending"], "local",
+        "the model being asked, for the asking… line"
+    );
+    assert!(
+        decision[0]["toast"]
+            .as_str()
+            .unwrap()
+            .ends_with("▎ asking local…"),
+        "{}",
+        decision[0]["toast"]
+    );
 
     line.clear();
     reader.read_line(&mut line).unwrap();
@@ -309,7 +321,20 @@ fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision() {
     );
     let mut f = Fixture::new("pending", &config);
     f.start_daemon();
-    f.exchange(r#"{"v":1,"type":"command_finished","session":"s4","command":"make test","status":2,"cwd":"/"}"#);
+    let (code, _, err) = f.run(
+        &[
+            "triage",
+            "--status",
+            "2",
+            "--command",
+            "make test",
+            "--session",
+            "s4",
+        ],
+        None,
+    );
+    assert_eq!(code, 3, "3 tells the hook a model is being asked: {err}");
+    assert!(err.contains("asking local"), "{err}");
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut bubbles = Vec::new();
     while Instant::now() < deadline && bubbles.is_empty() {
