@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Configuration — Kintsu</title>
-  <meta name="description" content="Every knob of Kintsu: models and providers, routing per task, privacy constraints, keys, the bubble, noise control, the daemon, agents, and four complete example configurations.">
+  <meta name="description" content="Every setting of Kintsu: models and providers, routing per task, privacy constraints, keys, the bubble, noise control, the daemon, agents, and four complete example configurations.">
   <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
   <meta name="theme-color" content="#0f0d0b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,7 +27,7 @@
 <main id="main" class="doc">
   <header class="doc-head">
     <p class="section-label">Configuration</p>
-    <h1>One file. Every knob.</h1>
+    <h1>One file. Every setting.</h1>
     <p class="lede"><code>~/.config/kintsu/config.toml</code>, written by <code>kintsu setup</code>, checked by <code>kintsu doctor</code>, overridden per project by a <code>.kintsu.toml</code> at the root of a repository. This page is the designed schema; it may still move until v0.1 ships, and every change will be listed in the changelog.</p>
     <nav class="toc" aria-label="On this page">
       <a href="#models">Models</a><a href="#routing">Routing</a><a href="#constraints">Constraints</a><a href="#keys">Keys</a><a href="#agents">Agents</a><a href="#ui">The bubble</a><a href="#noise">Noise</a><a href="#daemon">Daemon and hooks</a><a href="#project">Per project</a><a href="#examples">Complete examples</a><a href="#commands">Commands</a>
@@ -76,7 +76,7 @@ tier     = <span class="s">"agent"</span></code></pre>
         <tr><td><code>cli_agent</code></td><td>Claude Code, Codex, OpenCode, aider, Gemini CLI, Copilot CLI, or any command template</td><td>the CLI installed and logged in</td><td><span class="where you">your account</span></td></tr>
       </tbody>
     </table>
-    <p class="note">Tiers are what the router reasons about. <code>tiny</code>: up to about 2B parameters, answers in a few hundred milliseconds, always local. <code>small</code>: 7 to 14B local, or a Haiku-class API. <code>large</code>: a frontier model. <code>agent</code>: a CLI with tools, not a chat completion.</p>
+    <p class="note">Tiers are what the router uses. <code>tiny</code>: up to about 2B parameters, answers in a few hundred milliseconds, always local. <code>small</code>: 7 to 14B local, or a Haiku-class API. <code>large</code>: a frontier model. <code>agent</code>: a CLI with tools, not a chat completion.</p>
   </section>
 
   <!-- ─────────── routing ─────────── -->
@@ -101,10 +101,10 @@ summarize = <span class="s">"2s"</span></code></pre>
 
     <figure class="router" id="router">
       <div class="router-text">
-        <p class="viz-title">How a task finds its brain</p>
+        <p class="viz-title">How a task is routed to a model</p>
         <p class="task"><span class="task-name" id="router-task">classify</span> <span class="task-note" id="router-note">is this failure worth a bubble?</span></p>
         <p class="router-why" id="router-why">A tiny local model reads the output and says whether it deserves your attention.</p>
-        <p class="viz-note">Per task, an ordered list of brains; constraints filter it first.</p>
+        <p class="viz-note">Per task, an ordered list of models; constraints filter it first.</p>
       </div>
       <svg class="router-svg" viewBox="0 0 420 150" aria-hidden="true">
         <path class="edge" d="M40 75 C 120 75, 150 22, 230 22"/>
@@ -135,7 +135,7 @@ summarize = <span class="s">"2s"</span></code></pre>
   <!-- ─────────── constraints ─────────── -->
   <section id="constraints">
     <h2>Constraints</h2>
-    <p>Constraints filter the candidate lists before the router looks at them. They are how a case with a secret in it never reaches a cloud model, and how a budget stays a budget.</p>
+    <p>Constraints filter the candidate lists before the router looks at them. They are how a case with a secret in it never reaches a cloud model, and how a budget is enforced.</p>
     <div class="config">
       <div class="config-head"><span>[routing.constraints]</span></div>
 <pre><code><span class="k">[routing.constraints]</span>

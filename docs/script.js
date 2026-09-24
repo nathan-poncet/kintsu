@@ -67,7 +67,7 @@
       fix: "Rule · command-name typo · not destructive" + sugg("git status"),
       agent: ["This one does not need an agent, but you can still hand it off. <span class='d'>⏎ to start · p to review what is sent</span>"],
       ignore: "Quiet for <b>gti</b>: <span class='d'>this session · always</span>",
-      privacy: "Nothing left the machine. Rules run locally.",
+      privacy: "Nothing was sent. Rules run locally.",
     },
   };
   const buildToast = {
@@ -78,7 +78,7 @@
       fix: "Small model · confidence 0.92 · not destructive" + sugg("nvm use 22 && npm run build"),
       agent: ["Handing this to <b>Claude Code</b>: command, output (redacted: 1 token), cwd, git state, last 10 commands.<br>", "<span class='d'>⏎ to start · p to review what is sent</span>"],
       ignore: "Quiet for <b>npm run build</b>: <span class='d'>this directory · this session · always</span>",
-      privacy: `What left the machine, to <b>haiku</b> (Anthropic, cloud):<br><span class="ok">✓</span> command, exit status, duration<br><span class="ok">✓</span> 14 lines of output — <span class="redact">NPM_TOKEN=npm_••••••••</span> redacted<br><span class="ok">✓</span> cwd ~/dev/acme · branch main, clean · last 10 commands<br><span class="d">✗</span> environment variables · file contents · anything you did not see here`,
+      privacy: `Sent to <b>haiku</b> (Anthropic, cloud):<br><span class="ok">✓</span> command, exit status, duration<br><span class="ok">✓</span> 14 lines of output — <span class="redact">NPM_TOKEN=npm_••••••••</span> redacted<br><span class="ok">✓</span> cwd ~/dev/acme · branch main, clean · last 10 commands<br><span class="d">✗</span> environment variables · file contents · anything you did not see here`,
     },
   };
   const testToast = {
@@ -96,12 +96,12 @@
   const lintToast = {
     s: "lint failed on <b>src/legacy.c</b> again. Ask?", a: ["why", "agent", "ignore", "more"], fix: "",
     head: "make lint · exit 2 · 0.8 s", cmd: "make lint",
-    sections: { why: ["<b>src/legacy.c</b> has an unused variable and the linter treats warnings as errors. You have seen this bubble twice this week."], fix: "No one-line fix: this is code.", agent: ["Hand it to your agent? <span class='d'>⏎ to start</span>"], ignore: "Quiet for <b>make lint</b>: <span class='d'>this command · this directory · this session · always</span>", privacy: "Nothing left the machine." },
+    sections: { why: ["<b>src/legacy.c</b> has an unused variable and the linter treats warnings as errors. You have seen this bubble twice this week."], fix: "No one-line fix: this is code.", agent: ["Hand it to your agent? <span class='d'>⏎ to start</span>"], ignore: "Quiet for <b>make lint</b>: <span class='d'>this command · this directory · this session · always</span>", privacy: "Nothing was sent." },
   };
   const followUp = {
     html: "<span class='d'>haiku ·</span> Also: package.json says <b>\"engines\": { \"node\": \">=22\" }</b>. A <b>.nvmrc</b> would stop this from happening again. <span class='g'>^K</span> to add one.",
     fix: "echo 22 > .nvmrc", head: "npm run build · follow-up", cmd: "npm run build",
-    sections: { why: ["Every shell that opens this directory picks the right Node with nvm, fnm or volta. One file, no surprises."], fix: sugg("echo 22 > .nvmrc"), agent: ["Hand the follow-up to <b>Claude Code</b>? <span class='d'>⏎ to start</span>"], ignore: "Quiet about follow-ups for <b>npm run build</b>.", privacy: "Sent to <b>haiku</b>: the previous case only. Nothing new left the machine." },
+    sections: { why: ["Every shell that opens this directory picks the right Node with nvm, fnm or volta. One file, no surprises."], fix: sugg("echo 22 > .nvmrc"), agent: ["Hand the follow-up to <b>Claude Code</b>? <span class='d'>⏎ to start</span>"], ignore: "Quiet about follow-ups for <b>npm run build</b>.", privacy: "Sent to <b>haiku</b>: the previous case only. Nothing new was sent." },
   };
 
   const SCENES = {
@@ -115,29 +115,29 @@
     ],
     tour: [
       CH({ id: "typo", tag: "Tab", title: "A typo, fixed by a rule", who: "a rule", where: "local", cost: "under a millisecond · no model", keys: "Tab or → accepts · anything else ignores · Enter runs",
-        text: "<b>gti</b> is not on your PATH. A rule ported from thefuck finds the nearest command and puts it on your next prompt as ghost text. Nothing left the machine, and nothing ran until you pressed Enter." }),
+        text: "<b>gti</b> is not on your PATH. A rule ported from thefuck finds the nearest command and puts it on your next prompt as ghost text. Nothing was sent, and nothing ran until you pressed Enter." }),
       S("A typo. A rule knows. The fix is already typed for you."),
       P(), W(600), T("gti status"), E(), O(err("zsh: command not found: gti")), W(400),
       TOAST(typoToast), GHOST("git status"), W(1600), KEY("Tab"), TAB(), W(700), KEY("Enter"), E(),
       O("On branch main", "Your branch is up to date with 'origin/main'.", "nothing to commit, working tree clean"), W(1500),
 
       CH({ id: "bubble", tag: "the bubble", title: "A real failure, a real bubble", who: "a rule and a tiny model", where: "local", cost: "a few hundred milliseconds · free", keys: "click a word · ^K for more",
-        text: "The build fails after twelve seconds. A tiny local model turns fourteen lines of trace into one sentence. The bubble: a gold seam, the sentence, a line of words. The words are links. Nothing steals a keystroke from your prompt." }),
+        text: "The build fails after twelve seconds. A tiny local model turns fourteen lines of trace into one sentence. The bubble: one sentence and a line of words. The words are links. It never captures your keyboard." }),
       S("A real failure. One sentence, a line of words. Click them, or ^K."),
       P(), T("npm run build"), E(), O(...BUILD_TRACE), W(500), TOAST(buildToast), P(), W(2400),
 
-      CH({ id: "panel", tag: "^K", title: "The bubble becomes a panel", who: "Kintsu", where: "local", cost: "instant", keys: "w f a i p · Esc folds it back · mouse and wheel",
-        text: "The same bubble, unfolded in place under your prompt, never full screen. The command and its status, five sections with one-letter keys, mouse welcome. It opened on Why, the first word of the bubble." }),
-      S("^K unfolds the bubble in place. Five sections, one key each."),
+      CH({ id: "panel", tag: "^K", title: "The bubble becomes a panel", who: "Kintsu", where: "local", cost: "instant", keys: "w f a i p · Esc closes it · mouse and wheel",
+        text: "The same bubble, opened in place under your prompt, never full screen. The command and its status, five sections with one-letter keys, mouse welcome. It opened on Why, the first word of the bubble." }),
+      S("^K opens the bubble in place. Five sections, one key each."),
       KEY("^K"), W(500), OPEN("why", false), W(2600),
 
       CH({ id: "why", tag: "w · Why", title: "Why it failed", who: "haiku · Anthropic", where: "cloud", cost: "about a tenth of a cent · or local, one line of config", keys: "w · click Why · kintsu why",
-        text: "The explanation streams from the model you routed the <b>explain</b> task to, here Claude Haiku. Swap it for Ollama and it never leaves your machine. It reads the redacted case, never your files." }),
+        text: "The explanation streams from the model you routed the <b>explain</b> task to, here Claude Haiku. Swap it for Ollama and nothing is sent anywhere. It reads the redacted case, never your files." }),
       S("Why: the explanation streams in from the model you chose."),
       KEY("w"), W(400), TABTO("why"), W(3400),
 
-      CH({ id: "privacy", tag: "p · Privacy", title: "What left the machine", who: "Kintsu", where: "local", cost: "redaction on by default", keys: "p · click Privacy · kintsu privacy",
-        text: "Not a promise, a tab. The exact payload that went to Haiku, redactions highlighted: an npm token sat in the output and the model never saw it. A case marked sensitive would have been answered locally, automatically." }),
+      CH({ id: "privacy", tag: "p · Privacy", title: "What was sent", who: "Kintsu", where: "local", cost: "redaction on by default", keys: "p · click Privacy · kintsu privacy",
+        text: "The exact payload that went to Haiku, redactions highlighted: an npm token sat in the output and the model never saw it. A case marked sensitive would have been answered locally, automatically." }),
       S("Privacy: the exact payload, secrets redacted."),
       KEY("p"), W(400), TABTO("privacy"), W(3800),
 
@@ -158,7 +158,7 @@
       T("vim scripts/build.js"), E(), P(), W(1800), MSG(followUp), W(3800),
 
       CH({ id: "ignore", tag: "i · Ignore", title: "Ignore, mute, forever", who: "Kintsu", where: "local", cost: "quiet by default", keys: "i · kintsu ignore · kintsu mute 1h",
-        text: "A flaky linter you already know about. Ignore has scopes: this command, this directory, this session, forever. <b>kintsu mute 1h</b> buys an hour of nothing. The same failure twice is one bubble anyway." }),
+        text: "A flaky linter you already know about. Ignore has scopes: this command, this directory, this session, forever. <b>kintsu mute 1h</b> mutes everything for an hour. The same failure twice is one bubble anyway." }),
       S("Ignore: this command, this directory, this session, or forever."),
       T("make lint"), E(), O(err("src/legacy.c:12: warning treated as error: unused variable 'tmp'"), err("make: *** [Makefile:31: lint] Error 1")), W(400),
       TOAST(lintToast), P(), W(1800), KEY("i"), IGNORE(), W(1400), T("kintsu mute 1h"), E(), O(dim("quiet until 17:42")), W(3200), END(),
@@ -350,7 +350,7 @@
     takeWheel() {
       if (this.driving) return;
       this.driving = true; this.run++; this.playing = false; this.paused = false;
-      this.setBadge("✋ you're driving · pick a chapter to resume", "Resume the tour");
+      this.setBadge("manual · pick a chapter to resume", "Resume the tour");
     }
     act(name) {
       this.takeWheel();
@@ -447,7 +447,7 @@
     vizzes.forEach((v) => vio.observe(v));
   }
 
-  // ── the router, live: a task finds its brain ─────────────────────────
+  // ── the router, live: a task is routed to a model ─────────────────────────
   const router = document.getElementById("router");
   if (router) {
     const ROUTES = [

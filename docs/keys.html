@@ -27,7 +27,7 @@
   <header class="doc-head">
     <p class="section-label">Keys and commands</p>
     <h1>Every action, <em>three ways.</em></h1>
-    <p class="lede">A key, a word you can click, and a command. Nothing steals a keystroke from your prompt; the single letters only work once the panel is open.</p>
+    <p class="lede">A key, a word you can click, and a command. It never captures your keyboard; the single letters only work once the panel is open.</p>
   </header>
   <section id="keys">
     
@@ -35,13 +35,13 @@
       <thead><tr><th>where</th><th>key</th><th>does</th></tr></thead>
       <tbody>
         <tr><td>at the prompt, empty line</td><td><kbd>Tab</kbd> or <kbd>→</kbd></td><td>accept the ghost-text fix (zsh, fish)</td></tr>
-        <tr><td>at the prompt</td><td><kbd>^K</kbd></td><td>unfold the last bubble into the panel, or fold it</td></tr>
+        <tr><td>at the prompt</td><td><kbd>^K</kbd></td><td>open the last bubble as a panel, or close it</td></tr>
         <tr><td>at the prompt</td><td>click a word</td><td>open the panel on that action (terminals that render OSC 8 links)</td></tr>
         <tr><td>panel</td><td><kbd>w</kbd> <kbd>f</kbd> <kbd>a</kbd> <kbd>i</kbd> <kbd>p</kbd></td><td>Why · Fix · Agent · Ignore · Privacy</td></tr>
-        <tr><td>panel</td><td><kbd>⏎</kbd></td><td>insert the focused suggestion in your line and fold; you press Enter again to run</td></tr>
+        <tr><td>panel</td><td><kbd>⏎</kbd></td><td>insert the focused suggestion in your line and close the panel; you press Enter again to run</td></tr>
         <tr><td>panel</td><td><kbd>c</kbd></td><td>copy the focused suggestion</td></tr>
         <tr><td>panel</td><td><kbd>Tab</kbd> · <kbd>↑</kbd> <kbd>↓</kbd> · wheel</td><td>move focus · scroll</td></tr>
-        <tr><td>panel</td><td><kbd>Esc</kbd> or <kbd>q</kbd></td><td>fold</td></tr>
+        <tr><td>panel</td><td><kbd>Esc</kbd> or <kbd>q</kbd></td><td>close the panel</td></tr>
       </tbody>
     </table>
     <table class="ref">
@@ -49,7 +49,7 @@
         <tr><td><code>kintsu why</code> · <code>fix</code> · <code>agent</code> · <code>privacy</code> · <code>ignore</code></td><td>act on the last failure; alias <code>k</code></td></tr>
         <tr><td><code>kintsu ignore --command|--dir|--session|--always</code></td><td>quiet, with a scope</td></tr>
         <tr><td><code>kintsu mute 1h</code></td><td>an hour of nothing</td></tr>
-        <tr><td><code>kintsu setup</code> · <code>doctor</code> · <code>models</code> · <code>login</code></td><td>configure, check, list the brains, store a key</td></tr>
+        <tr><td><code>kintsu setup</code> · <code>doctor</code> · <code>models</code> · <code>login</code></td><td>configure, check, list the models, store a key</td></tr>
         <tr><td><code>kintsu service install</code> · <code>uninstall</code></td><td>the daemon survives logout, restarts on crash</td></tr>
         <tr><td><code>kintsu init zsh|bash|fish</code></td><td>the hook, to eval or source</td></tr>
         <tr><td><code>KINTSU_DISABLE=1</code></td><td>a shell you want left alone</td></tr>

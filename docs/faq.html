@@ -27,7 +27,7 @@
 <main id="main" class="doc faq">
   <header class="doc-head">
     <p class="section-label">Questions</p>
-    <h1>Fair ones, answered straight.</h1>
+    <h1>Questions, answered directly.</h1>
     <p class="lede">Twenty-four questions in five groups. If yours is missing, <a href="https://github.com/nathan-poncet/kintsu/issues" target="_blank" rel="noopener">open an issue</a>: the answer becomes a line here.</p>
   </header>
   <section>
@@ -55,15 +55,15 @@
         <h3>Models and cost</h3>
         <details><summary>What does an answer cost?</summary><p>Rules and the tiny local model: nothing. An explanation from a small cloud model such as Haiku: about a tenth of a cent for a typical case. A large model: a few cents. Your agent: whatever your subscription already covers. <code>kintsu models</code> shows the running total and <code>max_daily_cost</code> caps it; past the cap the router falls back to local and rules.</p></details>
         <details><summary>Can I use my Claude, ChatGPT or Copilot subscription instead of an API key?</summary><p>Yes, through the CLI you already have: Claude Code, Codex, Copilot CLI or Gemini CLI configured as a <code>cli_agent</code>. Kintsu writes the brief and launches the CLI; the CLI uses its own login. That is how Agent works, and it can also serve Why and Fix if you route them there, at the cost of a slower answer.</p></details>
-        <details><summary>Do I need Ollama?</summary><p>No, but it is the difference between good and great. With a tiny local model, classification and summaries are free and instant, and sensitive cases still get an answer. Without it, those tasks fall back to rules and the toast is a little less clever. <code>kintsu setup</code> detects Ollama and picks a small model if you say yes.</p></details>
-        <details><summary>How does the router pick a brain?</summary><p>Per task, an ordered list of candidates from your config. The router drops what the constraints forbid (a cloud model for a sensitive case, a paid model past the budget, a slow model for a fast task), skips models whose circuit is open after three failures, and takes the first one left. On a timeout it moves to the next. The last candidate is always <code>rules-only</code>.</p></details>
+        <details><summary>Do I need Ollama?</summary><p>No, but it makes a noticeable difference. With a tiny local model, classification and summaries are free and instant, and sensitive cases still get an answer. Without it, those tasks fall back to rules and the toast is a little less clever. <code>kintsu setup</code> detects Ollama and picks a small model if you say yes.</p></details>
+        <details><summary>How does the router pick a model?</summary><p>Per task, an ordered list of candidates from your config. The router drops what the constraints forbid (a cloud model for a sensitive case, a paid model past the budget, a slow model for a fast task), skips models whose circuit is open after three failures, and takes the first one left. On a timeout it moves to the next. The last candidate is always <code>rules-only</code>.</p></details>
         <details><summary>Which providers?</summary><p>Anthropic, OpenAI, Gemini, Ollama, and any endpoint that speaks the OpenAI chat API: OpenRouter, Groq, Mistral, Together, LM Studio, llama-server, vLLM. Plus any CLI agent as a provider. Keys come from your keychain, an environment variable or a command such as <code>op read</code>; a literal in the file works and gets a warning.</p></details>
       </div>
 
       <div class="faq-group">
         <h3>Compared to</h3>
         <details><summary>Isn't this Warp?</summary><p>Warp did it first, and did it well, inside Warp: with a Warp account, Warp's models and Warp's quota. Kintsu does it in the terminal and shell you already use, with any model or agent, keys in your keychain and the source on GitHub. If you are happy in Warp, stay there.</p></details>
-        <details><summary>Isn't this thefuck?</summary><p>For chapter 1, yes, and Kintsu ports its best rules with credit. thefuck waits for you to type a word, has no model for what rules cannot know, cannot read the output, and cannot hand a case to an agent. It also starts a Python interpreter each time; Kintsu's quiet path is a native binary.</p></details>
+        <details><summary>Isn't this thefuck?</summary><p>For chapter 1, yes, and Kintsu ports its best rules with credit. thefuck waits for you to type a word, has no model for what rules cannot know, cannot read the output, and cannot hand a case to an agent. It also starts a Python interpreter each time; Kintsu's fast path is a native binary.</p></details>
         <details><summary>Isn't this Claude Code, Codex, Copilot CLI, Gemini CLI?</summary><p>Those are agents you open. Kintsu is what notices the failure, writes the brief and opens them for you with the case attached. They are not competitors; they are where Agent hands off to.</p></details>
         <details><summary>What about zsh-autofix, ai-fix, butterfish, shell_gpt?</summary><p>Each has a piece: zsh-autofix triggers on failure but is zsh plus oh-my-zsh plus Ollama only; ai-fix re-runs your failed command to capture its error, which is unsafe; butterfish wraps your shell in a PTY; shell_gpt and aichat are chat CLIs you call. None combines the automatic trigger, any shell and terminal, any model, safe capture and a real hand-off. <a href="https://github.com/nathan-poncet/kintsu/blob/main/docs/VISION.md#what-exists-already" target="_blank" rel="noopener">The full comparison</a> is in the vision document.</p></details>
       </div>
@@ -73,7 +73,7 @@
         <details><summary>What works today?</summary><p>The hooks, and a placeholder line after a failure. The bubble, the daemon, the rules and the models are designed in four documents and land with v0.1. The <a href="roadmap.html">roadmap</a> shows what becomes real when, chapter by chapter.</p></details>
         <details><summary>Why Rust, and why one binary?</summary><p>The quiet path runs after every failed command and must start in well under a millisecond; a static binary installs everywhere, including a server you do not own. One crate, three rings as folders, a test that keeps them honest. It is an application, not a library.</p></details>
         <details><summary>License, contributions?</summary><p>MIT. Issues and pull requests are welcome; the most useful contribution before v0.1 is an opinion on the design documents. Conventions are in <a href="https://github.com/nathan-poncet/kintsu/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">CONTRIBUTING.md</a>.</p></details>
-        <details><summary>Why "Kintsu"?</summary><p>Kintsugi, 金継ぎ, is the Japanese craft of repairing broken pottery with gold: the crack becomes the most visible and most valued part of the piece. A failed command is a crack. Kintsu is the gold seam, and the thing you learn from the fix is worth more than a command that never failed.</p></details>
+        <details><summary>Why "Kintsu"?</summary><p>Kintsugi, 金継ぎ, is the Japanese craft of repairing broken pottery with gold. The name says what the tool does: it repairs failed commands, visibly.</p></details>
       </div>
     </div>
   </section>
