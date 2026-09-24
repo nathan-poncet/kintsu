@@ -19,7 +19,7 @@ pub mod testing;
 pub mod triage;
 
 pub use diagnose::{Check, Diagnose, Health};
-pub use explain::{Explain, ExplainError, Explanation};
+pub use explain::{Explain, Explanation};
 pub use fix_last::{FixLast, FixProposal};
 pub use follow_up::FollowUp;
 pub use hand_off::{HandOff, HandOffPlan};
