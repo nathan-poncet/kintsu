@@ -404,9 +404,11 @@ body.docs main.doc { max-width: 780px; width: 100%; margin: 0 auto; }
 .toc li a:hover { color: var(--text); }
 .toc li a[aria-current="true"] { color: var(--gold); border-left-color: var(--gold); }
 .toc:not(.has-items) { visibility: hidden; }
-body.docs .doc-head { padding: 28px 0 6px; }
+body.docs .doc-head { padding: 28px 0 0; }
 body.docs .doc-head h1 { font-size: clamp(32px, 4.2vw, 44px); }
 body.docs .doc section { padding: 48px 0 0; scroll-margin-top: 24px; }
+body.docs .doc-head + section { padding-top: 20px; }
+body.docs .doc-head .lede { margin-bottom: 0; }
 body.docs .doc h2 { position: relative; font-size: 24px; }
 .anchor { margin-left: 8px; font-size: 16px; color: var(--dim); text-decoration: none; opacity: 0; transition: opacity .15s; vertical-align: 2px; }
 h2:hover .anchor, .anchor:focus-visible { opacity: 1; }
