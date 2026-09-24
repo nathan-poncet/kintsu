@@ -368,8 +368,16 @@ fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision() {
         ],
         None,
     );
-    assert_eq!(code, 3, "3 tells the hook a model is being asked: {err}");
+    assert_eq!(code, 0, "{err}");
     assert!(err.contains("asking local"), "{err}");
+    assert!(
+        f.dir
+            .join("state")
+            .join("sessions")
+            .join("s4.asking")
+            .is_file(),
+        "the marker the hook reads"
+    );
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut bubbles = Vec::new();
     while Instant::now() < deadline && bubbles.is_empty() {

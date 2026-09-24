@@ -101,6 +101,8 @@ pub enum CliError {
     UnknownConfigSubcommand,
     #[error("daemon knows run, stop and status")]
     UnknownDaemonAction,
+    #[error("`{0}` needs a value")]
+    MissingValue(String),
 }
 
 fn supported_shells() -> String {
@@ -192,7 +194,7 @@ fn parse_session_flag(flags: &[&str]) -> Result<Option<SessionId>, CliError> {
     match flags {
         [] => Ok(None),
         ["--session", id] => Ok(Some(SessionId::new(*id)).filter(|s| !s.as_str().is_empty())),
-        ["--session"] => Err(CliError::IncompleteTriage),
+        ["--session"] => Err(CliError::MissingValue("--session".into())),
         [other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
     }
 }
@@ -326,6 +328,10 @@ mod tests {
         assert_eq!(
             parse_args(["pending", "--x"]),
             Err(CliError::UnknownFlag("--x".into()))
+        );
+        assert_eq!(
+            parse_args(["subscribe", "--session"]),
+            Err(CliError::MissingValue("--session".into()))
         );
     }
 

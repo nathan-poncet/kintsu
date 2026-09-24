@@ -1,6 +1,6 @@
 //! A failure worth attention, with everything a helper needs to know.
 
-use crate::entities::{CommandLine, CommandOutcome, Fix, Redacted, SessionId, Timestamp, redact};
+use crate::entities::{CommandLine, CommandOutcome, Fix, SessionId, Timestamp, redact};
 
 /// The unguessable identity of a case; clickable links and `act` frames
 /// carry it, so it is never sequential.
@@ -112,27 +112,38 @@ impl FailureCase {
         self.proposal.as_ref()
     }
 
-    /// Everything that could leave the machine, with secrets redacted:
-    /// the command line, the output, the recent history.
-    pub fn redacted(&self) -> Redacted {
-        let mut text = String::new();
-        text.push_str(self.outcome.command().as_str());
-        if let Some(out) = &self.output {
-            text.push('\n');
-            text.push_str(out);
+    /// Everything that could leave the machine, each part with its secrets
+    /// masked on its own, so nothing depends on how lines are counted.
+    pub fn redacted(&self) -> RedactedCase {
+        let command = redact(self.outcome.command().as_str());
+        let output = self.output.as_deref().map(redact);
+        let recent: Vec<_> = self.recent.iter().map(|l| redact(l.as_str())).collect();
+        let redactions = command.findings().len()
+            + output.as_ref().map_or(0, |o| o.findings().len())
+            + recent.iter().map(|r| r.findings().len()).sum::<usize>();
+        RedactedCase {
+            command: command.text().to_string(),
+            output: output.map(|o| o.text().to_string()),
+            recent: recent.into_iter().map(|r| r.text().to_string()).collect(),
+            redactions,
         }
-        for line in &self.recent {
-            text.push('\n');
-            text.push_str(line.as_str());
-        }
-        redact(&text)
     }
 
     /// Whether anything sensitive appeared in the command, its output or
     /// the recent history: then no cloud model may see the case.
     pub fn is_sensitive(&self) -> bool {
-        !self.redacted().findings().is_empty()
+        self.redacted().redactions > 0
     }
+}
+
+/// A case as it may leave the machine: the same parts, secrets masked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RedactedCase {
+    pub command: String,
+    pub output: Option<String>,
+    pub recent: Vec<String>,
+    /// How many secrets were masked across the parts.
+    pub redactions: usize,
 }
 
 #[cfg(test)]
@@ -147,6 +158,24 @@ mod tests {
             CommandOutcome::new(CommandLine::new(text).unwrap(), ExitStatus::new(code)),
             Some("/home/me/dev".into()),
         )
+    }
+
+    #[test]
+    fn each_part_is_redacted_on_its_own_and_the_findings_add_up() {
+        let c = case(
+            "curl -H 'Authorization: Bearer sk-live-abcdefghijklmnop' https://x",
+            22,
+        )
+        .with_output("NPM_TOKEN=npm_abcdefghijklmnopqrstuvwxyz0123456789\nline two".into())
+        .with_recent(vec![CommandLine::new("export X=1").unwrap()]);
+        let r = c.redacted();
+        assert_eq!(
+            r.command,
+            "curl -H 'Authorization: Bearer ••••••••' https://x"
+        );
+        assert_eq!(r.output.as_deref(), Some("NPM_TOKEN=••••••••\nline two"));
+        assert_eq!(r.recent, vec!["export X=1"]);
+        assert_eq!(r.redactions, 2);
     }
 
     #[test]

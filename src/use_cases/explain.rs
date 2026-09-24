@@ -3,12 +3,8 @@
 
 use thiserror::Error;
 
-use crate::entities::{
-    FailureCase, Message, MessageBody, ModelSpec, SessionId, Settings, case_document,
-};
-use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Clock, ModelError, ModelGateway, Notifier, NotifyError, Secrets,
-};
+use crate::entities::{FailureCase, ModelSpec, SessionId, Settings, case_document};
+use crate::use_cases::ports::{CaseStore, CaseStoreError, ModelError, ModelGateway, Secrets};
 use crate::use_cases::prompts::explain_prompt;
 use crate::use_cases::routing::{ask_first, excluded_for_sensitivity, model_candidates};
 
@@ -35,8 +31,6 @@ pub enum ExplainError {
     AllFailed(Vec<(String, ModelError)>),
     #[error(transparent)]
     Cases(#[from] CaseStoreError),
-    #[error(transparent)]
-    Notify(#[from] NotifyError),
 }
 
 /// Explains the last failure.
@@ -71,30 +65,6 @@ impl Explain<'_> {
     pub fn candidate(&self, session: Option<&SessionId>) -> Result<String, ExplainError> {
         let (_, candidates) = self.prepare(session)?;
         Ok(candidates[0].name.clone())
-    }
-
-    /// Asks and sends the answer to the shell as a message; a failure is
-    /// sent as one line too, so the "asking…" line never dangles.
-    pub fn deliver(
-        &self,
-        session: &SessionId,
-        notifier: &dyn Notifier,
-        clock: &dyn Clock,
-    ) -> Result<Message, ExplainError> {
-        let case_id = match self.cases.last(Some(session))? {
-            Some(case) => case.id().clone(),
-            None => return Err(ExplainError::NoCase),
-        };
-        let body = match self.run(Some(session)) {
-            Ok(explanation) => MessageBody::Explanation {
-                model: explanation.model,
-                text: explanation.text,
-            },
-            Err(e) => MessageBody::Note(e.to_string()),
-        };
-        let message = Message::new(case_id, clock.now(), body);
-        notifier.deliver(session, message.clone())?;
-        Ok(message)
     }
 
     pub fn run(&self, session: Option<&SessionId>) -> Result<Explanation, ExplainError> {
@@ -190,48 +160,21 @@ mod tests {
     }
 
     #[test]
-    fn deliver_sends_the_explanation_or_the_reason_as_a_message() {
+    fn the_candidate_is_named_without_asking_anything() {
         let cases = MemoryCases::default();
         cases.save(&case("make", 2, Some("42"))).unwrap();
-        let models = ScriptedModels::answering(&[
-            ("cloud", Ok("Because.")),
-            ("local", Err(ModelError::Unreachable("down".into()))),
-        ]);
-        let notifier = MemoryNotifier::default();
-        let clock = FakeClock::at(7);
-        let secrets = MapSecrets::with(&[]);
+        let models = ScriptedModels::default();
         let uc = Explain {
-            settings: &settings(&["cloud"]),
+            settings: &settings(&["cloud", "local"]),
             cases: &cases,
-            secrets: &secrets,
+            secrets: &MapSecrets::with(&[]),
             models: &models,
         };
         assert_eq!(uc.candidate(Some(&SessionId::new("42"))).unwrap(), "cloud");
-        let m = uc
-            .deliver(&SessionId::new("42"), &notifier, &clock)
-            .unwrap();
-        assert_eq!(
-            m.body(),
-            &MessageBody::Explanation {
-                model: "cloud".into(),
-                text: "Because.".into()
-            }
-        );
-        let down = Explain {
-            settings: &settings(&["local"]),
-            ..uc
-        };
-        let m = down
-            .deliver(&SessionId::new("42"), &notifier, &clock)
-            .unwrap();
-        assert_eq!(
-            m.body(),
-            &MessageBody::Note("no model answered (local: unreachable: down)".into())
-        );
-        assert_eq!(notifier.delivered.borrow().len(), 2);
         assert_eq!(
             uc.candidate(Some(&SessionId::new("other"))).unwrap_err(),
             ExplainError::NoCase
         );
+        assert!(models.asked().is_empty());
     }
 }

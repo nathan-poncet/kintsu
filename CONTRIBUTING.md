@@ -28,6 +28,14 @@ cargo llvm-cov --all-targets --ignore-filename-regex 'src/main\.rs' --fail-under
 cargo deny check                                                                           # cargo install cargo-deny
 ```
 
+The hooks draw above a live prompt, which no unit test can see. After a
+change under `shell/`, run the screen harness (needs `pip install pyte`,
+zsh and fish):
+
+```sh
+cargo build && python3 scripts/shell-harness.py && python3 scripts/shell-harness.py zsh
+```
+
 A release is a tag: bump `version` in `Cargo.toml`, move the `[Unreleased]`
 notes under the version in `CHANGELOG.md`, `git tag vX.Y.Z && git push --tags`.
 The release workflow verifies the tag, drafts the release from the

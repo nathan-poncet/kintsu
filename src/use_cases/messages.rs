@@ -1,10 +1,13 @@
-//! After the bubble, when no rule knew: ask the quick-fix model in the
-//! background and send the answer to the shell as a message. Only when
-//! the user opted in (`ui.eager_fix`) and a model is routed for it.
+//! What the daemon sends to a shell later, as messages: the quick-fix
+//! model's answer after a bubble no rule could fix, and the explanation
+//! `kintsu why` asked for. One place for the rule that a model which had
+//! nothing, or failed, says so in one line, so an "asking…" line under
+//! the bubble never dangles.
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, Message, MessageBody, Settings};
+use crate::entities::{FailureCase, Message, MessageBody, SessionId, Settings};
+use crate::use_cases::explain::{Explain, ExplainError};
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, ModelError, ModelGateway, Notifier, NotifyError, Secrets,
 };
@@ -13,7 +16,9 @@ use crate::use_cases::routing::{ask_first, model_candidates};
 
 /// Why nothing was sent.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum FollowUpError {
+pub enum MessagesError {
+    #[error(transparent)]
+    Explain(#[from] ExplainError),
     #[error("eager fixes are off for this model")]
     Disabled,
     #[error("no model is routed for quick fixes, or none may see this case")]
@@ -30,8 +35,8 @@ pub enum FollowUpError {
     Cases(#[from] CaseStoreError),
 }
 
-/// Asks the quick-fix model about an offered case and delivers the answer.
-pub struct FollowUp<'a> {
+/// Asks models in the background and delivers what they said.
+pub struct Messages<'a> {
     pub settings: &'a Settings,
     pub clock: &'a dyn Clock,
     pub secrets: &'a dyn Secrets,
@@ -40,9 +45,9 @@ pub struct FollowUp<'a> {
     pub cases: &'a dyn CaseStore,
 }
 
-impl FollowUp<'_> {
-    /// The model that will be asked first, when one will be.
-    pub fn candidate(&self, case: &FailureCase) -> Option<String> {
+impl Messages<'_> {
+    /// The model that will be asked for a fix first, when one will be.
+    pub fn fix_candidate(&self, case: &FailureCase) -> Option<String> {
         case.session()?;
         let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
         let first = candidates.first()?;
@@ -50,22 +55,20 @@ impl FollowUp<'_> {
             .then(|| first.name.clone())
     }
 
-    /// Runs when a case was offered without a rule fix. A model that had
-    /// nothing, or failed, is reported to the shell in one line, so the
-    /// "asking…" line under the bubble never dangles.
-    pub fn run(&self, case: &FailureCase) -> Result<Message, FollowUpError> {
+    /// Runs when a case was offered without a rule fix.
+    pub fn fix(&self, case: &FailureCase) -> Result<Message, MessagesError> {
         let session = case
             .session()
             .ok_or_else(|| NotifyError::UnknownSession("none".into()))?;
         let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
         if candidates.is_empty() {
-            return Err(FollowUpError::NoModel);
+            return Err(MessagesError::NoModel);
         }
         if !self.settings.ui.eager_fix.allows(candidates[0]) {
-            return Err(FollowUpError::Disabled);
+            return Err(MessagesError::Disabled);
         }
         if !self.models.is_reachable(candidates[0]) {
-            return Err(FollowUpError::NotRunning(candidates[0].name.clone()));
+            return Err(MessagesError::NotRunning(candidates[0].name.clone()));
         }
         let first = candidates[0].name.clone();
         let (name, answer) = match ask_first(
@@ -83,12 +86,12 @@ impl FollowUp<'_> {
                     case,
                     format!("{first} did not answer ({})", detail.join("; ")),
                 )?;
-                return Err(FollowUpError::AllFailed(failures));
+                return Err(MessagesError::AllFailed(failures));
             }
         };
         let Some(fix) = parse_quick_fix(&answer, &name) else {
             self.note(session, case, format!("{name} had no fix for this one."))?;
-            return Err(FollowUpError::NoFix);
+            return Err(MessagesError::NoFix);
         };
         self.cases
             .save(&case.clone().with_proposal(Some(fix.clone())))?;
@@ -97,9 +100,42 @@ impl FollowUp<'_> {
         Ok(message)
     }
 
+    /// The model `kintsu why` will ask first, or why it cannot.
+    pub fn explain_candidate(&self, session: &SessionId) -> Result<String, ExplainError> {
+        self.explain_use_case().candidate(Some(session))
+    }
+
+    /// Explains the session's last failure and sends the answer, or the
+    /// reason there is none, as a message.
+    pub fn explain(&self, session: &SessionId) -> Result<Message, MessagesError> {
+        let case_id = match self.cases.last(Some(session))? {
+            Some(case) => case.id().clone(),
+            None => return Err(ExplainError::NoCase.into()),
+        };
+        let body = match self.explain_use_case().run(Some(session)) {
+            Ok(explanation) => MessageBody::Explanation {
+                model: explanation.model,
+                text: explanation.text,
+            },
+            Err(e) => MessageBody::Note(e.to_string()),
+        };
+        let message = Message::new(case_id, self.clock.now(), body);
+        self.notifier.deliver(session, message.clone())?;
+        Ok(message)
+    }
+
+    fn explain_use_case(&self) -> Explain<'_> {
+        Explain {
+            settings: self.settings,
+            cases: self.cases,
+            secrets: self.secrets,
+            models: self.models,
+        }
+    }
+
     fn note(
         &self,
-        session: &crate::entities::SessionId,
+        session: &SessionId,
         case: &FailureCase,
         text: String,
     ) -> Result<(), NotifyError> {
@@ -139,7 +175,7 @@ mod tests {
         let models = ScriptedModels::answering(&[("local", Ok("nvm use 22 && npm run build"))]);
         let notifier = MemoryNotifier::default();
         let cases = MemoryCases::default();
-        let uc = FollowUp {
+        let uc = Messages {
             settings: &settings(EagerFix::On, &["local"]),
             clock: &FakeClock::at(5),
             secrets: &MapSecrets::with(&[]),
@@ -147,7 +183,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
         };
-        let message = uc.run(&case("npm run build", 1, Some("42"))).unwrap();
+        let message = uc.fix(&case("npm run build", 1, Some("42"))).unwrap();
         assert!(
             cases
                 .last(Some(&SessionId::new("42")))
@@ -173,7 +209,7 @@ mod tests {
         let clock = FakeClock::at(0);
         let declined = ScriptedModels::answering(&[("local", Ok("NONE"))]);
         let cases = MemoryCases::default();
-        let off = FollowUp {
+        let off = Messages {
             settings: &settings(EagerFix::Off, &["local"]),
             clock: &clock,
             secrets: &secrets,
@@ -182,26 +218,26 @@ mod tests {
             cases: &cases,
         };
         assert_eq!(
-            off.run(&case("make", 2, Some("42"))).unwrap_err(),
-            FollowUpError::Disabled
+            off.fix(&case("make", 2, Some("42"))).unwrap_err(),
+            MessagesError::Disabled
         );
-        let unrouted = FollowUp {
+        let unrouted = Messages {
             settings: &settings(EagerFix::On, &[]),
             ..off
         };
         assert_eq!(
-            unrouted.run(&case("make", 2, Some("42"))).unwrap_err(),
-            FollowUpError::NoModel
+            unrouted.fix(&case("make", 2, Some("42"))).unwrap_err(),
+            MessagesError::NoModel
         );
-        let asked = FollowUp {
+        let asked = Messages {
             settings: &settings(EagerFix::On, &["local"]),
             ..off
         };
         assert_eq!(
-            asked.run(&case("make", 2, Some("42"))).unwrap_err(),
-            FollowUpError::NoFix
+            asked.fix(&case("make", 2, Some("42"))).unwrap_err(),
+            MessagesError::NoFix
         );
-        let cloud_only = FollowUp {
+        let cloud_only = Messages {
             settings: &settings(EagerFix::On, &["cloud"]),
             ..off
         };
@@ -210,18 +246,18 @@ mod tests {
             22,
             Some("42"),
         );
-        assert_eq!(cloud_only.run(&secret).unwrap_err(), FollowUpError::NoModel);
+        assert_eq!(cloud_only.fix(&secret).unwrap_err(), MessagesError::NoModel);
         let down = ScriptedModels::answering(&[(
             "local",
             Err(ModelError::MissingKey("$X is not set".into())),
         )]);
-        let named = FollowUp {
+        let named = Messages {
             models: &down,
             ..asked
         };
         assert_eq!(
             named
-                .run(&case("make", 2, Some("42")))
+                .fix(&case("make", 2, Some("42")))
                 .unwrap_err()
                 .to_string(),
             "no model answered (local: no key: $X is not set)"
@@ -242,51 +278,115 @@ mod tests {
                 "local did not answer (local: no key: $X is not set)"
             ]
         );
-        assert_eq!(off.candidate(&case("make", 2, Some("42"))), None, "off");
+        assert_eq!(off.fix_candidate(&case("make", 2, Some("42"))), None, "off");
         assert_eq!(
-            asked.candidate(&case("make", 2, Some("42"))).as_deref(),
+            asked.fix_candidate(&case("make", 2, Some("42"))).as_deref(),
             Some("local")
         );
-        assert_eq!(cloud_only.candidate(&secret), None, "sensitive, cloud only");
-        let auto_local = FollowUp {
+        assert_eq!(
+            cloud_only.fix_candidate(&secret),
+            None,
+            "sensitive, cloud only"
+        );
+        let auto_local = Messages {
             settings: &settings(EagerFix::Auto, &["local"]),
             ..off
         };
         assert_eq!(
             auto_local
-                .candidate(&case("make", 2, Some("42")))
+                .fix_candidate(&case("make", 2, Some("42")))
                 .as_deref(),
             Some("local"),
             "auto asks a local model"
         );
-        let auto_cloud = FollowUp {
+        let auto_cloud = Messages {
             settings: &settings(EagerFix::Auto, &["cloud", "local"]),
             ..off
         };
         assert_eq!(
-            auto_cloud.candidate(&case("make", 2, Some("42"))),
+            auto_cloud.fix_candidate(&case("make", 2, Some("42"))),
             None,
             "auto never asks a remote model on its own"
         );
         let mut stopped = ScriptedModels::answering(&[("local", Ok("x"))]);
         stopped.down.push("local".into());
-        let not_running = FollowUp {
+        let not_running = Messages {
             settings: &settings(EagerFix::Auto, &["local"]),
             models: &stopped,
             ..off
         };
         assert_eq!(
-            not_running.candidate(&case("make", 2, Some("42"))),
+            not_running.fix_candidate(&case("make", 2, Some("42"))),
             None,
             "a stopped server is not announced"
         );
         assert_eq!(
-            not_running.run(&case("make", 2, Some("42"))).unwrap_err(),
-            FollowUpError::NotRunning("local".into())
+            not_running.fix(&case("make", 2, Some("42"))).unwrap_err(),
+            MessagesError::NotRunning("local".into())
         );
         assert_eq!(
-            auto_cloud.run(&case("make", 2, Some("42"))).unwrap_err(),
-            FollowUpError::Disabled
+            auto_cloud.fix(&case("make", 2, Some("42"))).unwrap_err(),
+            MessagesError::Disabled
         );
+    }
+
+    #[test]
+    fn an_explanation_or_the_reason_there_is_none_is_sent_as_a_message() {
+        let cases = MemoryCases::default();
+        cases.save(&case("make", 2, Some("42"))).unwrap();
+        let models = ScriptedModels::answering(&[
+            ("cloud", Ok("Because.")),
+            ("local", Err(ModelError::Unreachable("down".into()))),
+        ]);
+        let notifier = MemoryNotifier::default();
+        let clock = FakeClock::at(7);
+        let secrets = MapSecrets::with(&[]);
+        let explain_via = |names: &[&str]| Settings {
+            routing: Routing {
+                explain: names.iter().map(|s| s.to_string()).collect(),
+                ..Default::default()
+            },
+            ..settings(EagerFix::Off, &[])
+        };
+        let cloud = explain_via(&["cloud"]);
+        let uc = Messages {
+            settings: &cloud,
+            clock: &clock,
+            secrets: &secrets,
+            models: &models,
+            notifier: &notifier,
+            cases: &cases,
+        };
+        assert_eq!(
+            uc.explain_candidate(&SessionId::new("42")).unwrap(),
+            "cloud"
+        );
+        let m = uc.explain(&SessionId::new("42")).unwrap();
+        assert_eq!(
+            m.body(),
+            &MessageBody::Explanation {
+                model: "cloud".into(),
+                text: "Because.".into()
+            }
+        );
+        let local = explain_via(&["local"]);
+        let down = Messages {
+            settings: &local,
+            ..uc
+        };
+        let m = down.explain(&SessionId::new("42")).unwrap();
+        assert_eq!(
+            m.body(),
+            &MessageBody::Note("no model answered (local: unreachable: down)".into())
+        );
+        assert_eq!(notifier.delivered.borrow().len(), 2);
+        assert_eq!(
+            uc.explain_candidate(&SessionId::new("other")).unwrap_err(),
+            ExplainError::NoCase
+        );
+        assert!(matches!(
+            uc.explain(&SessionId::new("other")).unwrap_err(),
+            MessagesError::Explain(ExplainError::NoCase)
+        ));
     }
 }

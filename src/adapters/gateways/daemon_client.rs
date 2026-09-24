@@ -2,7 +2,7 @@
 //! read the answer. Starts the daemon when nothing answers, at most once
 //! a minute, and never waits longer than the caller allows.
 
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -10,6 +10,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use serde_json::{Value, json};
 
+use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::entities::SessionId;
 use crate::use_cases::TriageInput;
 
@@ -131,10 +132,10 @@ impl DaemonClient {
     /// Asks the daemon to explain the session's last failure later, as a
     /// message. `None` when no daemon runs; `Ok(model)` names the model
     /// being asked; `Err(reason)` is what the daemon refused at once.
-    pub fn explain(&self, session: &SessionId, color: bool) -> Option<Result<String, String>> {
+    pub fn explain(&self, session: &SessionId) -> Option<Result<String, String>> {
         let mut stream = self.connect().ok()?;
         stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
-        let frame = json!({"v": 1, "type": "explain", "version": self.version, "session": session.as_str(), "color": color});
+        let frame = json!({"v": 1, "type": "explain", "version": self.version, "session": session.as_str()});
         send_line(&mut stream, &frame.to_string()).ok()?;
         let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;
         match answer["type"].as_str() {
@@ -182,12 +183,34 @@ impl DaemonClient {
         Ok(true)
     }
 
-    /// The text of a bubble frame, for the subscriber loop.
-    pub fn bubble_text(line: &str) -> Option<String> {
-        let v: Value = serde_json::from_str(line).ok()?;
-        (v["type"] == "bubble")
-            .then(|| v["text"].as_str().map(String::from))
-            .flatten()
+    /// Reads a subscription until the daemon closes it or the parent shell
+    /// is gone, handing every bubble's text to `on_text`.
+    pub fn follow(stream: UnixStream, mut on_text: impl FnMut(&str)) -> io::Result<()> {
+        stream.set_read_timeout(Some(Duration::from_secs(30)))?;
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => return Ok(()),
+                Ok(_) => {
+                    if let Some(text) = bubble_text(&line) {
+                        on_text(&text);
+                    }
+                }
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    if std::os::unix::process::parent_id() == 1 {
+                        return Ok(());
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        }
     }
 
     fn connect(&self) -> io::Result<UnixStream> {
@@ -255,22 +278,12 @@ impl DaemonClient {
     }
 }
 
-fn send_line(stream: &mut UnixStream, line: &str) -> io::Result<()> {
-    stream.write_all(line.as_bytes())?;
-    stream.write_all(b"\n")?;
-    stream.flush()
-}
-
-fn read_line(stream: &mut UnixStream) -> io::Result<String> {
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    if reader.read_line(&mut line)? == 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "the daemon closed the connection",
-        ));
-    }
-    Ok(line)
+/// The text of a bubble frame; nothing for pings and the rest.
+fn bubble_text(line: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    (v["type"] == "bubble")
+        .then(|| v["text"].as_str().map(String::from))
+        .flatten()
 }
 
 fn texts(v: &Value) -> Vec<String> {
@@ -290,12 +303,11 @@ mod tests {
     #[test]
     fn bubble_text_reads_bubbles_and_nothing_else() {
         assert_eq!(
-            DaemonClient::bubble_text(r#"{"v":1,"type":"bubble","case":"c","text":"▎ hi"}"#)
-                .as_deref(),
+            bubble_text(r#"{"v":1,"type":"bubble","case":"c","text":"▎ hi"}"#).as_deref(),
             Some("▎ hi")
         );
-        assert_eq!(DaemonClient::bubble_text(r#"{"v":1,"type":"ping"}"#), None);
-        assert_eq!(DaemonClient::bubble_text("nope"), None);
+        assert_eq!(bubble_text(r#"{"v":1,"type":"ping"}"#), None);
+        assert_eq!(bubble_text("nope"), None);
     }
 
     #[test]

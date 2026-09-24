@@ -6,7 +6,14 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- `kintsu triage` exits 0 in every case; the hooks learn that an "asking…"
+  line is waiting from the marker file both `triage` and `why` leave.
+- Internal: the daemon's session registry, the `libc` calls and the marker
+  are gateways of their own; one use case sends every message; each part
+  of a case is redacted separately; the pseudo-terminal harness for the
+  hooks lives in `scripts/`.
 
 ## [0.1.1] - 2026-09-25
 

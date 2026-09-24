@@ -2,15 +2,15 @@
 //! gateways, calls a use case and hands the result to a presenter. Nothing
 //! here decides anything a test would want to check.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
-    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds,
-    ShellAgents, SystemClock, load_settings,
+    AskingMarker, DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HttpModels, JsonState,
+    RandomIds, ShellAgents, SystemClock, load_settings,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -205,10 +205,12 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     match command {
         Command::Triage { input, signal_pid } => triage(
             rt,
-            &settings,
-            &state,
-            &environment,
-            &style,
+            &Local {
+                settings: &settings,
+                state: &state,
+                environment: &environment,
+                style: &style,
+            },
             input,
             signal_pid,
             err,
@@ -239,16 +241,10 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         Command::Why => {
             if rt.daemon {
                 if let Some(session) = session {
-                    match rt.client().explain(session, rt.color) {
+                    match rt.client().explain(session) {
                         Some(Ok(model)) => {
                             let _ = writeln!(err, "{}", pending_line(&model, &style));
-                            // The hook reads this marker to let the answer replace the line above.
-                            let sessions = rt.state_dir.join("sessions");
-                            let _ = std::fs::create_dir_all(&sessions);
-                            let _ = std::fs::write(
-                                sessions.join(format!("{}.asking", session.as_str())),
-                                b"",
-                            );
+                            let _ = AskingMarker::new(&rt.state_dir).set(session);
                             return ExitCode::SUCCESS;
                         }
                         Some(Err(reason)) => return failure(err, &reason, &style, false),
@@ -351,19 +347,29 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     }
 }
 
+/// The gateways the local path needs, built once per run.
+struct Local<'a> {
+    settings: &'a Settings,
+    state: &'a JsonState,
+    environment: &'a FsEnvironment,
+    style: &'a Style,
+}
+
 /// The hook's call: the daemon within the budget when it may, the local
 /// path otherwise. The prompt never waits longer than the budget.
-#[allow(clippy::too_many_arguments)]
 fn triage(
     rt: &Runtime,
-    settings: &Settings,
-    state: &JsonState,
-    environment: &FsEnvironment,
-    style: &Style,
+    local: &Local<'_>,
     input: TriageInput,
     signal_pid: Option<u32>,
     err: &mut dyn Write,
 ) -> ExitCode {
+    let Local {
+        settings,
+        state,
+        environment,
+        style,
+    } = *local;
     if rt.daemon {
         if let Some(view) = rt
             .client()
@@ -372,13 +378,10 @@ fn triage(
             for text in view.toast.iter().chain(view.bubbles.iter()) {
                 let _ = writeln!(err, "{text}");
             }
-            // 3 tells the hook a model is being asked, so it can let the answer
-            // replace the "asking…" line.
-            return if view.pending.is_some() {
-                ExitCode::from(3)
-            } else {
-                ExitCode::SUCCESS
-            };
+            if let (Some(_), Some(session)) = (&view.pending, &input.session) {
+                let _ = AskingMarker::new(&rt.state_dir).set(session);
+            }
+            return ExitCode::SUCCESS;
         }
     }
     let triage = Triage {
@@ -416,32 +419,11 @@ fn subscribe(rt: &Runtime, session: Option<SessionId>, out: &mut dyn Write) -> E
     let Ok(stream) = rt.client().subscribe(&session, rt.color) else {
         return ExitCode::from(1);
     };
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    loop {
-        line.clear();
-        match reader.read_line(&mut line) {
-            Ok(0) => return ExitCode::SUCCESS,
-            Ok(_) => {
-                if let Some(text) = DaemonClient::bubble_text(&line) {
-                    let _ = writeln!(out, "{text}");
-                    let _ = out.flush();
-                }
-            }
-            Err(e)
-                if matches!(
-                    e.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) =>
-            {
-                if std::os::unix::process::parent_id() == 1 {
-                    return ExitCode::SUCCESS;
-                }
-            }
-            Err(_) => return ExitCode::SUCCESS,
-        }
-    }
+    let _ = DaemonClient::follow(stream, |text| {
+        let _ = writeln!(out, "{text}");
+        let _ = out.flush();
+    });
+    ExitCode::SUCCESS
 }
 
 fn silence(

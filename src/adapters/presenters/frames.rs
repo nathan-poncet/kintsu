@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::entities::{Message, QuietReason, TriageDecision};
+use crate::entities::{CaseId, QuietReason, TriageDecision};
 
 const V: u64 = 1;
 
@@ -50,8 +50,8 @@ fn quiet_name(reason: &QuietReason) -> String {
 }
 
 /// A message, rendered, for the shell it belongs to.
-pub fn bubble(message: &Message, text: &str) -> String {
-    json!({"v": V, "type": "bubble", "case": message.case().as_str(), "text": text}).to_string()
+pub fn bubble(case: &CaseId, text: &str) -> String {
+    json!({"v": V, "type": "bubble", "case": case.as_str(), "text": text}).to_string()
 }
 
 pub fn ping() -> String {
@@ -83,7 +83,7 @@ pub fn error(message: &str) -> String {
 mod tests {
     use super::*;
     use crate::entities::{
-        CaseId, CommandLine, CommandOutcome, ExitStatus, FailureCase, MessageBody, Timestamp,
+        CaseId, CommandLine, CommandOutcome, ExitStatus, FailureCase, Timestamp,
     };
     use serde_json::Value;
 
@@ -139,15 +139,7 @@ mod tests {
         ] {
             assert_eq!(parse(&frame)["type"], kind);
         }
-        let m = Message::new(
-            CaseId::new("c1"),
-            Timestamp::from_millis(0),
-            MessageBody::Explanation {
-                model: "m".into(),
-                text: "t".into(),
-            },
-        );
-        let b = parse(&bubble(&m, "▎ t"));
+        let b = parse(&bubble(&CaseId::new("c1"), "▎ t"));
         assert_eq!(
             (b["type"].as_str(), b["case"].as_str(), b["text"].as_str()),
             (Some("bubble"), Some("c1"), Some("▎ t"))

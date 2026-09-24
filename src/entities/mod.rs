@@ -31,7 +31,7 @@ pub use fix::{Confidence, Fix, FixSource};
 pub use ignore::{IgnoreEntry, IgnoreScope, IgnoreTarget};
 pub use message::{Message, MessageBody};
 pub use outcome::CommandOutcome;
-pub use redaction::{Redacted, redact};
+pub use redaction::redact;
 pub use rules::{DirEntry, Facts, Os, suggest_fix};
 pub use session::{Session, SessionId};
 pub use settings::{

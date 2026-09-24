@@ -291,6 +291,49 @@ Because the server may be stopped, the daemon probes the local endpoint
 (a 50 ms TCP connect) before announcing "asking local…", and `doctor`
 warns with the command that starts it.
 
+## 16. Architecture review after the daemon (2026-09-25)
+
+Reviewed: every ring against the Dependency Rule, the responsibilities of
+the composition roots, the two contracts between the binary and the
+hooks. Kept as is: the entities, the ports and their fakes, the
+presenters, the TOML and JSON edges. Changed:
+
+- The daemon's session registry, which is the daemon's `Notifier`, lived
+  in `daemon.rs` next to the socket loop and called a presenter itself.
+  It is now `gateways/sessions.rs`, rendering injected by the composition
+  root, with its own tests over socket pairs. The `libc` calls moved to
+  `gateways/unix.rs`, the one module allowed `unsafe`; the daemon file
+  is one function per frame.
+- Two mechanisms told the hooks "an asking… line is waiting": exit status
+  3 from `kintsu triage`, and a marker file from `kintsu why`, both built
+  ad hoc in `app.rs`. One remains: the marker, through
+  `gateways/asking_marker.rs`, read by the hooks after any `kintsu` call.
+  Exit statuses are ordinary again.
+- The eager fix and the asynchronous explanation duplicated the policy
+  "a model that had nothing, or failed, says so in one line" in two
+  shapes. One use case, `Messages`, owns it; `Explain` is synchronous
+  only.
+- `FailureCase::redacted` masked one concatenated text that
+  `case_document` cut back into parts by counting lines. Each part is
+  now redacted on its own.
+- The pseudo-terminal harness that verifies the hooks' drawing lived
+  outside the repository. It is `scripts/shell-harness.py`, documented
+  in CONTRIBUTING.
+- Smaller: `--session` without a value names the flag; the subscription
+  loop moved from `app.rs` into the client gateway; the `explain` frame
+  lost an unused field.
+- Found by the harness while re-checking: fish may run the SIGUSR1
+  handler between a command and its next prompt (an instant model
+  answers before the prompt is drawn). The handler now knows whether a
+  prompt is on screen (`fish_preexec` / `fish_prompt` events) and, when
+  none is, prints under what was just printed instead of climbing into
+  it.
+
+Known debt, accepted for now: the prompt-height arithmetic exists twice,
+once per shell, because the shells differ; state is JSON files, not the
+SQLite the design mentions; `app.rs` is the largest file and will split
+once the panel arrives; the harness is manual, not in CI.
+
 ## What is not built, by priority
 
 1. What the daemon unlocks next: the panel, ghost text, clickable words,

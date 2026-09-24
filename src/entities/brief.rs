@@ -16,15 +16,9 @@ pub struct CaseDocument {
 /// is fenced, so a model reads it as data and never as instructions.
 pub fn case_document(case: &FailureCase) -> CaseDocument {
     let redacted = case.redacted();
-    let mut lines = redacted.text().lines();
-    let command = lines.next().unwrap_or_default().to_string();
-    let rest: Vec<&str> = lines.collect();
-    let split = rest.len().saturating_sub(case.recent().len());
-    let (output, recent) = rest.split_at(split);
-
     let mut text = String::new();
     text.push_str("## Command\n\n```sh\n");
-    text.push_str(&command);
+    text.push_str(&redacted.command);
     text.push_str("\n```\n\n");
     text.push_str(&format!("Exit status: {}", case.outcome().status()));
     if let Some(d) = case.outcome().duration() {
@@ -34,19 +28,19 @@ pub fn case_document(case: &FailureCase) -> CaseDocument {
         text.push_str(&format!(" · Directory: `{cwd}`"));
     }
     text.push_str("\n\n");
-    if case.output().is_some() {
+    if let Some(output) = &redacted.output {
         text.push_str("## Output\n\n```text\n");
-        text.push_str(&output.join("\n"));
+        text.push_str(output);
         text.push_str("\n```\n\n");
     }
-    if !recent.is_empty() {
+    if !redacted.recent.is_empty() {
         text.push_str("## Commands before it\n\n```sh\n");
-        text.push_str(&recent.join("\n"));
+        text.push_str(&redacted.recent.join("\n"));
         text.push_str("\n```\n\n");
     }
     CaseDocument {
         text,
-        redactions: redacted.findings().len(),
+        redactions: redacted.redactions,
     }
 }
 

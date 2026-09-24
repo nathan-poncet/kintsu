@@ -34,8 +34,8 @@ kintsu/
     ├── main.rs                   reads the environment once (paths, session, colour) and calls app::run
     ├── app.rs                    composition root: one arm per subcommand, builds gateways, calls a
     │                             use case, hands the result to a presenter
-    ├── daemon.rs                 the resident process: socket listener, sessions and subscribers,
-    │                             follow-up workers; `daemon::os` holds the few libc calls
+    ├── daemon.rs                 the resident process: socket listener, one function per frame,
+    │                             background workers for the Messages use case
     ├── (planned)                 service.rs (launchd, systemd, URL scheme)
     │
     ├── entities/                 enterprise rules, no I/O, depends on nothing else in the crate
@@ -61,7 +61,7 @@ kintsu/
     ├── use_cases/                application rules, depends on the entities only
     │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
     │   ├── fix_last.rs               rules first, then a stored proposal, then the quick-fix model
-    │   ├── follow_up.rs              eager fix: ask the model after the bubble, deliver a message
+    │   ├── messages.rs               what the daemon sends later: the eager fix, the explanation, or why not
     │   ├── explain.rs                routed models, sensitive ⇒ local only
     │   ├── hand_off.rs               prepare the brief, then launch the agent
     │   ├── ignore.rs                 ignore and mute
@@ -83,6 +83,8 @@ kintsu/
         │   │                         doctor.rs · shell_hook.rs · frames.rs (daemon → client frames)
         │   └── (planned)             panel/ (ratatui, inline viewport) · ghost_text.rs · json.rs
         └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
+            │                         sessions.rs (Notifier: subscribers, SIGUSR1, pending messages) ·
+            │                         asking_marker.rs (the file the hooks read) · ndjson.rs · unix.rs (libc) ·
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·

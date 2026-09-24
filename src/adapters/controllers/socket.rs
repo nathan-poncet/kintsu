@@ -33,7 +33,7 @@ pub enum Request {
     /// A shell asks for the bubbles it has not seen.
     Pending { session: SessionId, color: bool },
     /// `kintsu why`: explain the session's last failure later, as a message.
-    Explain { session: SessionId, color: bool },
+    Explain { session: SessionId },
     /// Stop the daemon.
     Shutdown,
 }
@@ -129,7 +129,6 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
         }),
         "explain" => Ok(Request::Explain {
             session: SessionId::new(required("session")?),
-            color,
         }),
         "shutdown" => Ok(Request::Shutdown),
         other => Err(FrameError::UnknownType(other.to_string())),
@@ -227,8 +226,7 @@ mod tests {
         assert_eq!(
             parse_frame(r#"{"type":"explain","session":"7"}"#).unwrap(),
             Request::Explain {
-                session: SessionId::new("7"),
-                color: false
+                session: SessionId::new("7")
             }
         );
     }

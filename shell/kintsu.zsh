@@ -32,9 +32,7 @@ if [[ -o interactive ]]; then
     [[ -z "$__kintsu_fd" ]] && __kintsu_subscribe
     [[ -z "$cmdline" ]] && return $__kintsu_status
     if [[ "$cmdline" == kintsu* ]]; then
-      # `kintsu why` leaves a marker when it printed an "asking…" line.
-      local marker="__KINTSU_STATE_DIR__/sessions/$KINTSU_SESSION.asking"
-      [[ -e "$marker" ]] && { command rm -f -- "$marker"; __kintsu_pending_seq=$__kintsu_seq; }
+      __kintsu_take_marker
       return $__kintsu_status
     fi
     if [[ -n "$started" && -n "${EPOCHREALTIME:-}" ]]; then
@@ -43,10 +41,17 @@ if [[ -o interactive ]]; then
     fi
     command kintsu triage --status "$__kintsu_status" --command "$cmdline" --cwd "$PWD" \
       --session "$KINTSU_SESSION" --shell zsh "${timing[@]}"
-    # 3: a model is being asked and an "asking…" line was printed; the answer
-    # may replace it if no other prompt is drawn before it arrives.
-    (( $? == 3 )) && __kintsu_pending_seq=$__kintsu_seq
+    __kintsu_take_marker
     return $__kintsu_status
+  }
+
+  # kintsu leaves a marker when it printed an "asking…" line: the answer may
+  # replace that line if no other prompt is drawn before it arrives.
+  __kintsu_take_marker() {
+    local marker="__KINTSU_STATE_DIR__/sessions/$KINTSU_SESSION.asking"
+    [[ -e "$marker" ]] || return 0
+    command rm -f -- "$marker"
+    __kintsu_pending_seq=$__kintsu_seq
   }
 
   # A background `kintsu subscribe` whose output zle watches: a message is

@@ -31,9 +31,14 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   instead of SQLite, the daemon's actual scope…). Update it when a decision
   changes.
 - `src/daemon.rs` is the resident process (composition root, like `app.rs`);
-  `daemon::os` is the only module allowed `unsafe` (`libc` calls). Tests and
-  the CI smoke run set `KINTSU_NO_DAEMON=1` unless they test the daemon;
-  `tests/daemon.rs` drives a real daemon over a scratch socket.
+  `adapters/gateways/unix.rs` is the only module allowed `unsafe` (`libc`).
+  Tests and the CI smoke run set `KINTSU_NO_DAEMON=1` unless they test the
+  daemon; `tests/daemon.rs` drives a real daemon over a scratch socket.
+- The hooks and the binary share two contracts: the marker file
+  `<state>/sessions/<id>.asking` (`gateways/asking_marker.rs`) and the frames
+  of the socket protocol. After touching `shell/*`, run
+  `scripts/shell-harness.py`, which drives real zsh and fish in a
+  pseudo-terminal and shows the screen.
 - A new side effect gets a port, an in-memory fake and a contract test first;
   every gateway passes the same contract suite.
 - Design references before proposing anything: `docs/DAEMON.md` (process model,
