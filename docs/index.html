@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kintsu — the command failed. Kintsu handles it.</title>
+  <title>Kintsu — every failed command, handled in place</title>
   <meta name="description" content="Kintsu is an open-source bubble under a failed command, in the terminal and shell you already use. It fixes the typo, explains the trace, or hands the case to your agent. Your models, your keys, nothing runs without you.">
-  <meta property="og:title" content="Kintsu — the command failed. Kintsu handles it.">
+  <meta property="og:title" content="Kintsu — every failed command, handled in place">
   <meta property="og:description" content="A bubble under the error. Fixes the typo, explains the trace, hands the case to your agent. Your terminal, your shell, your models, your keys. Open source.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
@@ -34,8 +34,8 @@
   <!-- hero -->
   <section class="hero">
     <p class="eyebrow"><span class="dot" aria-hidden="true"></span> Open source · pre-alpha</p>
-    <h1>The command failed.<br><em>Kintsu handles it.</em></h1>
-    <p class="sub">A bubble under the error. It fixes the typo, explains the trace, or hands the case to your agent. Your terminal, your models, your keys.</p>
+    <h1>Every failed command,<br>handled in place.</h1>
+    <p class="sub">A short suggestion appears under the error: fix the typo, explain the trace, or hand the case to your agent. In your terminal and shell, with your models and your keys.</p>
     <div class="oneliner">
       <span class="dollar" aria-hidden="true">$</span>
       <code>curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh</code>
@@ -52,10 +52,10 @@
 
   <section class="why" aria-label="What Kintsu does">
     <ol class="features">
-      <li class="feature">
+      <li class="feature"><a class="feature-link" href="tour.html#ch-2">
         <div class="ftext">
           <span class="fnum">01</span>
-          <h2><a href="tour.html#ch-2">A short suggestion under the error <span aria-hidden="true">→</span></a></h2>
+          <h2>A short suggestion under the error <span class="arrow" aria-hidden="true">→</span></h2>
           <p>One sentence under the failure, a line of words you can click. <kbd>Tab</kbd> takes the fix, <kbd>^K</kbd> opens the panel. It never captures your keyboard.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="p">$</span> gti status
@@ -63,12 +63,12 @@
 <span class="s">▎</span> Did you mean <b>git status</b>?
 <span class="s">▎</span> <span class="g">Tab to fix</span> · Why · Agent · Ignore · ^K more
 <span class="p">$</span> <span class="ghost">git status</span></pre>
-      </li>
+      </a></li>
 
-      <li class="feature">
+      <li class="feature"><a class="feature-link" href="tour.html#ch-7">
         <div class="ftext">
           <span class="fnum">02</span>
-          <h2><a href="tour.html#ch-7">Your agent, briefed <span aria-hidden="true">→</span></a></h2>
+          <h2>Your agent, briefed <span class="arrow" aria-hidden="true">→</span></h2>
           <p>Command, output, directory, branch, last commands, secrets redacted. Handed to Claude Code, Codex, OpenCode or aider, in your terminal.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="s">▎</span> 3 failures, one cause: the fixture token expired on Sep 1.
@@ -76,12 +76,12 @@
 <span class="s">▎</span> last 10 commands · <span class="r">redacted: 1 token</span> · <span class="g">⏎</span> to start
 <span class="d">claude-code ·</span> reading tests/fixtures/token.ts …
 <span class="d">claude-code ·</span> npm test → <span class="ok">48 passed</span> · diff ready. Commit?</pre>
-      </li>
+      </a></li>
 
-      <li class="feature">
+      <li class="feature"><a class="feature-link" href="configuration.html">
         <div class="ftext">
           <span class="fnum">03</span>
-          <h2><a href="configuration.html">Your models, your keys <span aria-hidden="true">→</span></a></h2>
+          <h2>Your models, your keys <span class="arrow" aria-hidden="true">→</span></h2>
           <p>A rule, a tiny local model, the cloud model you chose, your agent. One file decides who answers what. A secret in the output forces local.</p>
         </div>
         <div class="brains" aria-hidden="true">
@@ -90,12 +90,12 @@
           <div><span class="where cloud">cloud</span><b>haiku, or yours</b><span class="d">explains</span></div>
           <div><span class="where you">your account</span><b>claude code</b><span class="d">fixes the code</span></div>
         </div>
-      </li>
+      </a></li>
 
-      <li class="feature">
+      <li class="feature"><a class="feature-link" href="tour.html#ch-5">
         <div class="ftext">
           <span class="fnum">04</span>
-          <h2><a href="tour.html#ch-5">Never runs a command. Shows what is sent <span aria-hidden="true">→</span></a></h2>
+          <h2>Never runs a command. Shows what is sent <span class="arrow" aria-hidden="true">→</span></h2>
           <p>A fix is inserted in your line; you press Enter. The Privacy tab is the exact payload that went out. No telemetry, no account.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="s">▎</span> Sent to <b>haiku</b>:
@@ -103,12 +103,12 @@
 <span class="s">▎</span> <span class="ok">✓</span> <span class="r">NPM_TOKEN=npm_••••••••</span> redacted
 <span class="s">▎</span> <span class="ok">✓</span> cwd · branch main, clean · last 10 commands
 <span class="s">▎</span> <span class="d">✗ environment · files · anything you did not see</span></pre>
-      </li>
+      </a></li>
 
-      <li class="feature">
+      <li class="feature"><a class="feature-link" href="docs.html">
         <div class="ftext">
           <span class="fnum">05</span>
-          <h2><a href="docs.html">Quiet, fast, everywhere <span aria-hidden="true">→</span></a></h2>
+          <h2>Quiet, fast, everywhere <span class="arrow" aria-hidden="true">→</span></h2>
           <p>Under a millisecond on success, one bubble for the same failure twice. Slow answers arrive later, above your prompt. zsh, bash, fish. Any terminal, SSH, tmux, Herdr.</p>
         </div>
         <pre class="snippet" aria-hidden="true"><span class="p">$</span> vim scripts/build.js
@@ -116,7 +116,7 @@
 <span class="s">▎</span> <span class="d">haiku ·</span> While you were away: package.json says <b>"node": ">=22"</b>.
 <span class="s">▎</span> A <b>.nvmrc</b> would stop this from happening again. <span class="g">^K</span> to add one.
 <span class="p">$</span> <span class="cur"></span></pre>
-      </li>
+      </a></li>
     </ol>
   </section>
 
