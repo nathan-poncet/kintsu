@@ -291,19 +291,17 @@ section { padding: 60px 0 6px; }
 .providers { margin-top: 16px; color: var(--dim); font-size: 14px; }
 
 /* faq */
-.faq-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 40px; }
-.faq-groups.compact { gap: 0 40px; }
-.faq-groups.compact details:first-of-type { border-top: 1px solid var(--line); }
-@media (max-width: 860px) { .faq-groups { grid-template-columns: 1fr; } }
-.faq-group h3 { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.faq-group h2 { margin-bottom: 6px; }
 .faq details { border-top: 1px solid var(--line); }
-.faq .faq-group details:last-of-type { border-bottom: 1px solid var(--line); }
-.faq summary { cursor: pointer; padding: 12px 30px 12px 0; font-weight: 600; font-size: 15.5px; list-style: none; position: relative; }
+.faq .faq-list details:last-of-type { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; padding: 18px 36px 18px 0; font-weight: 600; font-size: 16px; line-height: 1.4; list-style: none; position: relative; }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: "+"; position: absolute; right: 6px; top: 9px; color: var(--muted); font-size: 20px; line-height: 1; }
+.faq summary:hover { color: var(--gold); }
+.faq summary::after { content: "+"; position: absolute; right: 8px; top: 15px; color: var(--muted); font-size: 20px; line-height: 1; }
 .faq details[open] summary::after { content: "−"; }
-.faq details p { margin: 0 0 14px; color: var(--muted); font-size: 15px; }
-.faq details a { color: var(--text); }
+.faq details p { margin: 0 0 22px; color: var(--muted); font-size: 15.5px; line-height: 1.7; max-width: 680px; }
+.faq details a { color: var(--text); text-decoration: none; }
+.faq details a:hover { color: var(--gold); }
 
 /* ── doc pages (configuration, roadmap) ── */
 body.page main.doc { max-width: 920px; }
