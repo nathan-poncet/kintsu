@@ -4,8 +4,8 @@
    surfaces. Roles below; values per mode. */
 
 :root {
-  --bg: #0f0d0b; --bg-2: #15120f; --surface: #1a1613; --line: #2a2521;
-  --text: #ece6da; --muted: #9a9184; --dim: #6d665c;
+  --bg: #1a1714; --bg-2: #201c18; --surface: #26211c; --line: #38312a;
+  --text: #ece6da; --muted: #9a9184; --dim: #766e63;
   --gold: #d9a441; --gold-2: #f0c866; --gold-dark: #b8862b;
   --red: #e06c5a;
   --viz-local: #2fa36f; --viz-cloud: #3987e5; --viz-you: #c98500;
@@ -15,50 +15,50 @@
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --max: 1240px; --radius: 0;
   --seam: #d9a441; --seam-glow: rgba(217,164,65,.35);
-  --grid: rgba(236,230,218,.045);
-  --term-bg: #0b0a09;
-  --term-bar: #110f0d;
-  --term-border: #1f1b17;
-  --term-border-2: #2a2521;
+  --grid: rgba(236,230,218,.055);
+  --term-bg: #131110;
+  --term-bar: #1a1714;
+  --term-border: #2b2620;
+  --term-border-2: #38312a;
   --term-text: #e8e2d6;
   --term-text-2: #d8d1c4;
   --term-text-3: #cfc6b8;
   --term-out: #b9b1a4;
   --term-muted: #8d8478;
   --term-muted-2: #a89e90;
-  --term-dim: #6d665c;
-  --term-ghost: #5f584f;
-  --term-dots: #3a332d;
+  --term-dim: #766e63;
+  --term-ghost: #6b6359;
+  --term-dots: #48413a;
   --term-err: #d99f93;
   --term-ok: #8fbf7f;
   --term-warn: #e06c5a;
   --term-str: #cfe3b6;
-  --term-key-bg: #1a1613;
+  --term-key-bg: #26211c;
   --term-shadow: 0 30px 80px rgba(0,0,0,.5);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --grid: rgba(34,29,24,.06);
-    --term-bg: #fbf8f1;
-    --term-bar: #f1ece1;
-    --term-border: #e2dbcc;
-    --term-border-2: #e2dbcc;
+    --grid: rgba(34,29,24,.075);
+    --term-bg: #f4efe5;
+    --term-bar: #e8e1d3;
+    --term-border: #d8cfbf;
+    --term-border-2: #d8cfbf;
     --term-text: #221d18;
     --term-text-2: #3a342c;
     --term-text-3: #4a443c;
     --term-out: #5b5449;
     --term-muted: #857c70;
     --term-muted-2: #857c70;
-    --term-dim: #9b9184;
+    --term-dim: #8f8578;
     --term-ghost: #b5ada0;
-    --term-dots: #cfc6b8;
+    --term-dots: #c6bdae;
     --term-err: #b3423a;
     --term-ok: #2f7d4e;
     --term-warn: #b3423a;
     --term-str: #3b6d2b;
-    --term-key-bg: #f1ece1;
+    --term-key-bg: #e8e1d3;
     --term-shadow: 0 24px 60px rgba(60,40,10,.12);
-    --bg: #f7f3ea; --bg-2: #f1ece1; --surface: #fffdf8; --line: #e2dbcc; --text: #221d18; --muted: #6b6257; --dim: #9b9184;
+    --bg: #eee8dc; --bg-2: #e6dfd0; --surface: #f6f2e9; --line: #d8cfbf; --text: #221d18; --muted: #6b6257; --dim: #8f8578;
     --gold: #a9781f; --gold-2: #c8941f; --gold-dark: #8a6217;
     --viz-local: #128a5c; --viz-cloud: #2a78d6; --viz-you: #9a6c1c;
     --ramp-0: #5c3c0c; --ramp-1: #7a5212; --ramp-2: #996a1a; --ramp-3: #b8862b; --ramp-later: #9b9184;
@@ -66,27 +66,27 @@
   }
 }
 :root[data-theme="light"] {
-  --grid: rgba(34,29,24,.06);
-    --term-bg: #fbf8f1;
-    --term-bar: #f1ece1;
-    --term-border: #e2dbcc;
-    --term-border-2: #e2dbcc;
+  --grid: rgba(34,29,24,.075);
+    --term-bg: #f4efe5;
+    --term-bar: #e8e1d3;
+    --term-border: #d8cfbf;
+    --term-border-2: #d8cfbf;
     --term-text: #221d18;
     --term-text-2: #3a342c;
     --term-text-3: #4a443c;
     --term-out: #5b5449;
     --term-muted: #857c70;
     --term-muted-2: #857c70;
-    --term-dim: #9b9184;
+    --term-dim: #8f8578;
     --term-ghost: #b5ada0;
-    --term-dots: #cfc6b8;
+    --term-dots: #c6bdae;
     --term-err: #b3423a;
     --term-ok: #2f7d4e;
     --term-warn: #b3423a;
     --term-str: #3b6d2b;
-    --term-key-bg: #f1ece1;
+    --term-key-bg: #e8e1d3;
     --term-shadow: 0 24px 60px rgba(60,40,10,.12);
-    --bg: #f7f3ea; --bg-2: #f1ece1; --surface: #fffdf8; --line: #e2dbcc; --text: #221d18; --muted: #6b6257; --dim: #9b9184;
+    --bg: #eee8dc; --bg-2: #e6dfd0; --surface: #f6f2e9; --line: #d8cfbf; --text: #221d18; --muted: #6b6257; --dim: #8f8578;
     --gold: #a9781f; --gold-2: #c8941f; --gold-dark: #8a6217;
     --viz-local: #128a5c; --viz-cloud: #2a78d6; --viz-you: #9a6c1c;
     --ramp-0: #5c3c0c; --ramp-1: #7a5212; --ramp-2: #996a1a; --ramp-3: #b8862b; --ramp-later: #9b9184;

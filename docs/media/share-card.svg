@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#0f0d0b"/>
+  <rect width="1200" height="630" fill="#1a1714"/>
   <g font-family="Menlo, JetBrainsMono Nerd Font, monospace" fill="#d9a441" font-size="18" letter-spacing="3">
     <rect x="72" y="74" width="22" height="2" fill="#d9a441"/>
     <text x="108" y="82">KINTSU · OPEN SOURCE · PRE-ALPHA</text>
@@ -9,7 +9,7 @@
     <text x="72" y="272">HANDLED IN PLACE.</text>
   </g>
   <text x="72" y="330" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="26" fill="#9a9184">A short suggestion under the error. Your terminal, your shell, your models, your keys.</text>
-  <rect x="72" y="382" width="1056" height="176" fill="#0b0a09" stroke="#2a2521"/>
+  <rect x="72" y="382" width="1056" height="176" fill="#131110" stroke="#2b2620"/>
   <rect x="72" y="382" width="1056" height="34" fill="#110f0d" stroke="#2a2521"/>
   <g fill="#3a332d"><circle cx="92" cy="399" r="5"/><circle cx="110" cy="399" r="5"/><circle cx="128" cy="399" r="5"/></g>
   <text x="600" y="404" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="14" fill="#8d8478">zsh — ~/dev/acme</text>
