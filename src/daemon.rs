@@ -22,7 +22,7 @@ use crate::adapters::gateways::{
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
 use crate::entities::{Message, SessionId, Settings, TriageDecision, UiMode};
 use crate::use_cases::ports::{Notifier, NotifyError};
-use crate::use_cases::{FollowUp, Triage};
+use crate::use_cases::{Explain, FollowUp, Triage};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Subscribers are pinged this often so dead ones are noticed.
@@ -255,6 +255,37 @@ fn handle(daemon: &Arc<Daemon>, mut stream: UnixStream) {
                 let _ = send(&mut stream, &frames::bubble(&placeholder, &text));
             }
             let _ = send(&mut stream, &frames::done());
+        }
+        Request::Explain { session, color: _ } => {
+            let settings = daemon.settings();
+            let state = JsonState::new(&daemon.cfg.state_dir);
+            let explain = Explain {
+                settings: &settings,
+                cases: &state,
+                secrets: &EnvSecrets,
+                models: &HttpModels,
+            };
+            match explain.candidate(Some(&session)) {
+                Err(e) => {
+                    let _ = send(&mut stream, &frames::error(&e.to_string()));
+                }
+                Ok(model) => {
+                    let _ = send(&mut stream, &frames::asked(&model));
+                    let daemon = Arc::clone(daemon);
+                    std::thread::spawn(move || {
+                        let state = JsonState::new(&daemon.cfg.state_dir);
+                        let explain = Explain {
+                            settings: &settings,
+                            cases: &state,
+                            secrets: &EnvSecrets,
+                            models: &HttpModels,
+                        };
+                        if let Err(e) = explain.deliver(&session, &daemon.sessions, &SystemClock) {
+                            log(&format!("explain for {}: {e}", session.as_str()));
+                        }
+                    });
+                }
+            }
         }
         Request::Shutdown => {
             let _ = send(&mut stream, &frames::bye());

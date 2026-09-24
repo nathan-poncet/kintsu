@@ -128,6 +128,28 @@ impl DaemonClient {
         Ok(out)
     }
 
+    /// Asks the daemon to explain the session's last failure later, as a
+    /// message. `None` when no daemon runs; `Ok(model)` names the model
+    /// being asked; `Err(reason)` is what the daemon refused at once.
+    pub fn explain(&self, session: &SessionId, color: bool) -> Option<Result<String, String>> {
+        let mut stream = self.connect().ok()?;
+        stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+        let frame = json!({"v": 1, "type": "explain", "version": self.version, "session": session.as_str(), "color": color});
+        send_line(&mut stream, &frame.to_string()).ok()?;
+        let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;
+        match answer["type"].as_str() {
+            Some("ack") => Some(Ok(answer["pending"]
+                .as_str()
+                .unwrap_or("the model")
+                .to_string())),
+            Some("error") => Some(Err(answer["message"]
+                .as_str()
+                .unwrap_or("the daemon refused")
+                .to_string())),
+            _ => None,
+        }
+    }
+
     /// The daemon's version, when one answers.
     pub fn hello(&self) -> io::Result<String> {
         let mut stream = self.connect()?;

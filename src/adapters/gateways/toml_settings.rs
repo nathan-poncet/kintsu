@@ -350,9 +350,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_default_file_parses_into_the_defaults() {
+    fn the_default_file_routes_the_local_model_and_keeps_the_other_defaults() {
         let s = parse_settings(DEFAULT_CONFIG, Some("/home/me")).unwrap();
-        assert_eq!(s, Settings::default());
+        let local = s.model("local").unwrap();
+        assert_eq!(
+            (local.provider, local.model.as_str(), local.tier),
+            (Provider::Ollama, "qwen2.5-coder:7b", Tier::Large)
+        );
+        assert_eq!(local.base_url.as_deref(), Some("http://127.0.0.1:11434"));
+        assert_eq!(s.models.len(), 1);
+        assert_eq!(s.routing.quick_fix, vec!["local"]);
+        assert_eq!(s.routing.explain, vec!["local"]);
+        assert!(s.routing.investigate.is_empty());
+        let defaults = Settings::default();
+        assert_eq!(
+            (s.quiet, s.ui, s.sensitive_local_only),
+            (defaults.quiet, defaults.ui, defaults.sensitive_local_only)
+        );
     }
 
     #[test]

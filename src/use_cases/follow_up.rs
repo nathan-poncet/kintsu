@@ -18,6 +18,8 @@ pub enum FollowUpError {
     Disabled,
     #[error("no model is routed for quick fixes, or none may see this case")]
     NoModel,
+    #[error("{0} is not running")]
+    NotRunning(String),
     #[error("the model had no fix")]
     NoFix,
     #[error("no model answered ({})", .0.iter().map(|(n, e)| format!("{n}: {e}")).collect::<Vec<_>>().join("; "))]
@@ -44,10 +46,7 @@ impl FollowUp<'_> {
         case.session()?;
         let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
         let first = candidates.first()?;
-        self.settings
-            .ui
-            .eager_fix
-            .allows(first)
+        (self.settings.ui.eager_fix.allows(first) && self.models.is_reachable(first))
             .then(|| first.name.clone())
     }
 
@@ -64,6 +63,9 @@ impl FollowUp<'_> {
         }
         if !self.settings.ui.eager_fix.allows(candidates[0]) {
             return Err(FollowUpError::Disabled);
+        }
+        if !self.models.is_reachable(candidates[0]) {
+            return Err(FollowUpError::NotRunning(candidates[0].name.clone()));
         }
         let first = candidates[0].name.clone();
         let (name, answer) = match ask_first(
@@ -265,6 +267,22 @@ mod tests {
             auto_cloud.candidate(&case("make", 2, Some("42"))),
             None,
             "auto never asks a remote model on its own"
+        );
+        let mut stopped = ScriptedModels::answering(&[("local", Ok("x"))]);
+        stopped.down.push("local".into());
+        let not_running = FollowUp {
+            settings: &settings(EagerFix::Auto, &["local"]),
+            models: &stopped,
+            ..off
+        };
+        assert_eq!(
+            not_running.candidate(&case("make", 2, Some("42"))),
+            None,
+            "a stopped server is not announced"
+        );
+        assert_eq!(
+            not_running.run(&case("make", 2, Some("42"))).unwrap_err(),
+            FollowUpError::NotRunning("local".into())
         );
         assert_eq!(
             auto_cloud.run(&case("make", 2, Some("42"))).unwrap_err(),

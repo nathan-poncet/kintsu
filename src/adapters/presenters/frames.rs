@@ -66,6 +66,11 @@ pub fn ack() -> String {
     json!({"v": V, "type": "ack"}).to_string()
 }
 
+/// `ack` with the name of the model being asked in the background.
+pub fn asked(model: &str) -> String {
+    json!({"v": V, "type": "ack", "pending": model}).to_string()
+}
+
 pub fn bye() -> String {
     json!({"v": V, "type": "bye"}).to_string()
 }
@@ -128,6 +133,7 @@ mod tests {
             (ping(), "ping"),
             (done(), "done"),
             (ack(), "ack"),
+            (asked("haiku"), "ack"),
             (bye(), "bye"),
             (error("x"), "error"),
         ] {

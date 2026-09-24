@@ -4,15 +4,18 @@
 #   curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh
 #
 # Puts one static binary in ~/.local/bin (or --dir), from the latest GitHub
-# release when there is one, otherwise from source with cargo, then offers
-# to add the one-line hook to your shell. Nothing else is touched.
+# release when there is one, otherwise from source with cargo; offers to add
+# the one-line hook to your shell and to set up a local model (Ollama with
+# qwen2.5-coder:7b, about 4.7 GB) so fixes and explanations never leave your
+# machine; writes a default configuration if you have none. Nothing else.
 #
 # Options
 #   --dir DIR        install directory            (default ~/.local/bin, or $KINTSU_INSTALL_DIR)
 #   --version vX.Y.Z a specific release            (default latest, or $KINTSU_VERSION)
 #   --from-source    skip the release, build with cargo
 #   --no-hook        do not touch your shell configuration
-#   --yes            add the hook without asking   (or KINTSU_YES=1)
+#   --no-model       do not install Ollama or pull the local model   (or KINTSU_NO_MODEL=1)
+#   --yes            answer yes to every question  (or KINTSU_YES=1)
 #   --dry-run        print what would happen
 #   --uninstall      remove the binary and the hook line
 #   --help
@@ -21,7 +24,9 @@ set -eu
 REPO="nathan-poncet/kintsu"
 DIR="${KINTSU_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${KINTSU_VERSION:-latest}"
-FROM_SOURCE=0; HOOK=1; YES="${KINTSU_YES:-}"; DRY=0; UNINSTALL=0
+FROM_SOURCE=0; HOOK=1; MODEL=1; YES="${KINTSU_YES:-}"; DRY=0; UNINSTALL=0
+[ -n "${KINTSU_NO_MODEL:-}" ] && MODEL=0
+LOCAL_MODEL="qwen2.5-coder:7b"
 
 if [ -t 2 ]; then GOLD="$(printf '\033[33m')"; DIM="$(printf '\033[2m')"; RST="$(printf '\033[0m')"; else GOLD=""; DIM=""; RST=""; fi
 say()  { printf '%s▎%s %s\n' "$GOLD" "$RST" "$*" >&2; }
@@ -29,7 +34,7 @@ note() { printf '%s▎ %s%s\n' "$GOLD" "$DIM$*" "$RST" >&2; }
 die()  { printf '%s▎%s %s\n' "$GOLD" "$RST" "$*" >&2; exit 1; }
 run()  { if [ "$DRY" = 1 ]; then note "would run: $*"; else "$@"; fi; }
 
-usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -39,6 +44,7 @@ while [ $# -gt 0 ]; do
     --version=*) VERSION="${1#--version=}" ;;
     --from-source) FROM_SOURCE=1 ;;
     --no-hook) HOOK=0 ;;
+    --no-model) MODEL=0 ;;
     --yes|-y) YES=1 ;;
     --dry-run) DRY=1 ;;
     --uninstall) UNINSTALL=1 ;;
@@ -155,6 +161,52 @@ if [ "$HOOK" = 1 ]; then
       note "$hook_line"
     fi
   fi
+fi
+
+# ── local model ───────────────────────────────────────────────────────────────
+# Asks once. A yes installs Ollama when it is missing and pulls the model the
+# default configuration routes for fixes and explanations.
+ask() {  # ask "question"  → 0 when yes (or --yes), 1 otherwise; no terminal means no
+  if [ -n "$YES" ]; then return 0; fi
+  if ( : </dev/tty ) 2>/dev/null; then
+    printf '%s▎%s %s [Y/n] ' "$GOLD" "$RST" "$1" >/dev/tty 2>/dev/null || true
+    ans=""; read -r ans </dev/tty 2>/dev/null || ans=n
+    case "$ans" in ""|y|Y|yes|YES) return 0 ;; esac
+  fi
+  return 1
+}
+if [ "$MODEL" = 1 ]; then
+  if have ollama; then
+    say "Ollama is installed."
+  elif ask "install Ollama and pull $LOCAL_MODEL (about 4.7 GB) so fixes and explanations run on this machine?"; then
+    case "$os" in
+      Darwin)
+        if have brew; then run brew install ollama; run brew services start ollama
+        else note "Homebrew is missing: install Ollama from https://ollama.com/download, then run:  ollama pull $LOCAL_MODEL"; MODEL=0; fi ;;
+      Linux)
+        if [ "$DRY" = 1 ]; then note "would run: curl -fsSL https://ollama.com/install.sh | sh"; else curl -fsSL https://ollama.com/install.sh | sh; fi ;;
+    esac
+  else
+    note "skipping the local model; later:  ollama pull $LOCAL_MODEL"; MODEL=0
+  fi
+  if [ "$MODEL" = 1 ] && { have ollama || [ "$DRY" = 1 ]; }; then
+    if [ "$DRY" = 1 ]; then note "would run: ollama pull $LOCAL_MODEL"
+    elif ollama list 2>/dev/null | grep -q "^$LOCAL_MODEL"; then note "$LOCAL_MODEL is already pulled"
+    else
+      say "pulling $LOCAL_MODEL (about 4.7 GB, once)..."
+      ollama pull "$LOCAL_MODEL" || note "the pull failed; later:  ollama pull $LOCAL_MODEL"
+    fi
+  fi
+fi
+
+# ── configuration ─────────────────────────────────────────────────────────────
+config="${KINTSU_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/kintsu/config.toml}"
+if [ -f "$config" ]; then
+  note "keeping your configuration at $config"
+elif [ "$DRY" = 1 ]; then
+  note "would write the default configuration to $config"
+else
+  mkdir -p "$(dirname "$config")" && "$DIR/kintsu" default-config > "$config" && say "default configuration written to $config"
 fi
 
 say "done. Open a new shell; the next failure gets a bubble."

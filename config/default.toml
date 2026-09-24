@@ -6,11 +6,11 @@
 # A model is a named endpoint: a provider, a model id, how to reach it, what
 # it may be used for. Name them the way you will read them.
 
-# [models.local]
-# provider = "ollama"                    # ollama · openai_compatible · anthropic · gemini · cli_agent
-# model    = "qwen2.5-coder:7b"
-# tier     = "small"                     # tiny · small · large · agent
-# base_url = "http://127.0.0.1:11434"    # the default for ollama
+[models.local]
+provider = "ollama"                      # ollama · openai_compatible · anthropic · gemini · cli_agent
+model    = "qwen2.5-coder:7b"            # the installer pulls this one; `ollama pull qwen2.5-coder:7b` by hand
+tier     = "large"                       # tiny · small · large · agent
+base_url = "http://127.0.0.1:11434"      # the default for ollama
 
 # [models.haiku]
 # provider = "anthropic"
@@ -37,9 +37,9 @@
 # Per task, the models to try in order. Rules always run first and need
 # nothing here.
 
-# [routing]
-# quick_fix   = ["local"]                # `kintsu fix` when no rule knows
-# explain     = ["local", "haiku"]       # `kintsu why`
+[routing]
+quick_fix   = ["local"]                  # `kintsu fix`, and the message after a failure no rule can fix
+explain     = ["local"]                  # `kintsu why`; add a cloud model after it, e.g. ["local", "haiku"]
 # investigate = ["claude-code"]          # `kintsu agent`
 
 [routing.constraints]

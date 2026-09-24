@@ -15,7 +15,7 @@ use crate::adapters::gateways::{
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
     Style, doctor_report, error_line, explanation, fix_report, hand_off_notice, ignored,
-    privacy_report, raw_fix, shell_hook, toast,
+    pending_line, privacy_report, raw_fix, shell_hook, toast,
 };
 use crate::daemon::{self, DaemonConfig};
 use crate::entities::{SessionId, Settings, UiMode};
@@ -96,7 +96,11 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Command::Init(shell) => {
-            let _ = write!(out, "{}", shell_hook(shell));
+            let _ = write!(
+                out,
+                "{}",
+                shell_hook(shell, &rt.state_dir.display().to_string())
+            );
             return ExitCode::SUCCESS;
         }
         Command::DefaultConfig => {
@@ -233,6 +237,25 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             }
         }
         Command::Why => {
+            if rt.daemon {
+                if let Some(session) = session {
+                    match rt.client().explain(session, rt.color) {
+                        Some(Ok(model)) => {
+                            let _ = writeln!(err, "{}", pending_line(&model, &style));
+                            // The hook reads this marker to let the answer replace the line above.
+                            let sessions = rt.state_dir.join("sessions");
+                            let _ = std::fs::create_dir_all(&sessions);
+                            let _ = std::fs::write(
+                                sessions.join(format!("{}.asking", session.as_str())),
+                                b"",
+                            );
+                            return ExitCode::SUCCESS;
+                        }
+                        Some(Err(reason)) => return failure(err, &reason, &style, false),
+                        None => {}
+                    }
+                }
+            }
             let explain = Explain {
                 settings: &settings,
                 cases: &state,
@@ -306,6 +329,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 settings: &settings,
                 secrets: &EnvSecrets,
                 environment: &environment,
+                models: &HttpModels,
             }
             .run(session);
             let places = Places {

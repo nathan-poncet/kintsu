@@ -249,9 +249,12 @@ providing a linker for `ring`. Expect to adjust it on the first tag.
 ## Open questions for the maintainer (2026-09-24, evening), answered on 2026-09-25
 
 Answers: 1. `"auto"`, on when the model is local, is the default. 2. The
-landing keeps the vision under the pre-alpha label. 3. Open: the
-maintainer wants `why` asynchronous too and asked what the panel is
-before deciding. 4. `v0.1.0` is tagged; fixes bump the patch number.
+landing keeps the vision under the pre-alpha label. 3. `why` is
+asynchronous through the daemon (an "asking…" line, then the explanation
+as a message; `kintsu why` leaves a marker file the hooks read so the
+answer replaces the line, and exits 0 so prompts show no error); the
+panel stays the big piece of v0.2. 4. `v0.1.0` is tagged; fixes bump the
+patch number.
 
 1. **`eager_fix` by default.** Off today, so nothing is sent to a model
    without an explicit command. On, every failure no rule can fix goes to
@@ -274,6 +277,19 @@ before deciding. 4. `v0.1.0` is tagged; fixes bump the patch number.
    is left is the maintainer's daily-use verdict, the agent presets for
    opencode, gemini and copilot (unverified), and the first run of the
    release workflow. Suggested: a few days of use, then `v0.1.0`.
+
+## 15. A local model by default (2026-09-25)
+
+Asked by the maintainer for v0.1: the installer offers to install Ollama
+(Homebrew on macOS, the official script on Linux) and to pull
+`qwen2.5-coder:7b`, about 4.7 GB, and writes the default configuration
+when there is none. That configuration declares the model as `local`,
+`tier = "large"`, and routes it for `quick_fix` and `explain`; with
+`eager_fix = "auto"` the message after a failure works out of the box and
+nothing leaves the machine. `--no-model` or `KINTSU_NO_MODEL=1` skips it.
+Because the server may be stopped, the daemon probes the local endpoint
+(a 50 ms TCP connect) before announcing "asking local…", and `doctor`
+warns with the command that starts it.
 
 ## What is not built, by priority
 

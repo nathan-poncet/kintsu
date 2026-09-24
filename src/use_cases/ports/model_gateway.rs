@@ -44,4 +44,12 @@ pub trait ModelGateway {
         key: Option<&str>,
         prompt: &Prompt,
     ) -> Result<String, ModelError>;
+
+    /// Whether the model can be reached right now, without asking it
+    /// anything: a local server that is not running is not. Remote
+    /// endpoints are assumed reachable; only a request tells.
+    fn is_reachable(&self, spec: &ModelSpec) -> bool {
+        let _ = spec;
+        true
+    }
 }

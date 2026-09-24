@@ -121,7 +121,37 @@ pub fn parse_answer(provider: Provider, status: u16, body: &Value) -> Result<Str
         .ok_or_else(|| ModelError::Malformed("no text in the answer".into()))
 }
 
+/// `host:port` of a base URL, with the scheme's default port.
+fn authority(base_url: &str) -> Option<(String, u16)> {
+    let (scheme, rest) = base_url.split_once("://")?;
+    let host_port = rest.split('/').next()?;
+    let default = if scheme == "https" { 443 } else { 80 };
+    Some(match host_port.rsplit_once(':') {
+        Some((host, port)) if !host.contains(']') || host.ends_with(']') => (
+            host.trim_matches(['[', ']']).to_string(),
+            port.parse().unwrap_or(default),
+        ),
+        _ => (host_port.trim_matches(['[', ']']).to_string(), default),
+    })
+}
+
 impl ModelGateway for HttpModels {
+    /// Local endpoints get a 50 ms TCP probe; a refused connection means the
+    /// server is not running and nothing is worth announcing.
+    fn is_reachable(&self, spec: &ModelSpec) -> bool {
+        if !spec.is_local() {
+            return true;
+        }
+        let Some((host, port)) = spec.base_url.as_deref().and_then(authority) else {
+            return true;
+        };
+        use std::net::{TcpStream, ToSocketAddrs};
+        let Ok(mut addrs) = (host.as_str(), port).to_socket_addrs() else {
+            return true;
+        };
+        addrs.any(|addr| TcpStream::connect_timeout(&addr, StdDuration::from_millis(50)).is_ok())
+    }
+
     fn complete(
         &self,
         spec: &ModelSpec,
@@ -298,6 +328,25 @@ mod tests {
             parse_answer(Provider::Ollama, 500, &Value::Null).unwrap_err(),
             ModelError::Refused("HTTP 500".into())
         );
+    }
+
+    #[test]
+    fn a_local_server_that_is_not_running_is_not_reachable_and_remote_ones_are_assumed_to_be() {
+        assert!(!HttpModels.is_reachable(&spec(Provider::Ollama, "http://127.0.0.1:9")));
+        assert!(HttpModels.is_reachable(&spec(Provider::Anthropic, "https://api.anthropic.com")));
+        assert_eq!(
+            authority("http://127.0.0.1:11434"),
+            Some(("127.0.0.1".into(), 11434))
+        );
+        assert_eq!(
+            authority("https://api.openai.com/v1"),
+            Some(("api.openai.com".into(), 443))
+        );
+        assert_eq!(
+            authority("http://[::1]:1234/v1"),
+            Some(("::1".into(), 1234))
+        );
+        assert_eq!(authority("nope"), None);
     }
 
     #[test]

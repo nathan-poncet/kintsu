@@ -104,16 +104,19 @@ Notes on each, and on Copilot CLI, Amazon Q, Gemini CLI and friends, in
 ## Try the skeleton
 
 One line. The installer detects your platform, takes the latest release
-or, while there is none, builds from source with cargo, puts the binary in
-`~/.local/bin`, and asks before adding the hook to your shell:
+or, when there is none, builds from source with cargo, puts the binary in
+`~/.local/bin`, asks before adding the hook to your shell, offers to set
+up a local model (Ollama with `qwen2.5-coder:7b`) so fixes and
+explanations never leave your machine, and writes a default configuration
+if you have none:
 
 ```sh
 curl -fsSL https://nathan-poncet.github.io/kintsu/install.sh | sh
 ```
 
-`--dir`, `--no-hook`, `--yes`, `--dry-run` and `--uninstall` do what they
-say; the script is [130 lines of plain sh](install.sh), read it first if
-you like. By hand, with a Rust toolchain ([rustup.rs](https://rustup.rs)):
+`--dir`, `--no-hook`, `--no-model`, `--yes`, `--dry-run` and `--uninstall`
+do what they say; the script is [200 lines of plain sh](install.sh), read it
+first if you like. By hand, with a Rust toolchain ([rustup.rs](https://rustup.rs)):
 
 ```sh
 cargo install --git https://github.com/nathan-poncet/kintsu
@@ -128,7 +131,8 @@ kintsu init fish | source     # ~/.config/fish/config.fish
 ```
 
 Remove the line to uninstall. With no configuration file, the rules work
-and nothing leaves your machine. To add a model or an agent:
+and nothing leaves your machine. The default configuration routes the
+local model for fixes and explanations; to add a cloud model or an agent:
 
 ```sh
 kintsu default-config > ~/.config/kintsu/config.toml   # then edit it
@@ -140,7 +144,7 @@ The commands, all about the last failure of the current shell:
 | command | does |
 |---|---|
 | `kintsu fix` | the corrected command, from a rule or your quick-fix model; `--raw` is what `^K` uses |
-| `kintsu why` | an explanation from the first configured model that answers; a case holding a secret only reaches local models |
+| `kintsu why` | an explanation from the first configured model that answers, delivered above your prompt while you keep working; a case holding a secret only reaches local models |
 | `kintsu agent [--with name] [words…]` | writes the brief and launches your CLI agent (Claude Code, Codex, OpenCode, aider, Gemini CLI, Copilot CLI…) |
 | `kintsu privacy` | exactly what a model or an agent would receive, secrets masked |
 | `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |

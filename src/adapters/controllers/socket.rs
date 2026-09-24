@@ -32,6 +32,8 @@ pub enum Request {
     Subscribe { session: SessionId, color: bool },
     /// A shell asks for the bubbles it has not seen.
     Pending { session: SessionId, color: bool },
+    /// `kintsu why`: explain the session's last failure later, as a message.
+    Explain { session: SessionId, color: bool },
     /// Stop the daemon.
     Shutdown,
 }
@@ -122,6 +124,10 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
             color,
         }),
         "pending" => Ok(Request::Pending {
+            session: SessionId::new(required("session")?),
+            color,
+        }),
+        "explain" => Ok(Request::Explain {
             session: SessionId::new(required("session")?),
             color,
         }),
@@ -217,6 +223,13 @@ mod tests {
         assert_eq!(
             parse_frame(r#"{"type":"shutdown"}"#).unwrap(),
             Request::Shutdown
+        );
+        assert_eq!(
+            parse_frame(r#"{"type":"explain","session":"7"}"#).unwrap(),
+            Request::Explain {
+                session: SessionId::new("7"),
+                color: false
+            }
         );
     }
 

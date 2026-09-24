@@ -19,7 +19,15 @@ if status is-interactive
     function __kintsu_postexec --on-event fish_postexec
         set -l kintsu_status $status
         set -q KINTSU_DISABLE; and return $kintsu_status
-        string match -q 'kintsu*' -- "$argv[1]"; and return $kintsu_status
+        if string match -q 'kintsu*' -- "$argv[1]"
+            # `kintsu why` leaves a marker when it printed an "asking…" line.
+            set -l marker "__KINTSU_STATE_DIR__/sessions/$KINTSU_SESSION.asking"
+            if test -e "$marker"
+                command rm -f -- "$marker"
+                set -g __kintsu_pending_seq (math $__kintsu_seq + 1)
+            end
+            return $kintsu_status
+        end
         command kintsu triage --status $kintsu_status --command "$argv[1]" --cwd "$PWD" \
             --session "$KINTSU_SESSION" --shell fish --duration-ms "$CMD_DURATION" --signal-pid $fish_pid
         # 3: a model is being asked and an "asking…" line was printed; the

@@ -2,7 +2,7 @@
 //! principle, are the keys where the configuration says.
 
 use crate::entities::{KeySource, Provider, SessionId, Settings};
-use crate::use_cases::ports::{Environment, Secrets};
+use crate::use_cases::ports::{Environment, ModelGateway, Secrets};
 
 /// How a check went.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +25,7 @@ pub struct Diagnose<'a> {
     pub settings: &'a Settings,
     pub secrets: &'a dyn Secrets,
     pub environment: &'a dyn Environment,
+    pub models: &'a dyn ModelGateway,
 }
 
 impl Diagnose<'_> {
@@ -94,7 +95,23 @@ impl Diagnose<'_> {
                         Health::Problem,
                         format!("no keychain entry kintsu/{account}"),
                     ),
-                    (KeySource::None, true) => check(subject, Health::Ok, "local, no key needed"),
+                    (KeySource::None, true) if !self.models.is_reachable(m) => check(
+
+                        subject,
+
+                        Health::Warning,
+
+                        format!(
+
+                            "local, but nothing answers at {}; start the server (ollama serve, or brew services start ollama)",
+
+                            m.base_url.as_deref().unwrap_or("its address")
+
+                        ),
+
+                    ),
+
+                    (KeySource::None, true) => check(subject, Health::Ok, "local, no key needed, server running"),
                     (KeySource::None, false) => {
                         check(subject, Health::Problem, "a remote model needs a key")
                     }
@@ -164,6 +181,7 @@ mod tests {
             settings: &settings,
             secrets: &MapSecrets::with(&[("ANTHROPIC_API_KEY", "k")]),
             environment: &FakeEnvironment::with_executables(&["claude"]),
+            models: &ScriptedModels::default(),
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let health = |subject: &str| {
@@ -176,6 +194,20 @@ mod tests {
         assert_eq!(health("shell hook"), Health::Ok);
         assert_eq!(health("model cloud"), Health::Ok);
         assert_eq!(health("model local"), Health::Ok);
+        let mut stopped_models = ScriptedModels::default();
+        stopped_models.down.push("local".into());
+        let stopped = Diagnose {
+            models: &stopped_models,
+            ..uc
+        };
+        let report = stopped.run(Some(&SessionId::new("42")));
+        let local = report.iter().find(|c| c.subject == "model local").unwrap();
+        assert_eq!(local.health, Health::Warning);
+        assert!(
+            local.detail.contains("start the server"),
+            "{}",
+            local.detail
+        );
         assert_eq!(health("model bare"), Health::Problem);
         assert_eq!(health("model literal"), Health::Warning);
         assert_eq!(health("model claude"), Health::Ok);
@@ -191,6 +223,7 @@ mod tests {
             settings: &settings,
             secrets: &MapSecrets::with(&[]),
             environment: &FakeEnvironment::with_executables(&[]),
+            models: &ScriptedModels::default(),
         };
         let report = uc.run(None);
         assert_eq!(report[0].health, Health::Problem);

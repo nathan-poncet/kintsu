@@ -30,7 +30,13 @@ if [[ -o interactive ]]; then
     __kintsu_started=""
     [[ -n "${KINTSU_DISABLE:-}" ]] && return $__kintsu_status
     [[ -z "$__kintsu_fd" ]] && __kintsu_subscribe
-    [[ -z "$cmdline" || "$cmdline" == kintsu* ]] && return $__kintsu_status
+    [[ -z "$cmdline" ]] && return $__kintsu_status
+    if [[ "$cmdline" == kintsu* ]]; then
+      # `kintsu why` leaves a marker when it printed an "asking…" line.
+      local marker="__KINTSU_STATE_DIR__/sessions/$KINTSU_SESSION.asking"
+      [[ -e "$marker" ]] && { command rm -f -- "$marker"; __kintsu_pending_seq=$__kintsu_seq; }
+      return $__kintsu_status
+    fi
     if [[ -n "$started" && -n "${EPOCHREALTIME:-}" ]]; then
       duration=$(( (EPOCHREALTIME - started) * 1000 ))
       timing=(--duration-ms "${duration%.*}")

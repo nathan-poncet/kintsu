@@ -144,7 +144,8 @@
       <tbody>
         <tr><td><code>--dir DIR</code></td><td>install directory; default <code>~/.local/bin</code>, or <code>$KINTSU_INSTALL_DIR</code></td></tr>
         <tr><td><code>--no-hook</code></td><td>do not edit any shell configuration file</td></tr>
-        <tr><td><code>--yes</code></td><td>add the hook without asking; also <code>KINTSU_YES=1</code></td></tr>
+        <tr><td><code>--no-model</code></td><td>do not install Ollama or pull <code>qwen2.5-coder:7b</code>; also <code>KINTSU_NO_MODEL=1</code></td></tr>
+        <tr><td><code>--yes</code></td><td>answer yes to every question: the hook, the local model; also <code>KINTSU_YES=1</code></td></tr>
         <tr><td><code>--version vX.Y.Z</code></td><td>a specific release instead of the latest</td></tr>
         <tr><td><code>--from-source</code></td><td>skip the release, build with cargo</td></tr>
         <tr><td><code>--dry-run</code></td><td>print what would happen</td></tr>

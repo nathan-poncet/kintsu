@@ -146,6 +146,8 @@ impl Secrets for MapSecrets {
 pub struct ScriptedModels {
     pub answers: HashMap<String, Result<String, ModelError>>,
     pub calls: RefCell<Vec<(String, Option<String>, Prompt)>>,
+    /// Models whose server is not running.
+    pub down: Vec<String>,
 }
 
 impl ScriptedModels {
@@ -156,6 +158,7 @@ impl ScriptedModels {
                 .map(|(n, r)| (n.to_string(), r.clone().map(String::from)))
                 .collect(),
             calls: RefCell::default(),
+            down: Vec::new(),
         }
     }
 
@@ -169,6 +172,10 @@ impl ScriptedModels {
 }
 
 impl ModelGateway for ScriptedModels {
+    fn is_reachable(&self, spec: &ModelSpec) -> bool {
+        !self.down.contains(&spec.name)
+    }
+
     fn complete(
         &self,
         spec: &ModelSpec,

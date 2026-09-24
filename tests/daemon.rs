@@ -129,42 +129,45 @@ impl Drop for Fixture {
     }
 }
 
-/// Answers one Ollama chat request with the given content, then exits.
+/// Answers every Ollama chat request with the given content.
 fn fake_ollama(content: &'static str) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        let mut buf = vec![0u8; 65536];
-        let mut read = 0;
-        loop {
-            let n = stream.read(&mut buf[read..]).unwrap_or(0);
-            if n == 0 {
-                break;
-            }
-            read += n;
-            let text = String::from_utf8_lossy(&buf[..read]).to_string();
-            if let Some(split) = text.find("\r\n\r\n") {
-                let length: usize = text
-                    .lines()
-                    .find_map(|l| {
-                        l.to_ascii_lowercase()
-                            .strip_prefix("content-length:")
-                            .map(|v| v.trim().parse().unwrap())
-                    })
-                    .unwrap_or(0);
-                if read >= split + 4 + length {
+        for incoming in listener.incoming() {
+            let Ok(mut stream) = incoming else { continue };
+            let mut buf = vec![0u8; 65536];
+            let mut read = 0;
+            loop {
+                let n = stream.read(&mut buf[read..]).unwrap_or(0);
+                if n == 0 {
                     break;
                 }
+                read += n;
+                let text = String::from_utf8_lossy(&buf[..read]).to_string();
+                if let Some(split) = text.find("\r\n\r\n") {
+                    let length: usize = text
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if read >= split + 4 + length {
+                        break;
+                    }
+                }
             }
+            let body = format!(
+                r#"{{"message":{{"role":"assistant","content":"{content}"}},"done":true}}"#
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
         }
-        let body =
-            format!(r#"{{"message":{{"role":"assistant","content":"{content}"}},"done":true}}"#);
-        let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.len()
-        );
-        let _ = stream.write_all(response.as_bytes());
     });
     port
 }
@@ -263,7 +266,7 @@ fn the_hook_client_starts_the_daemon_and_the_daemon_commands_talk_to_it() {
 fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
     let port = fake_ollama("make -j4 test");
     let config = format!(
-        "[models.local]\nprovider = \"ollama\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\n[routing]\nquick_fix = [\"local\"]\n[ui]\neager_fix = true\n"
+        "[models.local]\nprovider = \"ollama\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\n[routing]\nquick_fix = [\"local\"]\nexplain = [\"local\"]\n[ui]\neager_fix = true\n"
     );
     let mut f = Fixture::new("message", &config);
     f.start_daemon();
@@ -311,6 +314,38 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
 
     let pending = f.exchange(r#"{"v":1,"type":"pending","session":"s3"}"#);
     assert_eq!(pending.len(), 1, "delivered live, nothing left pending");
+
+    // `kintsu why` through the daemon: an immediate "asking…" line, a marker
+    // for the hook, and the explanation as a bubble on the subscription.
+    let (code, _, err) = f.run(&["why"], Some("s3"));
+    assert_eq!((code, err.as_str()), (0, "▎ asking local…\n"));
+    assert!(
+        f.dir
+            .join("state")
+            .join("sessions")
+            .join("s3.asking")
+            .is_file(),
+        "marker for the hook"
+    );
+    line.clear();
+    reader.read_line(&mut line).unwrap();
+    let bubble: serde_json::Value = serde_json::from_str(&line).unwrap();
+    let text = bubble["text"].as_str().unwrap();
+    assert!(
+        text.contains("make -j4 test") && text.contains("— local"),
+        "{text}"
+    );
+
+    let refused = f.exchange(r#"{"v":1,"type":"explain","session":"nobody"}"#);
+    assert_eq!(refused[0]["type"], "error");
+    assert!(
+        refused[0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("no failure"),
+        "{}",
+        refused[0]
+    );
 }
 
 #[test]

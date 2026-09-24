@@ -8,6 +8,24 @@ All notable changes to kintsu are recorded here. The format follows
 
 _Nothing yet._
 
+## [0.1.1] - 2026-09-25
+
+### Added
+
+- The installer offers to install Ollama and pull `qwen2.5-coder:7b`
+  (`--no-model` to skip), and writes the default configuration when there
+  is none; that configuration routes the local model for `quick_fix` and
+  `explain`, so fixes and explanations work out of the box and never leave
+  the machine.
+- A local model whose server is not running is not asked and not
+  announced; `kintsu doctor` says how to start it.
+
+### Changed
+
+- `kintsu why` no longer blocks the prompt when the daemon runs: it prints
+  "asking …", and the explanation arrives as a message that takes that
+  line's place. Without a daemon it answers in place as before.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added
