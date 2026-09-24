@@ -162,21 +162,27 @@ mod tests {
     fn a_gone_subscriber_is_dropped_and_messages_wait_again() {
         let s = sessions();
         let id = SessionId::new("42");
-        let (client, server_side) = UnixStream::pair().unwrap();
+        // A stream that refuses every write, deterministically on every
+        // platform: our own end with its write half shut. What the kernel
+        // does with a peer that just closed is not this test's business.
+        let (client, _server_side) = UnixStream::pair().unwrap();
+        client.shutdown(std::net::Shutdown::Write).unwrap();
         s.attach(&id, client, false);
-        let _ = server_side.shutdown(std::net::Shutdown::Both);
-        drop(server_side);
-        // The kernel may accept a write or two to a peer that just closed; a
-        // following one fails, the subscriber is dropped, and from then on
-        // every message waits.
-        for i in 0..5 {
-            s.deliver(&id, note(&format!("m{i}"))).unwrap();
-        }
-        let waiting = s.drain(&id);
-        assert!(!waiting.is_empty(), "the dead subscriber was never noticed");
-        assert!(matches!(waiting.last().unwrap().body(), MessageBody::Note(t) if t == "m4"));
-        s.deliver(&id, note("after")).unwrap();
-        assert_eq!(s.drain(&id).len(), 1, "once dropped, everything waits");
+        s.deliver(&id, note("first")).unwrap();
+        s.deliver(&id, note("second")).unwrap();
+        let waiting: Vec<String> = s
+            .drain(&id)
+            .iter()
+            .map(|m| match m.body() {
+                MessageBody::Note(t) => t.clone(),
+                _ => unreachable!(),
+            })
+            .collect();
+        assert_eq!(
+            waiting,
+            vec!["first", "second"],
+            "dropped on the first failed write, everything waits"
+        );
     }
 
     #[test]
