@@ -18,11 +18,11 @@ use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
     EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds, Sessions, SystemClock,
-    load_settings, unix,
+    TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
 use crate::entities::{SessionId, Settings, TriageDecision, UiMode};
-use crate::use_cases::{Messages, Triage, TriageInput};
+use crate::use_cases::{CaptureOutput, Messages, Triage, TriageInput};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Subscribers are pinged this often so dead ones are noticed.
@@ -182,7 +182,7 @@ fn handle(daemon: &Arc<Daemon>, mut stream: UnixStream) {
             color,
             signal_pid,
         } => {
-            on_command_finished(daemon, &mut stream, input, color, signal_pid);
+            on_command_finished(daemon, &mut stream, *input, color, signal_pid);
         }
         Request::Subscribe { session, color } => {
             if send_line(&mut stream, &frames::ack()).is_ok() {
@@ -220,6 +220,7 @@ fn on_command_finished(
     let settings = daemon.settings();
     let style = daemon.style(&settings, color);
     let session = input.session.clone();
+    let terminal = input.terminal.clone();
     if let (Some(session), Some(pid)) = (&session, signal_pid) {
         daemon.sessions.register_signal(session, pid);
     }
@@ -263,12 +264,28 @@ fn on_command_finished(
         stream,
         &frames::decision(&decision, text.as_deref(), &bubbles, pending.as_deref()),
     );
-    if let (TriageDecision::Offer { case, fix: None }, Some(_)) = (decision, pending) {
+    if let TriageDecision::Offer { case, fix } = decision {
+        // Off the sync path: read the output, keep it with the case, then
+        // ask the model when no rule knew and the policy allows.
         let daemon = Arc::clone(daemon);
         std::thread::spawn(move || {
             let state = daemon.state();
-            if let Err(e) = messages(&daemon, &settings, &state).fix(&case) {
-                log(&format!("fix for {}: {e}", case.outcome().command()));
+            let capture = CaptureOutput {
+                settings: &settings,
+                output: &TerminalOutput::new(settings.capture.sources.clone()),
+                cases: &state,
+            };
+            let case = match capture.run(*case, &terminal) {
+                Ok(case) => case,
+                Err(e) => {
+                    log(&format!("capture: {e}"));
+                    return;
+                }
+            };
+            if fix.is_none() && pending.is_some() {
+                if let Err(e) = messages(&daemon, &settings, &state).fix(&case) {
+                    log(&format!("fix for {}: {e}", case.outcome().command()));
+                }
             }
         });
     }

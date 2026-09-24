@@ -4,6 +4,7 @@
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::entities::TerminalIdentity;
 use crate::entities::{CommandLine, CommandOutcome, Duration, ExitStatus, SessionId, Shell};
 use crate::use_cases::TriageInput;
 
@@ -24,7 +25,7 @@ pub enum Request {
     Hello { version: String },
     /// A hook reports a finished command line; wants a decision within the budget.
     CommandFinished {
-        input: TriageInput,
+        input: Box<TriageInput>,
         color: bool,
         signal_pid: Option<u32>,
     },
@@ -51,6 +52,28 @@ pub enum FrameError {
     Missing(&'static str),
     #[error("`{0}` has the wrong shape")]
     Invalid(&'static str),
+}
+
+/// The pane identity a hook sends; every field optional.
+fn terminal_identity(v: Option<&Value>) -> TerminalIdentity {
+    let field = |key: &str| {
+        v.and_then(|t| t.get(key))
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+    };
+    TerminalIdentity {
+        program: field("program"),
+        tmux_pane: field("tmux_pane"),
+        tmux_socket: field("tmux_socket"),
+        herdr_pane: field("herdr_pane"),
+        herdr_socket: field("herdr_socket"),
+        herdr_bin: field("herdr_bin"),
+        wezterm_pane: field("wezterm_pane"),
+        kitty_window: field("kitty_window"),
+        kitty_listen_on: field("kitty_listen_on"),
+        iterm_session: field("iterm_session"),
+    }
 }
 
 pub fn parse_frame(line: &str) -> Result<Frame, FrameError> {
@@ -108,13 +131,14 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 cwd: optional("cwd"),
                 session: optional("session").map(SessionId::new),
                 shell: optional("shell").and_then(|s| Shell::from_name(&s)),
+                terminal: terminal_identity(v.get("terminal")),
             };
             let signal_pid = v
                 .get("signal_pid")
                 .and_then(Value::as_u64)
                 .and_then(|p| u32::try_from(p).ok());
             Ok(Request::CommandFinished {
-                input,
+                input: Box::new(input),
                 color,
                 signal_pid,
             })
@@ -162,7 +186,7 @@ mod tests {
 
     #[test]
     fn a_finished_command_becomes_a_triage_input() {
-        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","color":true,"signal_pid":4242}"#;
+        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
         let Request::CommandFinished {
             input,
             color,
@@ -179,6 +203,9 @@ mod tests {
         assert_eq!(input.shell, Some(Shell::Zsh));
         assert!(color);
         assert_eq!(signal_pid, Some(4242));
+        assert_eq!(input.terminal.herdr_pane.as_deref(), Some("wS:p1"));
+        assert_eq!(input.terminal.tmux_pane, None, "empty means absent");
+        assert_eq!(input.terminal.program.as_deref(), Some("ghostty"));
         let bare = parse_frame(
             r#"{"v":1,"type":"command_finished","command":"ls","status":0,"session":""}"#,
         )

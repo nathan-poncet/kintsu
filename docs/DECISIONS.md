@@ -339,11 +339,33 @@ the design mentions is one more gateway when it is needed; `app.rs` is
 the largest file and will split once the panel arrives; the harness is
 manual, not in CI.
 
+## 17. v0.2, step A: the output is captured (2026-09-25)
+
+The hook's `kintsu triage` sends the pane identity it finds in its
+environment (`HERDR_PANE_ID`, `TMUX_PANE` and `TMUX`, `WEZTERM_PANE`,
+`KITTY_WINDOW_ID`, `ITERM_SESSION_ID`, `TERM_PROGRAM`). After an offer,
+and only then, the daemon reads the pane's recent text in the background
+through the `OutputSource` port, cuts what follows the last echo of the
+command (`output_after`, an entity), keeps at most `capture.max_lines`,
+and saves it with the case; the follow-up model, `why`, `privacy` and the
+brief see it from then on. Without a daemon the local path does the same
+after printing the bubble. The sync budget is untouched: nothing is read
+before the bubble.
+
+Sources, tried in the configured order, each through its own CLI:
+`herdr pane read <id> --source recent-unwrapped`, `tmux capture-pane -p -J`,
+`wezterm cli get-text`, `kitten @ get-text`, and iTerm2 through
+`osascript` (the visible screen only). Herdr and tmux were exercised on
+this machine; the other three follow their documentation and are covered
+by the same invocation tests. Ghostty has no way to read a pane, so a
+Ghostty user gets capture only inside Herdr or tmux. The opt-in stderr
+tee for shells without any source is not built.
+
 ## What is not built, by priority
 
 1. What the daemon unlocks next: the panel, ghost text, clickable words,
    `kintsu service install`.
-2. Output capture (tmux/WezTerm/Kitty/iTerm2 APIs, opt-in stderr tee).
+2. The stderr tee for terminals without a readable pane; `session_new`.
 3. `kintsu setup`, `kintsu models`, `kintsu login`, `kintsu service`.
 4. Learning rules from accepted fixes; the cost ledger; budgets.
 5. A Homebrew tap, `cargo binstall` metadata, a Nix flake (the install

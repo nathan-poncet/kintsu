@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
     AskingMarker, DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HttpModels, JsonState,
-    RandomIds, ShellAgents, SystemClock, load_settings,
+    RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -18,10 +18,10 @@ use crate::adapters::presenters::{
     pending_line, privacy_report, raw_fix, shell_hook, toast,
 };
 use crate::daemon::{self, DaemonConfig};
-use crate::entities::{SessionId, Settings, UiMode};
+use crate::entities::{SessionId, Settings, TerminalIdentity, TriageDecision, UiMode};
 use crate::use_cases::{
-    Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice, Triage,
-    TriageInput,
+    CaptureOutput, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy,
+    ScopeChoice, Triage, TriageInput,
 };
 
 pub const USAGE: &str = "\
@@ -65,6 +65,8 @@ pub struct Runtime {
     pub debug: bool,
     /// Whether hooks may talk to, and start, the daemon.
     pub daemon: bool,
+    /// The pane this process runs in, for the output capture.
+    pub terminal: TerminalIdentity,
 }
 
 impl Runtime {
@@ -211,7 +213,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 environment: &environment,
                 style: &style,
             },
-            input,
+            *input,
             signal_pid,
             err,
         ),
@@ -360,7 +362,7 @@ struct Local<'a> {
 fn triage(
     rt: &Runtime,
     local: &Local<'_>,
-    input: TriageInput,
+    mut input: TriageInput,
     signal_pid: Option<u32>,
     err: &mut dyn Write,
 ) -> ExitCode {
@@ -370,6 +372,7 @@ fn triage(
         environment,
         style,
     } = *local;
+    input.terminal = rt.terminal.clone();
     if rt.daemon {
         if let Some(view) = rt
             .client()
@@ -397,6 +400,16 @@ fn triage(
         Ok(decision) => {
             if let Some(text) = toast(&decision, style) {
                 let _ = writeln!(err, "{text}");
+            }
+            // The output is read after the bubble: it costs a program run,
+            // and only an offered case is worth it.
+            if let TriageDecision::Offer { case, .. } = decision {
+                let capture = CaptureOutput {
+                    settings,
+                    output: &TerminalOutput::new(settings.capture.sources.clone()),
+                    cases: state,
+                };
+                let _ = capture.run(*case, &rt.terminal);
             }
         }
         Err(e) if rt.debug => {
@@ -488,6 +501,7 @@ mod tests {
                 color: false,
                 debug: true,
                 daemon: false,
+                terminal: TerminalIdentity::default(),
             };
             let (mut out, mut err) = (Vec::new(), Vec::new());
             let code = run(&rt, &mut out, &mut err);

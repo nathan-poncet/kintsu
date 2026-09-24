@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    Duration, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier,
-    UiMode, UiSettings,
+    CaptureSettings, Duration, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing,
+    Settings, Tier, UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -41,6 +41,14 @@ struct FileDto {
     routing: RoutingDto,
     quiet: QuietDto,
     ui: UiDto,
+    capture: CaptureDto,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct CaptureDto {
+    sources: Option<Vec<String>>,
+    max_lines: Option<usize>,
 }
 
 #[derive(Deserialize, Default)]
@@ -196,11 +204,27 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             }
         },
     };
+    let defaults = CaptureSettings::default();
+    let capture = CaptureSettings {
+        sources: match file.capture.sources {
+            None => defaults.sources,
+            Some(list) => {
+                if let Some(bad) = list.iter().find(|s| !defaults.sources.contains(s)) {
+                    return Err(SettingsError::Invalid(format!(
+                        "capture.sources: `{bad}` (herdr, tmux, wezterm, kitty, iterm2)"
+                    )));
+                }
+                list
+            }
+        },
+        max_lines: file.capture.max_lines.unwrap_or(defaults.max_lines),
+    };
     Ok(Settings {
         models,
         routing,
         quiet,
         ui,
+        capture,
         sensitive_local_only,
     })
 }
@@ -527,6 +551,14 @@ eager_fix = true
         assert!(err("[routing]\nexplain = [\"ghost\"]").contains("routing names `ghost`"));
         assert!(err("[quiet]\nsame_failure = \"never\"").contains("quiet.same_failure"));
         assert!(err("[ui]\nmode = \"loud\"").contains("ui.mode"));
+        assert!(err("[capture]\nsources = [\"screen\"]").contains("capture.sources"));
+        let c = parse_settings(
+            "[capture]\nsources = [\"tmux\"]\nmax_lines = 80\nstderr_tee = true",
+            None,
+        )
+        .unwrap()
+        .capture;
+        assert_eq!((c.sources, c.max_lines), (vec!["tmux".to_string()], 80));
         assert!(err("[ui]\neager_fix = \"sometimes\"").contains("ui.eager_fix"));
         assert_eq!(
             parse_settings("[ui]\neager_fix = \"auto\"", None)

@@ -213,6 +213,31 @@ fn the_daemon_speaks_the_protocol() {
         "the case the daemon saved is the one the client reads"
     );
 
+    // The output is read from the terminal after the bubble: here a fake
+    // tmux answers capture-pane with a screen dump.
+    std::fs::write(
+        f.dir.join("bin").join("tmux"),
+        "#!/bin/sh\nprintf '$ make test\\nmake: *** No rule to make target test.  Stop.\\n'\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(
+        f.dir.join("bin").join("tmux"),
+        std::os::unix::fs::PermissionsExt::from_mode(0o755),
+    )
+    .unwrap();
+    f.exchange(r#"{"v":1,"type":"command_finished","session":"s1","command":"make test","status":2,"cwd":"/","terminal":{"tmux_pane":"%1"}}"#);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut privacy = String::new();
+    while Instant::now() < deadline && !privacy.contains("## Output") {
+        std::thread::sleep(Duration::from_millis(50));
+        privacy = f.run(&["privacy"], Some("s1")).1;
+    }
+    assert!(
+        privacy
+            .contains("## Output\n\n```text\nmake: *** No rule to make target test.  Stop.\n```"),
+        "{privacy}"
+    );
+
     let bye = f.exchange(r#"{"v":1,"type":"shutdown"}"#);
     assert_eq!(bye[0]["type"], "bye");
     f.wait_for_socket(false);

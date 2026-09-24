@@ -5,6 +5,7 @@
 //! depends on nothing else in the crate.
 
 pub mod brief;
+pub mod capture;
 pub mod case;
 pub mod command;
 pub mod danger;
@@ -23,6 +24,7 @@ pub mod time;
 pub mod triage;
 
 pub use brief::{CaseDocument, case_document, hand_off_brief};
+pub use capture::{TerminalIdentity, output_after};
 pub use case::{CaseId, FailureCase};
 pub use command::{CommandLine, CommandLineError};
 pub use danger::{Danger, classify_danger};
@@ -35,8 +37,8 @@ pub use redaction::redact;
 pub use rules::{DirEntry, Facts, Os, suggest_fix};
 pub use session::{Session, SessionId};
 pub use settings::{
-    EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings, Tier, UiMode,
-    UiSettings,
+    CaptureSettings, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings,
+    Tier, UiMode, UiSettings,
 };
 pub use shell::Shell;
 pub use time::{Duration, Timestamp};

@@ -10,6 +10,7 @@ pub mod ids;
 pub mod ignore_store;
 pub mod model_gateway;
 pub mod notifier;
+pub mod output_source;
 pub mod secrets;
 pub mod session_registry;
 
@@ -21,5 +22,6 @@ pub use ids::IdGenerator;
 pub use ignore_store::{IgnoreStore, IgnoreStoreError};
 pub use model_gateway::{ModelError, ModelGateway, Prompt};
 pub use notifier::{Notifier, NotifyError};
+pub use output_source::OutputSource;
 pub use secrets::Secrets;
 pub use session_registry::{RegistryError, SessionRegistry};

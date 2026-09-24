@@ -53,6 +53,7 @@ kintsu/
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
     │   ├── brief.rs                  case_document · hand_off_brief (output fenced as data)
+    │   ├── capture.rs                TerminalIdentity · output_after (the command's output cut from a screen)
     │   ├── message.rs                Message · MessageBody (what arrives later)
     │   ├── triage.rs                 TriageDecision · QuietReason
     │   ├── shell.rs                  Shell
@@ -62,6 +63,7 @@ kintsu/
     │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
     │   ├── fix_last.rs               rules first, then a stored proposal, then the quick-fix model
     │   ├── messages.rs               what the daemon sends later: the eager fix, the explanation, or why not
+    │   ├── capture.rs                read the output after an offer, keep it with the case
     │   ├── explain.rs                routed models, sensitive ⇒ local only
     │   ├── hand_off.rs               prepare the brief, then launch the agent
     │   ├── ignore.rs                 ignore and mute
@@ -73,7 +75,8 @@ kintsu/
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
     │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
-    │       └── (planned)             OutputSource · RuleBook · CostLedger
+    │       ├── output_source.rs
+    │       └── (planned)             RuleBook · CostLedger
     │
     └── adapters/                 depends on the entities and the use cases
         ├── controllers/              cli.rs (argv → Command; the environment is main's job) ·
@@ -85,6 +88,7 @@ kintsu/
         └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
             │                         sessions.rs (Notifier: subscribers, SIGUSR1, pending messages) ·
             │                         asking_marker.rs (the file the hooks read) · ndjson.rs · unix.rs (libc) ·
+            │                         terminals.rs (OutputSource: herdr, tmux, wezterm, kitty, iterm2) ·
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·

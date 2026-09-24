@@ -53,6 +53,13 @@ sensitive_output = "local_only"          # a case with a secret never reaches a 
 same_failure   = "once"                  # once · always
 # off_in       = ["~/scratch"]           # directories where no bubble is shown
 
+# ── Capture ─────────────────────────────────────────────────────────────
+# After a failure worth a bubble, the command's output is read from the
+# terminal and kept with the case, so `why`, `fix` and the agent see it.
+[capture]
+sources   = ["herdr", "tmux", "wezterm", "kitty", "iterm2"]   # tried in order; only what is present
+max_lines = 400                                                # 0 disables capture
+
 # ── UI ──────────────────────────────────────────────────────────────────
 [ui]
 mode  = "toast"                          # toast · hint (one dim line) · silent (commands only)

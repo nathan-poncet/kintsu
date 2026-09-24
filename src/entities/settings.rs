@@ -193,6 +193,27 @@ pub struct UiSettings {
     pub eager_fix: EagerFix,
 }
 
+/// Reading the failed command's output from the terminal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaptureSettings {
+    /// The sources to try, in order: `herdr`, `tmux`, `wezterm`, `kitty`, `iterm2`.
+    pub sources: Vec<String>,
+    /// How many lines of output a case keeps at most; 0 disables capture.
+    pub max_lines: usize,
+}
+
+impl Default for CaptureSettings {
+    fn default() -> Self {
+        Self {
+            sources: ["herdr", "tmux", "wezterm", "kitty", "iterm2"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            max_lines: 400,
+        }
+    }
+}
+
 /// Everything the user configured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -204,6 +225,8 @@ pub struct Settings {
     pub quiet: QuietSettings,
     /// How to draw.
     pub ui: UiSettings,
+    /// Where the output comes from.
+    pub capture: CaptureSettings,
     /// Never send a case with a secret to a model that is not local.
     pub sensitive_local_only: bool,
 }
@@ -215,6 +238,7 @@ impl Default for Settings {
             routing: Routing::default(),
             quiet: QuietSettings::default(),
             ui: UiSettings::default(),
+            capture: CaptureSettings::default(),
             sensitive_local_only: true,
         }
     }

@@ -6,6 +6,13 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The failed command's output is read from the terminal after the bubble
+  and kept with the case: Herdr, tmux, WezTerm, Kitty and iTerm2, tried in
+  the order of `[capture] sources`, at most `max_lines` lines. `why`, the
+  quick fix, `privacy` and the agent's brief see it.
+
 ### Changed
 
 - `kintsu triage` exits 0 in every case; the hooks learn that an "asking…"

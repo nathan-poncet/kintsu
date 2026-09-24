@@ -159,9 +159,9 @@ The commands, all about the last failure of the current shell:
    `why`, hand-off to a CLI agent by template, config file, noise
    control. Built; what differs from the design documents is in
    [docs/DECISIONS.md](docs/DECISIONS.md).
-2. **v0.2, it reads the output**: stderr/stdout capture through terminal
-   and multiplexer APIs, redaction and "what leaves the machine" preview,
-   ghost-text fixes, danger guard, project awareness.
+2. **v0.2, it reads the output**: output capture through terminal and
+   multiplexer APIs (Herdr, tmux, WezTerm, Kitty, iTerm2: built), ghost-text
+   fixes, clickable words, the panel, project awareness.
 3. **v0.3, your agent, your keys**: keychain storage, subscription reuse,
    local models as first-class citizens, cheap-model triage, an MCP server
    exposing the last failure to any agent.

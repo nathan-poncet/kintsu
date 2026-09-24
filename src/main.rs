@@ -14,7 +14,7 @@ use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use entities::SessionId;
+use entities::{SessionId, TerminalIdentity};
 
 fn main() -> ExitCode {
     let home = std::env::var("HOME").ok().filter(|h| !h.is_empty());
@@ -41,8 +41,22 @@ fn main() -> ExitCode {
             .map(|d| d.join("kintsu").join("daemon.sock"))
             .unwrap_or_else(|| state_dir.join("daemon.sock"))
     });
+    let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+    let terminal = TerminalIdentity {
+        program: var("TERM_PROGRAM"),
+        tmux_pane: var("TMUX_PANE"),
+        tmux_socket: var("TMUX").and_then(|t| t.split(',').next().map(String::from)),
+        herdr_pane: var("HERDR_PANE_ID"),
+        herdr_socket: var("HERDR_SOCKET_PATH"),
+        herdr_bin: var("HERDR_BIN_PATH"),
+        wezterm_pane: var("WEZTERM_PANE"),
+        kitty_window: var("KITTY_WINDOW_ID"),
+        kitty_listen_on: var("KITTY_LISTEN_ON"),
+        iterm_session: var("ITERM_SESSION_ID"),
+    };
     let runtime = app::Runtime {
         args: std::env::args().skip(1).collect(),
+        terminal,
         session: std::env::var("KINTSU_SESSION")
             .ok()
             .filter(|s| !s.is_empty())

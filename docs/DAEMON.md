@@ -1,10 +1,12 @@
 # The daemon
 
-*Status (2026-09-24): built as described below for the frames `hello`,
-`command_finished`, `subscribe`, `pending` and `shutdown`, the delivery
-into zsh, fish and bash, the on-demand start and the version handshake.
-Not yet: `session_new`, `act`, `get_case`, SQLite, `service install`, the
-idle exit. See [DECISIONS.md](DECISIONS.md), section 2.*
+*Status (2026-09-25): built as described below for the frames `hello`,
+`command_finished` (which carries the pane identity), `subscribe`,
+`pending`, `explain` and `shutdown`, the delivery into zsh, fish and bash,
+the on-demand start, the version handshake, and the output capture from
+Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer. Not yet:
+`session_new`, `act`, `get_case`, the stderr tee, SQLite, `service
+install`, the idle exit. See [DECISIONS.md](DECISIONS.md), sections 2 and 17.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and

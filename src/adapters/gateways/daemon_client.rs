@@ -73,6 +73,18 @@ impl DaemonClient {
             "shell": input.shell.map(|s| s.name()),
             "color": color,
             "signal_pid": signal_pid,
+            "terminal": {
+                "program": input.terminal.program,
+                "tmux_pane": input.terminal.tmux_pane,
+                "tmux_socket": input.terminal.tmux_socket,
+                "herdr_pane": input.terminal.herdr_pane,
+                "herdr_socket": input.terminal.herdr_socket,
+                "herdr_bin": input.terminal.herdr_bin,
+                "wezterm_pane": input.terminal.wezterm_pane,
+                "kitty_window": input.terminal.kitty_window,
+                "kitty_listen_on": input.terminal.kitty_listen_on,
+                "iterm_session": input.terminal.iterm_session,
+            },
         });
         send_line(&mut stream, &frame.to_string()).ok()?;
         let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;

@@ -3,6 +3,7 @@
 
 use thiserror::Error;
 
+use crate::entities::TerminalIdentity;
 use crate::entities::{
     CommandLine, CommandLineError, CommandOutcome, Duration, ExitStatus, SessionId, Shell,
 };
@@ -37,7 +38,7 @@ pub enum Command {
     /// `kintsu triage --status <code> --command <text> …`: a hook reports.
     /// `--signal-pid` names a shell to poke with SIGUSR1 when a message arrives.
     Triage {
-        input: TriageInput,
+        input: Box<TriageInput>,
         signal_pid: Option<u32>,
     },
     /// `kintsu subscribe [--session <id>]`: print bubbles as they come.
@@ -180,12 +181,13 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
         outcome = outcome.lasting(d);
     }
     Ok(Command::Triage {
-        input: TriageInput {
+        input: Box::new(TriageInput {
             outcome,
             cwd,
             session,
             shell,
-        },
+            terminal: TerminalIdentity::default(),
+        }),
         signal_pid,
     })
 }
@@ -275,7 +277,7 @@ mod tests {
 
     fn triage(args: &[&str]) -> TriageInput {
         match parse_args(args.iter().copied()).unwrap() {
-            Command::Triage { input, .. } => input,
+            Command::Triage { input, .. } => *input,
             other => panic!("expected triage, got {other:?}"),
         }
     }

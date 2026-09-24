@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::entities::{
     CommandLine, CommandOutcome, FailureCase, QuietReason, Session, SessionId, Settings, Shell,
-    TriageDecision, suggest_fix,
+    TerminalIdentity, TriageDecision, suggest_fix,
 };
 use crate::use_cases::facts::gather_facts;
 use crate::use_cases::ports::{
@@ -25,6 +25,8 @@ pub struct TriageInput {
     pub session: Option<SessionId>,
     /// Which shell.
     pub shell: Option<Shell>,
+    /// Which pane, for the output capture that follows an offer.
+    pub terminal: TerminalIdentity,
 }
 
 /// Why triage could not finish.
@@ -182,6 +184,7 @@ mod tests {
                     cwd: Some("/w".into()),
                     session: Some(SessionId::new("42")),
                     shell: Some(Shell::Zsh),
+                    terminal: TerminalIdentity::default(),
                 })
                 .unwrap()
         }
@@ -365,6 +368,7 @@ mod tests {
                 cwd: None,
                 session: None,
                 shell: None,
+                terminal: TerminalIdentity::default(),
             })
             .unwrap();
         let TriageDecision::Offer { case, .. } = decision else {

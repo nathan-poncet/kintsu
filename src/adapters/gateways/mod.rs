@@ -12,6 +12,7 @@ pub mod random_ids;
 pub mod sessions;
 pub mod shell_agents;
 pub mod system_clock;
+pub mod terminals;
 pub mod toml_settings;
 pub mod unix;
 
@@ -25,4 +26,5 @@ pub use random_ids::RandomIds;
 pub use sessions::Sessions;
 pub use shell_agents::ShellAgents;
 pub use system_clock::SystemClock;
+pub use terminals::TerminalOutput;
 pub use toml_settings::{DEFAULT_CONFIG, load_settings};

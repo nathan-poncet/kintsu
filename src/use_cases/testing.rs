@@ -210,6 +210,29 @@ impl AgentLauncher for RecordingLauncher {
     }
 }
 
+/// A screen dump for any known pane; records what was asked.
+#[derive(Default)]
+pub struct FakeOutput {
+    pub screen: Option<String>,
+    pub asked: RefCell<Vec<(TerminalIdentity, usize)>>,
+}
+
+impl FakeOutput {
+    pub fn showing(screen: &str) -> Self {
+        Self {
+            screen: Some(screen.to_string()),
+            asked: RefCell::default(),
+        }
+    }
+}
+
+impl OutputSource for FakeOutput {
+    fn recent(&self, terminal: &TerminalIdentity, lines: usize) -> Option<String> {
+        self.asked.borrow_mut().push((terminal.clone(), lines));
+        self.screen.clone()
+    }
+}
+
 #[derive(Default)]
 pub struct MemoryNotifier {
     pub delivered: RefCell<Vec<(SessionId, Message)>>,

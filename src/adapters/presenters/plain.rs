@@ -76,11 +76,14 @@ pub fn hand_off_notice(plan: &HandOffPlan, style: &Style) -> String {
         1 => " (redacted: 1 secret)".to_string(),
         n => format!(" (redacted: {n} secrets)"),
     };
-    let sent = if plan.brief.contains("## Commands before it") {
-        "command, status, directory, recent commands"
-    } else {
-        "command, status, directory"
-    };
+    let mut parts = vec!["command", "status", "directory"];
+    if plan.brief.contains("## Output") {
+        parts.push("output");
+    }
+    if plan.brief.contains("## Commands before it") {
+        parts.push("recent commands");
+    }
+    let sent = parts.join(", ");
     let how = style.dim(&format!(
         "kintsu privacy shows the brief{}the agent uses its own login.",
         style.dot()
