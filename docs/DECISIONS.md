@@ -58,11 +58,17 @@ built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
   the local, synchronous path when nothing answers in time. Both paths
   share the same JSON state, so nothing is lost either way.
 - Messages that arrive later reach the shell three ways: zsh keeps a
-  `kintsu subscribe` child whose output `zle -F` watches, prints the
-  message above the line being edited and redraws it; fish passes its pid
-  with every `command_finished`, the daemon sends SIGUSR1, the handler
+  `kintsu subscribe` child whose output `zle -F` watches; fish passes its
+  pid with every `command_finished`, the daemon sends SIGUSR1, the handler
   runs `kintsu pending`; bash receives what is pending with the next
-  decision, at the next prompt. All three verified in real shells.
+  decision, at the next prompt. In zsh and fish the handler climbs to the
+  first line of the prompt (its height comes from rendering `$PROMPT` /
+  `fish_prompt` again, plus the lines of the edited text), clears from
+  there, prints the message and lets the shell redraw the prompt below it,
+  typed text intact. Printing at the cursor and asking for a repaint, the
+  obvious way, made fish overwrite the message and left a stale prompt in
+  zsh. Verified in a screen emulator driving real zsh and fish sessions,
+  with a three-line prompt and text being typed when the message lands.
 - What the daemon sends today: with `ui.eager_fix = true` and a model in
   `routing.quick_fix`, every failure no rule could fix is sent to the
   model in the background and the answer lands as "Try …? (model, not

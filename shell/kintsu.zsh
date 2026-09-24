@@ -47,17 +47,30 @@ if [[ -o interactive ]]; then
     zle -F "$__kintsu_fd" __kintsu_deliver
   }
 
+  # `zle -I` parks the cursor on the line after the edited text and lets zsh
+  # redraw the prompt where the cursor is once we return. Climbing back to
+  # the prompt's first line and clearing from there puts the message above
+  # the prompt instead of leaving a stale copy of it behind.
   __kintsu_deliver() {
-    local fd=$1 line
+    local fd=$1 line text=""
     if ! IFS= read -r -u "$fd" line; then
       zle -F "$fd"
       exec {fd}<&-
       __kintsu_fd=""
       return
     fi
+    text="$line"$'\n'
+    while IFS= read -r -t 0.05 -u "$fd" line; do text+="$line"$'\n'; done
     zle -I
-    print -r -- "$line"
-    while IFS= read -r -t 0.05 -u "$fd" line; do print -r -- "$line"; done
+    local rendered="${(%%)PROMPT}"
+    local -a prompt_rows=("${(@f)rendered}") buffer_rows=("${(@f)BUFFER}")
+    local prompt_lines=${#prompt_rows} buffer_lines=${#buffer_rows}
+    (( prompt_lines < 1 )) && prompt_lines=1
+    (( buffer_lines < 1 )) && buffer_lines=1
+    local up=$(( prompt_lines + buffer_lines - 1 ))
+    (( up > 0 )) && print -n -- $'\e['"$up"'A'
+    print -n -- $'\r\e[J'
+    print -rn -- "$text"
   }
 
   __kintsu_fix_widget() {

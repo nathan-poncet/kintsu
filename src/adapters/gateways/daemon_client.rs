@@ -152,6 +152,8 @@ impl DaemonClient {
             &json!({"v": 1, "type": "shutdown", "version": self.version}).to_string(),
         )?;
         let _ = read_line(&mut stream);
+        // A deliberate stop must not keep the next hook call from restarting it.
+        let _ = std::fs::remove_file(self.socket.with_extension("spawn"));
         Ok(true)
     }
 

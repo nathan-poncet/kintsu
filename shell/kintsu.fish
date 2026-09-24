@@ -19,8 +19,19 @@ if status is-interactive
         return $kintsu_status
     end
 
+    # fish redraws the prompt where it believes it is, so the message must go
+    # above it: climb to the prompt's first line, clear from there, print, then
+    # leave the cursor where fish expects it before asking for a repaint.
     function __kintsu_on_message --on-signal SIGUSR1
-        command kintsu pending --session "$KINTSU_SESSION"
+        set -l text (command kintsu pending --session "$KINTSU_SESSION" 2>&1 | string collect)
+        test -n "$text"; or return
+        set -l prompt_lines (fish_prompt 2>/dev/null | string collect | string split \n | count)
+        set -l buffer_lines (commandline | count)
+        test $buffer_lines -lt 1; and set buffer_lines 1
+        set -l up (math "$prompt_lines + $buffer_lines - 2")
+        test $up -gt 0; and printf '\e[%dA' $up
+        printf '\r\e[J%s\n' "$text"
+        for i in (seq $up); printf '\n'; end
         commandline -f repaint
     end
 
