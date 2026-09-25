@@ -167,8 +167,9 @@ The commands, all about the last failure of the current shell:
    control. Built; what differs from the design documents is in
    [docs/DECISIONS.md](docs/DECISIONS.md).
 2. **v0.2, it reads the output**: output capture through terminal and
-   multiplexer APIs (Herdr, tmux, WezTerm, Kitty, iTerm2: built), ghost-text
-   fixes, clickable words, the panel, project awareness.
+   multiplexer APIs (Herdr, tmux, WezTerm, Kitty, iTerm2), ghost-text
+   fixes, clickable words, the panel, pipeline statuses. Built; project
+   awareness moved to v0.3.
 3. **v0.3, your agent, your keys**: keychain storage, subscription reuse,
    local models as first-class citizens, cheap-model triage, an MCP server
    exposing the last failure to any agent.

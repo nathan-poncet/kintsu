@@ -6,6 +6,10 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.2.0] - 2026-09-25
+
 ### Added
 
 - The panel: `^K` expands the last bubble under the prompt, with a

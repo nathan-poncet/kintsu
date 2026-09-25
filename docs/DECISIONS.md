@@ -477,7 +477,7 @@ evening, six of them after a fuller explanation. One is still *pending*.
 
 | decision | answer |
 |---|---|
-| 1. when to tag `v0.2.0` | after the fixes the first days of use bring |
+| 1. when to tag `v0.2.0` | after the fixes the first days of use bring; tagged on 2026-09-25, after one evening of use and its fixes (section 23) |
 | 2. a click answers in the shell | keep; the design's "a click opens the panel" is dropped |
 | 3. `ui.hotkey` | read it; `^K` stays the default |
 | 4. the panel's height | grows as answers arrive |

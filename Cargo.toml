@@ -1,6 +1,6 @@
 [package]
 name = "kintsu"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 description = "When a command fails, Kintsu offers to hand it to your AI agent, right there in the terminal. Any provider, your own key."
