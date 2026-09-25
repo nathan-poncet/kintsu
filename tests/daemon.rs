@@ -423,7 +423,7 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
 }
 
 #[test]
-fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision() {
+fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision_on_the_same_failure() {
     let port = fake_ollama("cargo build --release");
     let config = format!(
         "[models.local]\nprovider = \"ollama\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\n[routing]\nquick_fix = [\"local\"]\n[ui]\neager_fix = true\n"
@@ -456,8 +456,10 @@ fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision() {
     let mut bubbles = Vec::new();
     while Instant::now() < deadline && bubbles.is_empty() {
         std::thread::sleep(Duration::from_millis(50));
+        // The same failure again: the shell still looks at it, so what
+        // waited is shown. After another command it would be dropped.
         let next = f.exchange(
-            r#"{"v":1,"type":"command_finished","session":"s4","command":"ls","status":0}"#,
+            r#"{"v":1,"type":"command_finished","session":"s4","command":"make test","status":2}"#,
         );
         bubbles = next[0]["bubbles"].as_array().cloned().unwrap_or_default();
     }

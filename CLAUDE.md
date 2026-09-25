@@ -21,8 +21,9 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   anything that waits, no runtime), `src/adapters/` (`controllers/` turn argv,
   socket frames and URL-scheme calls into use case calls; `presenters/` map
   results to toast, panel, plain and JSON view states; `gateways/` implement the
-  ports over models, agents, terminals, storage, secrets), `src/main.rs` and
-  later `app.rs` / `daemon.rs` / `service.rs` as the composition root.
+  ports over models, agents, terminals, storage, secrets), `src/main.rs`,
+  `src/app/` (`mod.rs` plus one file per command family) and `daemon.rs`
+  as the composition root.
 - The website is static HTML/CSS/JS in `docs/` next to the design documents,
   served by GitHub Pages (source `main`, folder `/docs`). No framework, no
   build step. `scripts/docs-shell.py` regenerates the documentation shell.
@@ -30,13 +31,13 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   documents (hooks report every command, `^K` opens the panel, JSON state
   instead of SQLite, the daemon's actual scope…). Update it when a decision
   changes.
-- `src/daemon.rs` is the resident process (composition root, like `app.rs`);
+- `src/daemon.rs` is the resident process (composition root, like `app/`);
   `adapters/gateways/unix.rs` is the only module allowed `unsafe` (`libc`).
   Tests and the CI smoke run set `KINTSU_NO_DAEMON=1` unless they test the
   daemon; `tests/daemon.rs` drives a real daemon over a scratch socket.
-- The hooks and the binary share two contracts: the marker file
-  `<state>/sessions/<id>.asking` (`gateways/asking_marker.rs`) and the frames
-  of the socket protocol. After touching `shell/*`, run
+- The hooks and the binary share two contracts: the marker files
+  `<state>/sessions/<id>.asking`, `.ghost` and `.bubble`
+  (`gateways/hook_notes.rs`) and the frames of the socket protocol. After touching `shell/*`, run
   `scripts/shell-harness.py`, which drives real zsh and fish in a
   pseudo-terminal and shows the screen.
 - A new side effect gets a port, an in-memory fake and a contract test first;

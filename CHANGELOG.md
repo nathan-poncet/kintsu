@@ -15,6 +15,13 @@ All notable changes to kintsu are recorded here. The format follows
   panel, `c` copies it, Ignore applies the scope you pick, `esc` closes.
   `kintsu panel` is the command the hook runs. The bubble's actions line
   now ends with `^K more`.
+- The panel remembers: an explanation, whether the panel, `kintsu why` or
+  a message asked for it, and a quick-fix model's answer are kept with the
+  failure, so `^K` shows them again instead of asking again.
+- Pipelines: the hooks report every stage's status, and the first stage
+  that failed is the failure. `gti status | head` is a typo even though
+  `head` succeeded, `foo | grep x` under `pipefail` stays quiet when grep
+  found nothing, and the bubble names the stage that failed.
 - The bubble's words are clickable: `kintsu why`, `fix`, `agent` and
   `ignore` are OSC 8 links to `kintsu://act?case=…&do=…` on terminals
   that render them (`[ui] links = false` turns them off). `kintsu open
@@ -37,6 +44,20 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Fixed
 
+- `^K` opens the panel in the bubble's place and puts the bubble back on
+  close, instead of drawing a second copy of the failure under the prompt.
+- `^K` after a command that succeeded no longer opens the panel on an
+  older failure: the panel expands the failure just before, and stays
+  closed once the shell has moved on.
+- A model's late answer about one command no longer reads as being about
+  the next one: once the shell has moved on, the answer names its command
+  ("git status: local had no fix for this one.") and offers no keys; the
+  proposal is kept for `kintsu fix`. The "asking…" line it would have
+  replaced is blanked when the next command starts, in zsh and fish. In
+  bash, `kintsu why` answers in place, since bash hears no message before
+  its next prompt.
+- Messages that arrive later through the hooks are coloured like the
+  bubble again.
 - The output kept with a failure no longer starts at kintsu's own bubble:
   a line such as "git status exited 128." was taken for the prompt's echo,
   so `why`, the quick fix and the agent saw the bubble instead of the
@@ -53,6 +74,12 @@ All notable changes to kintsu are recorded here. The format follows
 
 - `^K` opens the panel instead of inserting the fix directly: ⏎ in the
   panel inserts it. `kintsu fix --raw` still prints the bare command.
+- OpenAI's own endpoint is sent `max_completion_tokens`, which its newer
+  models require; compatible servers still get `max_tokens`, and a server
+  refusing one name is asked once more with the other.
+- The `aider` preset is `aider --read {brief}`: the chat stays open with
+  the brief in context, where `--message-file` processed it and exited.
+- Case ids come from the system's randomness.
 - Rust 1.88 is the minimum toolchain (ratatui).
 - `kintsu triage` exits 0 in every case; the hooks learn that an "asking…"
   line is waiting from the marker file both `triage` and `why` leave.

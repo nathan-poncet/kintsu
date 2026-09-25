@@ -24,7 +24,7 @@ use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
 use crate::entities::{Action, CaseId, SessionId, Settings, Shell, TriageDecision, UiMode};
 use crate::use_cases::{
-    CaptureOutput, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
+    CaptureOutput, Focus, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -268,9 +268,18 @@ fn on_command_finished(
         t.push('\n');
         t.push_str(&pending_line(model, &style));
     }
+    // bash hears what waited only now: a message about a failure the shell
+    // no longer looks at names its command.
+    let watched = Focus {
+        sessions: &state,
+        cases: &state,
+    };
     let bubbles: Vec<String> = session
         .as_ref()
-        .map(|s| daemon.sessions.drain(s))
+        .map(|s| {
+            let waiting = daemon.sessions.drain(s);
+            watched.mark_late(s, waiting.clone()).unwrap_or(waiting)
+        })
         .unwrap_or_default()
         .iter()
         .map(|m| message_toast(m, &style))
@@ -408,6 +417,7 @@ fn messages<'a>(daemon: &'a Daemon, settings: &'a Settings, state: &'a JsonState
         models: &HttpModels,
         notifier: &daemon.sessions,
         cases: state,
+        sessions: state,
     }
 }
 

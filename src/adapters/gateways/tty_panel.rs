@@ -21,8 +21,8 @@ use ratatui::{Terminal, TerminalOptions, Viewport};
 
 use crate::adapters::controllers::key_for;
 use crate::adapters::gateways::unix;
-use crate::adapters::presenters::Style;
 use crate::adapters::presenters::panel::{Arrival, Effect, Panel};
+use crate::adapters::presenters::{Style, screen_rows};
 
 /// Handles the effects the terminal cannot: asking models, silencing.
 pub type Outside<'a> = &'a mut dyn FnMut(Effect, &mut Panel);
@@ -31,12 +31,18 @@ const POLL: Duration = Duration::from_millis(50);
 const CURSOR_ANSWER: Duration = Duration::from_secs(2);
 
 /// Draws until the user closes the panel or takes a suggestion; the text to
-/// insert, when they did.
+/// insert, when they did. The panel takes the place of the bubble: the
+/// cursor climbs `above` rows to the prompt's first line, then over the
+/// bubble's rows, and everything below is cleared before drawing. On
+/// close the bubble is printed again and the cursor is left where the
+/// prompt's first line goes, so the hook only has to redraw the prompt.
 pub fn run(
     panel: &mut Panel,
     style: &Style,
     arrivals: &Receiver<Arrival>,
     outside: Outside<'_>,
+    above: u16,
+    bubble: Option<&str>,
 ) -> io::Result<Option<String>> {
     let mut tty = OpenOptions::new()
         .read(true)
@@ -46,6 +52,8 @@ pub fn run(
     let _stdout = Diversion::of(libc_stdout(), &tty);
     let _guard = TtyGuard::enter(tty.try_clone()?)?;
     let (columns, rows) = crossterm::terminal::size()?;
+    let climb = above.saturating_add(bubble.map_or(0, |text| screen_rows(text, columns)));
+    climb_and_clear(&mut tty, climb)?;
     let height = panel
         .height(columns, style)
         .min(rows.saturating_sub(1))
@@ -85,8 +93,26 @@ pub fn run(
     send(&tty, DisableMouseCapture)?;
     terminal.show_cursor()?;
     write!(tty, "\x1b[{};1H\x1b[J", top + 1)?;
+    for line in bubble.into_iter().flat_map(str::lines) {
+        write!(tty, "{line}\r\n")?;
+    }
     tty.flush()?;
     Ok(taken)
+}
+
+/// What the hook needs when there is nothing to expand: the cursor on the
+/// prompt's first line, the screen clear below it.
+pub fn clear_above(above: u16) -> io::Result<()> {
+    let mut tty = OpenOptions::new().write(true).open(terminal_path())?;
+    climb_and_clear(&mut tty, above)
+}
+
+fn climb_and_clear(tty: &mut File, rows: u16) -> io::Result<()> {
+    if rows > 0 {
+        write!(tty, "\x1b[{rows}A")?;
+    }
+    write!(tty, "\r\x1b[J")?;
+    tty.flush()
 }
 
 /// Where the viewport goes: the cursor's row, after scrolling the screen

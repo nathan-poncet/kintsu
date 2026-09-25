@@ -19,8 +19,34 @@ impl CaseId {
     }
 }
 
+/// What a model said about a case, and which model said it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Explanation {
+    model: String,
+    text: String,
+}
+
+impl Explanation {
+    pub fn new(model: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            text: text.into(),
+        }
+    }
+
+    /// The model that answered.
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// What it said.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
 /// A failed command and its context: where it ran, what ran before, what
-/// it printed when that was captured.
+/// it printed when that was captured, and what was already said about it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FailureCase {
     id: CaseId,
@@ -31,6 +57,7 @@ pub struct FailureCase {
     recent: Vec<CommandLine>,
     output: Option<String>,
     proposal: Option<Fix>,
+    explanation: Option<Explanation>,
 }
 
 impl FailureCase {
@@ -45,6 +72,7 @@ impl FailureCase {
             recent: Vec::new(),
             output: None,
             proposal: None,
+            explanation: None,
         }
     }
 
@@ -69,6 +97,12 @@ impl FailureCase {
     /// The same case with the output the command printed.
     pub fn with_output(mut self, output: String) -> Self {
         self.output = Some(output);
+        self
+    }
+
+    /// The same case with what a model explained about it.
+    pub fn with_explanation(mut self, explanation: Explanation) -> Self {
+        self.explanation = Some(explanation);
         self
     }
 
@@ -110,6 +144,11 @@ impl FailureCase {
     /// The fix a rule or a model already proposed, if any.
     pub fn proposal(&self) -> Option<&Fix> {
         self.proposal.as_ref()
+    }
+
+    /// What a model explained, when one was asked.
+    pub fn explanation(&self) -> Option<&Explanation> {
+        self.explanation.as_ref()
     }
 
     /// Everything that could leave the machine, each part with its secrets

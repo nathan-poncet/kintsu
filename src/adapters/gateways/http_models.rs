@@ -53,10 +53,12 @@ pub fn build_request(
                 None if spec.is_local() => {}
                 None => return Err(key_name("bearer token")),
             }
+            let mut body = json!({"model": spec.model, "messages": messages});
+            body[output_limit_field(base)] = json!(max_tokens);
             Request {
                 url: format!("{base}/chat/completions"),
                 headers,
-                body: json!({"model": spec.model, "messages": messages, "max_tokens": max_tokens}),
+                body,
             }
         }
         Provider::Anthropic => {
@@ -121,6 +123,52 @@ pub fn parse_answer(provider: Provider, status: u16, body: &Value) -> Result<Str
         .ok_or_else(|| ModelError::Malformed("no text in the answer".into()))
 }
 
+/// OpenAI's own endpoint retired `max_tokens` for its newer models; the
+/// compatible servers still expect it.
+fn output_limit_field(base_url: &str) -> &'static str {
+    match authority(base_url) {
+        Some((host, _)) if host == "api.openai.com" => "max_completion_tokens",
+        _ => "max_tokens",
+    }
+}
+
+/// A server refusing the output limit under one name is asked once more
+/// under the other: OpenAI's newer models and Azure want
+/// `max_completion_tokens`, older compatible servers only know `max_tokens`.
+fn renamed_output_limit(request: &Request, refusal: &str) -> Option<Request> {
+    const NAMES: [&str; 2] = ["max_tokens", "max_completion_tokens"];
+    if !NAMES.iter().any(|name| refusal.contains(name)) {
+        return None;
+    }
+    let mut body = request.body.clone();
+    let fields = body.as_object_mut()?;
+    let (from, to) = NAMES
+        .iter()
+        .zip(NAMES.iter().rev())
+        .find(|(from, _)| fields.contains_key(**from))?;
+    let limit = fields.remove(*from)?;
+    fields.insert((*to).to_string(), limit);
+    Some(Request {
+        url: request.url.clone(),
+        headers: request.headers.clone(),
+        body,
+    })
+}
+
+/// Sends one request; the status and the JSON body, whatever the status.
+fn post(agent: &ureq::Agent, request: &Request) -> Result<(u16, Value), ModelError> {
+    let mut call = agent.post(&request.url);
+    for (name, value) in &request.headers {
+        call = call.header(name.as_str(), value.as_str());
+    }
+    let mut response = call
+        .send_json(&request.body)
+        .map_err(|e| ModelError::Unreachable(e.to_string()))?;
+    let status = response.status().as_u16();
+    let body: Value = response.body_mut().read_json().unwrap_or(Value::Null);
+    Ok((status, body))
+}
+
 /// `host:port` of a base URL, with the scheme's default port.
 fn authority(base_url: &str) -> Option<(String, u16)> {
     let (scheme, rest) = base_url.split_once("://")?;
@@ -169,15 +217,15 @@ impl ModelGateway for HttpModels {
             .http_status_as_error(false)
             .build();
         let agent: ureq::Agent = config.into();
-        let mut call = agent.post(&request.url);
-        for (name, value) in &request.headers {
-            call = call.header(name.as_str(), value.as_str());
-        }
-        let mut response = call
-            .send_json(&request.body)
-            .map_err(|e| ModelError::Unreachable(e.to_string()))?;
-        let status = response.status().as_u16();
-        let body: Value = response.body_mut().read_json().unwrap_or(Value::Null);
+        let (status, body) = post(&agent, &request)?;
+        let answer = parse_answer(spec.provider, status, &body);
+        let Err(ModelError::Refused(refusal)) = &answer else {
+            return answer;
+        };
+        let Some(renamed) = renamed_output_limit(&request, refusal) else {
+            return answer;
+        };
+        let (status, body) = post(&agent, &renamed)?;
         parse_answer(spec.provider, status, &body)
     }
 }
@@ -233,6 +281,17 @@ mod tests {
                 .contains(&("authorization".into(), "Bearer k".into()))
         );
         assert_eq!(openai.body["messages"][0]["role"], "system");
+        assert_eq!(openai.body["max_completion_tokens"], 100);
+        assert!(openai.body.get("max_tokens").is_none());
+
+        let compatible = build_request(
+            &spec(Provider::OpenAiCompatible, "https://openrouter.ai/api/v1"),
+            Some("k"),
+            &prompt(),
+        )
+        .unwrap();
+        assert_eq!(compatible.body["max_tokens"], 100);
+        assert!(compatible.body.get("max_completion_tokens").is_none());
 
         let anthropic = build_request(
             &spec(Provider::Anthropic, "https://api.anthropic.com"),
@@ -248,6 +307,46 @@ mod tests {
         );
         assert_eq!(anthropic.body["system"], "sys");
         assert_eq!(anthropic.body["max_tokens"], 100);
+    }
+
+    #[test]
+    fn a_refusal_naming_the_output_limit_gets_the_request_renamed_once() {
+        let compatible = build_request(
+            &spec(Provider::OpenAiCompatible, "http://localhost:1234/v1"),
+            None,
+            &prompt(),
+        )
+        .unwrap();
+        let renamed = renamed_output_limit(
+            &compatible,
+            "HTTP 400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+        )
+        .unwrap();
+        assert_eq!(renamed.body["max_completion_tokens"], 100);
+        assert!(renamed.body.get("max_tokens").is_none());
+        assert_eq!(
+            (renamed.url, renamed.headers),
+            (compatible.url.clone(), compatible.headers.clone())
+        );
+
+        let openai = build_request(
+            &spec(Provider::OpenAiCompatible, "https://api.openai.com/v1"),
+            Some("k"),
+            &prompt(),
+        )
+        .unwrap();
+        let back = renamed_output_limit(
+            &openai,
+            "HTTP 400 Unrecognized request argument supplied: max_completion_tokens",
+        )
+        .unwrap();
+        assert_eq!(back.body["max_tokens"], 100);
+
+        assert_eq!(
+            renamed_output_limit(&compatible, "HTTP 401 invalid api key"),
+            None,
+            "only the output limit is renamed"
+        );
     }
 
     #[test]

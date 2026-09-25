@@ -211,7 +211,8 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, pan
 
 def panel_steps(send, screen, shell):
     """^K on a typo (a rule fix), Enter takes it; ^K after a plain failure,
-    w asks why, Esc closes. Prints the screen at each step."""
+    w asks why, Esc closes; ^K again shows the same answer; ^K after a
+    success opens nothing. Prints the screen at each step."""
     def snap(title):
         print(f"----- {shell}: {title}")
         for i, line in enumerate(screen.display):
@@ -231,6 +232,13 @@ def panel_steps(send, screen, shell):
     snap("w: why, from the model")
     send("\x1b", 1.0)
     snap("Esc: closed")
+    send("\x0b", 1.5)
+    send("w", 0.8)
+    snap("^K again, w: the explanation is remembered, nobody is asked")
+    send("\x1b", 1.0)
+    send("true\n", 1.0)
+    send("\x0b", 1.5)
+    snap("^K after a success: nothing opens")
 
 def run_bash():
     import shutil, subprocess

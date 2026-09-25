@@ -69,7 +69,7 @@ impl Triage<'_> {
             return Ok(TriageDecision::Quiet(QuietReason::Interrupted));
         }
         let quiet = &self.settings.quiet;
-        let program = outcome.command().program();
+        let program = outcome.program();
         if quiet.accepts(program, status.code()) {
             return Ok(TriageDecision::Quiet(QuietReason::AcceptedStatus));
         }
@@ -139,7 +139,9 @@ impl Triage<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, Timestamp};
+    use crate::entities::{
+        ExitStatus, FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, Timestamp,
+    };
     use crate::use_cases::testing::*;
 
     struct World {
@@ -178,15 +180,47 @@ mod tests {
         }
 
         fn run(&self, text: &str, code: i32) -> TriageDecision {
+            self.finish(outcome(text, code))
+        }
+
+        fn run_pipeline(&self, text: &str, statuses: &[i32]) -> TriageDecision {
+            let last = *statuses.last().unwrap();
+            self.finish(
+                outcome(text, last)
+                    .in_pipeline(statuses.iter().map(|c| ExitStatus::new(*c)).collect()),
+            )
+        }
+
+        fn finish(&self, outcome: CommandOutcome) -> TriageDecision {
             self.triage()
                 .run(TriageInput {
-                    outcome: outcome(text, code),
+                    outcome,
                     cwd: Some("/w".into()),
                     session: Some(SessionId::new("42")),
                     shell: Some(Shell::Zsh),
                     terminal: TerminalIdentity::default(),
                 })
                 .unwrap()
+        }
+    }
+
+    #[test]
+    fn in_a_pipeline_the_stage_that_failed_is_what_is_triaged() {
+        let w = World::new();
+        assert_eq!(
+            w.run_pipeline("cat log | grep nothing", &[0, 1]),
+            TriageDecision::Quiet(QuietReason::AcceptedStatus),
+            "grep found nothing; the pipeline did not fail"
+        );
+        assert_eq!(
+            w.run_pipeline("yes | head -1", &[141, 0]),
+            TriageDecision::Quiet(QuietReason::Succeeded)
+        );
+        match w.run_pipeline("gti status | head -1", &[127, 0]) {
+            TriageDecision::Offer { fix: Some(fix), .. } => {
+                assert_eq!(fix.command().as_str(), "git status | head -1");
+            }
+            other => panic!("a typo in the first stage is a typo: {other:?}"),
         }
     }
 

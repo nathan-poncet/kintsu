@@ -117,9 +117,69 @@ impl Style {
     }
 }
 
+/// Rows `text` takes on a terminal `columns` wide: escape sequences take
+/// no room, long lines wrap.
+pub fn screen_rows(text: &str, columns: u16) -> u16 {
+    let width = usize::from(columns.max(1));
+    text.lines()
+        .map(|line| visible_chars(line).max(1).div_ceil(width))
+        .map(|rows| u16::try_from(rows).unwrap_or(u16::MAX))
+        .fold(0u16, u16::saturating_add)
+}
+
+/// The characters a line shows once its CSI and OSC sequences are skipped.
+fn visible_chars(line: &str) -> usize {
+    let mut count = 0;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            count += 1;
+            continue;
+        }
+        match chars.next() {
+            Some('[') => {
+                for c in chars.by_ref() {
+                    if ('\x40'..='\x7e').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            Some(']') => {
+                let mut previous = '\0';
+                for c in chars.by_ref() {
+                    if c == '\x07' || (previous == '\x1b' && c == '\\') {
+                        break;
+                    }
+                    previous = c;
+                }
+            }
+            _ => {}
+        }
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn screen_rows_skip_escapes_and_count_wrapped_lines() {
+        assert_eq!(screen_rows("", 80), 0);
+        assert_eq!(screen_rows("a\nb", 80), 2);
+        assert_eq!(screen_rows(&"x".repeat(100), 80), 2);
+        assert_eq!(screen_rows("\n\n", 80), 2, "blank lines are rows too");
+        let linked =
+            "\x1b[1mbold\x1b[0m \x1b]8;;kintsu://act?case=c&do=why\x1b\\word\x1b]8;;\x1b\\";
+        assert_eq!(screen_rows(linked, 10), 1);
+        let colour = Style {
+            color: true,
+            ascii: false,
+            mode: UiMode::Toast,
+            links: true,
+        };
+        assert_eq!(screen_rows(&colour.lines("one\ntwo"), 80), 2);
+    }
 
     #[test]
     fn colour_adds_a_gold_seam_and_plain_does_not() {

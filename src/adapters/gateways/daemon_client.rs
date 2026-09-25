@@ -70,6 +70,7 @@ impl DaemonClient {
             "session": input.session.as_ref().map(|s| s.as_str()),
             "command": input.outcome.command().as_str(),
             "status": input.outcome.status().code(),
+            "pipestatus": input.outcome.pipestatus().iter().map(|s| s.code()).collect::<Vec<i32>>(),
             "duration_ms": input.outcome.duration().map(|d| d.as_millis()),
             "cwd": input.cwd,
             "shell": input.shell.map(|s| s.name()),

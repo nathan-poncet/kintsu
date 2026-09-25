@@ -8,6 +8,7 @@ pub mod diagnose;
 pub mod explain;
 pub mod facts;
 pub mod fix_last;
+pub mod focus;
 pub mod hand_off;
 pub mod ignore;
 pub mod messages;
@@ -22,8 +23,9 @@ pub mod triage;
 
 pub use capture::CaptureOutput;
 pub use diagnose::{Check, Diagnose, Health};
-pub use explain::{Explain, Explanation};
+pub use explain::{Explain, Explained};
 pub use fix_last::{FixLast, FixProposal};
+pub use focus::Focus;
 pub use hand_off::{HandOff, HandOffPlan};
 pub use ignore::{Ignore, IgnoreRequest, ScopeChoice};
 pub use messages::Messages;

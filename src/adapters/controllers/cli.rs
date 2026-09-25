@@ -55,7 +55,9 @@ pub enum Command {
     /// `kintsu daemon [run|stop|status]`.
     Daemon(DaemonAction),
     /// `kintsu panel`: the last bubble, expanded under the prompt.
-    Panel,
+    /// `kintsu panel [--above <rows>]`: what `^K` runs; `rows` from the
+    /// cursor up to the prompt's first line.
+    Panel { above: u16 },
     /// `kintsu open <kintsu://…>`: a click on a word, handed over by the desktop.
     Open { url: String },
     /// `kintsu service install|uninstall`: the daemon as a service, the scheme handler.
@@ -149,7 +151,10 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["daemon", "stop"] => Ok(Command::Daemon(DaemonAction::Stop)),
         ["daemon", "status"] => Ok(Command::Daemon(DaemonAction::Status)),
         ["daemon", ..] => Err(CliError::UnknownDaemonAction),
-        ["panel"] => Ok(Command::Panel),
+        ["panel"] => Ok(Command::Panel { above: 0 }),
+        ["panel", "--above", rows] => Ok(Command::Panel {
+            above: integer::<u16>("--above", rows)?,
+        }),
         ["open", url] => Ok(Command::Open {
             url: (*url).to_string(),
         }),
@@ -186,6 +191,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
     let mut session = None;
     let mut shell = None;
     let mut duration = None;
+    let mut pipestatus = None;
     let mut signal_pid = None;
     let mut flags = flags.iter();
     while let Some(flag) = flags.next() {
@@ -197,6 +203,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
             "--session" => session = Some(SessionId::new(value)).filter(|s| !s.as_str().is_empty()),
             "--shell" => shell = Shell::from_name(value),
             "--duration-ms" => duration = Some(Duration::from_millis(integer::<u64>(flag, value)?)),
+            "--pipestatus" => pipestatus = Some(statuses(flag, value)?),
             "--signal-pid" => signal_pid = Some(integer::<u32>(flag, value)?),
             other => return Err(CliError::UnknownFlag(other.to_string())),
         }
@@ -208,6 +215,9 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
     if let Some(d) = duration {
         outcome = outcome.lasting(d);
     }
+    if let Some(statuses) = pipestatus {
+        outcome = outcome.in_pipeline(statuses);
+    }
     Ok(Command::Triage {
         input: Box::new(TriageInput {
             outcome,
@@ -218,6 +228,14 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
         }),
         signal_pid,
     })
+}
+
+/// `$pipestatus` as the shells print it: one code per stage, space-separated.
+fn statuses(flag: &str, value: &str) -> Result<Vec<ExitStatus>, CliError> {
+    value
+        .split_whitespace()
+        .map(|code| integer::<i32>(flag, code).map(ExitStatus::new))
+        .collect()
 }
 
 fn parse_session_flag(flags: &[&str]) -> Result<Option<SessionId>, CliError> {
@@ -311,8 +329,49 @@ mod tests {
     }
 
     #[test]
+    fn the_pipeline_statuses_make_the_first_failing_stage_the_failure() {
+        let input = triage(&[
+            "triage",
+            "--status",
+            "0",
+            "--command",
+            "gti status | head -1",
+            "--pipestatus",
+            "127 0",
+        ]);
+        assert_eq!(input.outcome.status(), ExitStatus::new(127));
+        assert_eq!(input.outcome.program(), "gti");
+        let single = triage(&[
+            "triage",
+            "--status",
+            "2",
+            "--command",
+            "make",
+            "--pipestatus",
+            "2",
+        ]);
+        assert_eq!(single.outcome.status(), ExitStatus::new(2));
+        assert!(
+            parse_args([
+                "triage",
+                "--status",
+                "0",
+                "--command",
+                "x",
+                "--pipestatus",
+                "1 zero"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
     fn open_and_service_are_parsed() {
-        assert_eq!(parse_args(["panel"]), Ok(Command::Panel));
+        assert_eq!(parse_args(["panel"]), Ok(Command::Panel { above: 0 }));
+        assert_eq!(
+            parse_args(["panel", "--above", "3"]),
+            Ok(Command::Panel { above: 3 })
+        );
         assert_eq!(
             parse_args(["open", "kintsu://act?case=c&do=why"]),
             Ok(Command::Open {

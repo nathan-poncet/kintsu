@@ -32,11 +32,13 @@ kintsu/
 │
 └── src/
     ├── main.rs                   reads the environment once (paths, session, colour) and calls app::run
-    ├── app.rs                    composition root: one arm per subcommand, builds gateways, calls a
-    │                             use case, hands the result to a presenter
+    ├── app/                      composition root: mod.rs holds the runtime and one arm per
+    │                             subcommand; hooks.rs, panel.rs, desktop.rs and setup.rs each build
+    │                             the gateways for one family of commands and call a use case
     ├── daemon.rs                 the resident process: socket listener, one function per frame,
     │                             background workers for the Messages use case
-    ├── (planned)                 service.rs (launchd, systemd, URL scheme)
+    │                             (the service.rs of the design is gateways/service.rs, called
+    │                             from app/desktop.rs)
     │
     ├── entities/                 enterprise rules, no I/O, depends on nothing else in the crate
     │   ├── command.rs                CommandLine
@@ -147,11 +149,11 @@ kintsu/
      only ring allowed to import `reqwest`, `rusqlite`, `crossterm`,
      `ratatui`, `tokio` types and the OS.
 
-4. **Composition root (`src/main.rs`, later `app.rs`, `daemon.rs`,
+4. **Composition root (`src/main.rs`, `src/app/`, `daemon.rs`,
    `service.rs`).** One binary, two roles: the thin client the hooks and
-   the user call, and `kintsu daemon`, the resident process. `app.rs` has
-   one function per subcommand: build the gateways, call a use case, hand
-   the result to a presenter. `daemon.rs` owns the runtime, the socket
+   the user call, and `kintsu daemon`, the resident process. `app/` has
+   one function per subcommand, grouped by who calls them: build the
+   gateways, call a use case, hand the result to a presenter. `daemon.rs` owns the runtime, the socket
    listener and the session supervisor. `service.rs` writes the launchd
    plist, the systemd unit and the URL-scheme handler. Nothing here decides
    anything a test would want to check.

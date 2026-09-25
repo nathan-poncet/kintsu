@@ -14,5 +14,5 @@ pub use plain::{
     error_line, explanation, fix_report, hand_off_notice, ignored, privacy_report, raw_fix,
 };
 pub use shell_hook::shell_hook;
-pub use style::Style;
+pub use style::{Style, screen_rows};
 pub use toast::{message_toast, pending_line, toast};

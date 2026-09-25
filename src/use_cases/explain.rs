@@ -3,14 +3,14 @@
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, ModelSpec, SessionId, Settings, case_document};
+use crate::entities::{Explanation, FailureCase, ModelSpec, SessionId, Settings, case_document};
 use crate::use_cases::ports::{CaseStore, CaseStoreError, ModelError, ModelGateway, Secrets};
 use crate::use_cases::prompts::explain_prompt;
 use crate::use_cases::routing::{ask_first, excluded_for_sensitivity, model_candidates};
 
 /// An explanation and where it came from.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Explanation {
+pub struct Explained {
     pub case: FailureCase,
     pub model: String,
     pub text: String,
@@ -67,7 +67,9 @@ impl Explain<'_> {
         Ok(candidates[0].name.clone())
     }
 
-    pub fn run(&self, session: Option<&SessionId>) -> Result<Explanation, ExplainError> {
+    /// Asks, and keeps the answer with the case while the case is still the
+    /// shell's last, so the panel shows it again instead of asking again.
+    pub fn run(&self, session: Option<&SessionId>) -> Result<Explained, ExplainError> {
         let (case, candidates) = self.prepare(session)?;
         let redactions = case_document(&case).redactions;
         let (model, text) = ask_first(
@@ -77,10 +79,18 @@ impl Explain<'_> {
             &explain_prompt(&case),
         )
         .map_err(ExplainError::AllFailed)?;
-        Ok(Explanation {
+        let text = text.trim().to_string();
+        if self.cases.still_current(&case)? {
+            self.cases.save(
+                &case
+                    .clone()
+                    .with_explanation(Explanation::new(&model, &text)),
+            )?;
+        }
+        Ok(Explained {
             case,
             model,
-            text: text.trim().to_string(),
+            text,
             redactions,
         })
     }
@@ -156,6 +166,25 @@ mod tests {
         assert_eq!(
             none.run(None).unwrap_err(),
             ExplainError::SensitiveWithoutLocalModel
+        );
+    }
+
+    #[test]
+    fn the_explanation_is_kept_with_the_case_so_the_panel_shows_it_again() {
+        let cases = MemoryCases::default();
+        cases.save(&case("make", 2, Some("42"))).unwrap();
+        let models = ScriptedModels::answering(&[("local", Ok("The target is missing.\n"))]);
+        let uc = Explain {
+            settings: &settings(&["local"]),
+            cases: &cases,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+        };
+        uc.run(Some(&SessionId::new("42"))).unwrap();
+        let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!(
+            kept.explanation(),
+            Some(&Explanation::new("local", "The target is missing."))
         );
     }
 

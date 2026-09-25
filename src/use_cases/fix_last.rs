@@ -77,11 +77,17 @@ impl FixLast<'_> {
             &candidates,
             &quick_fix_prompt(&case),
         ) {
-            Ok((name, answer)) => Ok(FixProposal {
-                fix: parse_quick_fix(&answer, &name, case.outcome().command()),
-                case,
-                failures: Vec::new(),
-            }),
+            Ok((name, answer)) => {
+                let fix = parse_quick_fix(&answer, &name, case.outcome().command());
+                if fix.is_some() && self.cases.still_current(&case)? {
+                    self.cases.save(&case.clone().with_proposal(fix.clone()))?;
+                }
+                Ok(FixProposal {
+                    fix,
+                    case,
+                    failures: Vec::new(),
+                })
+            }
             Err(failures) => Ok(FixProposal {
                 case,
                 fix: None,
@@ -165,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn without_a_rule_the_quick_fix_model_is_asked() {
+    fn without_a_rule_the_quick_fix_model_is_asked_and_its_answer_kept_as_the_proposal() {
         let cases = MemoryCases::default();
         cases.save(&case("npm test", 1, Some("42"))).unwrap();
         let models = ScriptedModels::answering(&[("local", Ok("npm test -- --runInBand"))]);
@@ -179,6 +185,8 @@ mod tests {
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "npm test -- --runInBand");
         assert_eq!(fix.source(), &FixSource::Model("local".into()));
+        let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!(kept.proposal(), Some(&fix), "the panel reuses it");
     }
 
     #[test]

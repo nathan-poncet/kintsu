@@ -47,6 +47,38 @@ impl CommandLine {
         self.words().into_iter().skip(1).collect()
     }
 
+    /// The pipeline's stages, split at the `|` between them: `||` is not
+    /// a pipe, `|&` is one, and a `|` inside quotes belongs to its word.
+    pub fn stages(&self) -> Vec<&str> {
+        let text = &self.0;
+        let bytes = text.as_bytes();
+        let mut stages = Vec::new();
+        let (mut start, mut i) = (0, 0);
+        let (mut single, mut double) = (false, false);
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\\' if !single => i += 1,
+                b'\'' if !double => single = !single,
+                b'"' if !single => double = !double,
+                b'|' if !single && !double => {
+                    if bytes.get(i + 1) == Some(&b'|') {
+                        i += 1;
+                    } else {
+                        stages.push(text[start..i].trim());
+                        if bytes.get(i + 1) == Some(&b'&') {
+                            i += 1;
+                        }
+                        start = i + 1;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        stages.push(text[start.min(text.len())..].trim());
+        stages
+    }
+
     /// The same line with its first word replaced.
     pub fn with_program(&self, program: &str) -> Self {
         let rest: Vec<&str> = self.arguments();
@@ -86,6 +118,29 @@ mod tests {
         let line = CommandLine::new("  gti status --short").unwrap();
         assert_eq!(line.program(), "gti");
         assert_eq!(line.arguments(), vec!["status", "--short"]);
+    }
+
+    #[test]
+    fn a_pipeline_splits_into_stages_but_or_and_quoted_bars_do_not() {
+        let stages = |t: &str| {
+            CommandLine::new(t)
+                .unwrap()
+                .stages()
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(stages("gti status | head -1"), ["gti status", "head -1"]);
+        assert_eq!(
+            stages("make || echo 'a | b' | wc -l"),
+            ["make || echo 'a | b'", "wc -l"]
+        );
+        assert_eq!(stages("cmd 2>&1 |& tee log"), ["cmd 2>&1", "tee log"]);
+        assert_eq!(
+            stages(r#"echo "x|y" | tr \| _"#),
+            [r#"echo "x|y""#, r"tr \| _"]
+        );
+        assert_eq!(stages("ls"), ["ls"]);
     }
 
     #[test]

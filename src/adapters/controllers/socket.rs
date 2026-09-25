@@ -130,6 +130,15 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
             if let Some(ms) = v.get("duration_ms").and_then(Value::as_u64) {
                 outcome = outcome.lasting(Duration::from_millis(ms));
             }
+            if let Some(stages) = v.get("pipestatus").and_then(Value::as_array) {
+                let statuses = stages
+                    .iter()
+                    .filter_map(Value::as_i64)
+                    .filter_map(|code| i32::try_from(code).ok())
+                    .map(ExitStatus::new)
+                    .collect();
+                outcome = outcome.in_pipeline(statuses);
+            }
             let input = TriageInput {
                 outcome,
                 cwd: optional("cwd"),

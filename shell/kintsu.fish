@@ -2,37 +2,59 @@
 #
 # fish_postexec fires after every command line with its text in $argv and
 # the exit status in $status; empty lines never fire it. $CMD_DURATION is
-# the last command's duration in milliseconds. ^K inserts the fix for the
-# last failure in the command line; nothing runs until you press Enter.
+# the last command's duration in milliseconds. ^K expands the last bubble
+# into the panel, in the bubble's place; nothing runs until you press Enter.
 # Messages that arrive later reach the shell as SIGUSR1: the handler prints
 # them and repaints the prompt. KINTSU_DISABLE=1 switches the hook off.
 
 if status is-interactive
     set -gx KINTSU_SESSION $fish_pid
     set -g __kintsu_ghost_file "__KINTSU_STATE_DIR__/sessions/$fish_pid.ghost"
+    set -g __kintsu_bubble_file "__KINTSU_STATE_DIR__/sessions/$fish_pid.bubble"
     set -g __kintsu_seq 0
     set -g __kintsu_pending_seq -1
     set -g __kintsu_prompt_shown 0
 
     function __kintsu_count_prompt --on-event fish_prompt
         set -g __kintsu_seq (math $__kintsu_seq + 1)
+        # A prompt drawn while the previous one was still shown is an empty
+        # Enter (fish fires no postexec for it): the bubble is no longer
+        # right above the prompt. Repaints fire no prompt event.
+        test "$__kintsu_prompt_shown" = 1; and command rm -f -- "$__kintsu_bubble_file"
         set -g __kintsu_prompt_shown 1
     end
 
+    # An "asking…" line still waiting when another command starts: once that
+    # command has printed, its row can no longer be found, so it is blanked
+    # now, while the cursor is one fresh line under the prompt, and the
+    # answer will come below, naming its command.
     function __kintsu_preexec --on-event fish_preexec
         set -g __kintsu_prompt_shown 0
+        # Whatever this command prints is what sits above the next prompt;
+        # kintsu why and kintsu fix leave a marker of their own.
+        command rm -f -- "$__kintsu_bubble_file"
+        if test "$__kintsu_pending_seq" = "$__kintsu_seq"
+            set -l prompt_lines (fish_prompt 2>/dev/null | string collect | string split \n | count)
+            set -l typed_lines (count (string split \n -- "$argv[1]"))
+            test $typed_lines -lt 1; and set typed_lines 1
+            set -l up (math "$prompt_lines + $typed_lines")
+            printf '\e[%dA\e[2K\e[%dB' $up $up
+            set -g __kintsu_pending_seq -1
+        end
     end
 
     function __kintsu_postexec --on-event fish_postexec
         set -l kintsu_status $status
+        set -l kintsu_pipestatus $pipestatus
         command rm -f -- "$__kintsu_ghost_file" 2>/dev/null   # a fix is for the failure just before
         set -q KINTSU_DISABLE; and return $kintsu_status
         if string match -q 'kintsu*' -- "$argv[1]"
             __kintsu_take_marker
             return $kintsu_status
         end
-        command kintsu triage --status $kintsu_status --command "$argv[1]" --cwd "$PWD" \
-            --session "$KINTSU_SESSION" --shell fish --duration-ms "$CMD_DURATION" --signal-pid $fish_pid
+        command kintsu triage --status $kintsu_status --pipestatus "$kintsu_pipestatus" \
+            --command "$argv[1]" --cwd "$PWD" --session "$KINTSU_SESSION" --shell fish \
+            --duration-ms "$CMD_DURATION" --signal-pid $fish_pid
         __kintsu_take_marker
         return $kintsu_status
     end
@@ -76,21 +98,26 @@ if status is-interactive
         commandline -f repaint
     end
 
-    # ^K expands the last bubble into the panel, drawn on the tty under the
-    # prompt; what the user takes with ⏎ comes back on stdout and lands in
-    # the command line. Nothing runs until they press Enter. The screen is
-    # then put back the way fish expects before a repaint (see above).
+    # ^K expands the last bubble into the panel, in the bubble's place: from
+    # a fresh line, kintsu climbs the rows we name plus the bubble's own,
+    # draws, and on close puts the bubble back and leaves the cursor where
+    # the prompt's first line goes. The cursor is then put back where fish
+    # expects it before a repaint (see above). What the user takes with ⏎
+    # comes back on stdout and lands in the command line; nothing runs
+    # until they press Enter.
     function __kintsu_panel
         set -l prompt_lines (fish_prompt 2>/dev/null | string collect | string split \n | count)
         set -l buffer_lines (commandline | count)
         test $buffer_lines -lt 1; and set buffer_lines 1
+        set -l above (math "$prompt_lines + $buffer_lines - 1")
+        if test "$__kintsu_pending_seq" = "$__kintsu_seq"   # an "asking…" line is on screen
+            set above (math $above + 1)
+        end
+        set -g __kintsu_pending_seq -1
         printf '\n'
-        set -l out (command kintsu panel | string collect)
-        set -l up (math "$prompt_lines + $buffer_lines - 1")
-        test $up -gt 0; and printf '\e[%dA' $up
-        printf '\r\e[J'
+        set -l out (command kintsu panel --above $above | string collect)
         set -l down (math "$prompt_lines + $buffer_lines - 2")
-        for i in (seq $down); printf '\n'; end
+        test $down -gt 0; and for i in (seq $down); printf '\n'; end
         if test -n "$out"
             commandline -r -- "$out"
             commandline -f end-of-line

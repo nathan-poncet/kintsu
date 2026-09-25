@@ -27,7 +27,7 @@ pub mod triage;
 pub use action::Action;
 pub use brief::{CaseDocument, case_document, hand_off_brief};
 pub use capture::{TerminalIdentity, output_after};
-pub use case::{CaseId, FailureCase};
+pub use case::{CaseId, Explanation, FailureCase};
 pub use command::{CommandLine, CommandLineError};
 pub use danger::{Danger, classify_danger};
 pub use exit_status::ExitStatus;

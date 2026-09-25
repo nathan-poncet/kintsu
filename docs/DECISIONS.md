@@ -470,12 +470,128 @@ prompt is redrawn where it was; bash gets the same treatment through
 opening the panel on the clicked action is left for the panel's next
 iteration, together with `ui.hotkey`.
 
+## Open questions after v0.2's first day (2026-09-25, evening)
+
+Asked once steps A to C2 had landed; the maintainer answered the same
+evening, six of them after a fuller explanation. One is still *pending*.
+
+| decision | answer |
+|---|---|
+| 1. when to tag `v0.2.0` | after the fixes the first days of use bring |
+| 2. a click answers in the shell | keep; the design's "a click opens the panel" is dropped |
+| 3. `ui.hotkey` | read it; `^K` stays the default |
+| 4. the panel's height | grows as answers arrive |
+| 5. the site | shows the current tag; "Play with it" stays as it is |
+| 6. the stderr tee for terminals without a readable pane | *pending*: the maintainer asked why capture depends on the terminal when the shell is hooked; the answer is that the shell never sees the output, only the terminal holds it |
+| 7. project awareness: `Cargo.toml`, `.kintsu.toml`, `CLAUDE.md` in the brief | v0.3 |
+| 8. `$pipestatus` | build it; built, section 23 |
+| 9. email and IP redaction, custom patterns | v0.3 |
+| 10. `session_new` | build the frame |
+| 11. `kintsu models`, `kintsu login` | v0.3 |
+| 12. case ids from real randomness | yes; built, section 23 |
+| 13. the daemon's idle exit | not wanted: the daemon lives until logout or `kintsu daemon stop` |
+| 14. streaming | build it |
+| 15. `max_completion_tokens` | now; built, section 22 |
+| 16. storage | SQLite |
+| 17. `app.rs` | split now; done, section 22 |
+| 18. the pty harness | in CI |
+| 19. the prompt-height arithmetic, once per shell | accepted; the wrapped-prompt miscount is issue #1 |
+| 20. distribution | Homebrew and apt |
+| 21. aider's `--message-file` | `--read {brief}` instead; built, section 23 |
+
+## 22. The panel remembers, and opens only on the failure just before (2026-09-25)
+
+Two things the first day of use showed. `^K` after a command that
+succeeded opened the panel on an older failure: `kintsu panel` now goes
+through `Expand` (`use_cases/expand.rs`), which returns the shell's last
+failure only while it is also the shell's last recorded command. The
+hooks never report kintsu's own commands, so `kintsu why` does not end a
+case, and a repeated identical failure, which triage deduplicates, still
+counts as the same one. Otherwise `kintsu panel` exits quietly and the
+hook redraws the prompt. And every `^K` started from nothing: the Why
+section asked the model again. An explanation is now an entity kept with
+the case (`FailureCase::explanation`), saved by `Explain::run` whenever a
+model answers and the case is still current, whichever path asked: the
+panel, `kintsu why`, or the daemon's message. A quick-fix model's answer
+asked through `FixLast::run` is saved as the proposal the same way, as
+the daemon's eager fix already was. The panel opens on what the case
+holds and asks nobody. The harness scenario `panel` drives both: `^K`
+again shows the answer at once, `^K` after `true` opens nothing.
+
+Also this evening, from the answers above: OpenAI's own endpoint is sent
+`max_completion_tokens`, the compatible servers still `max_tokens`, and a
+refusal that names the other field is retried once with it. `app.rs`
+became `src/app/`: `mod.rs` keeps `Runtime`, the dispatch and the shared
+helpers; `hooks.rs` (`triage`, `subscribe`), `panel.rs`, `desktop.rs`
+(`open`, `service`) and `setup.rs` each compose one family of commands;
+the tests are `tests.rs`.
+
+## 23. The panel in the bubble's place, quiet late notes, the pipeline's real failure (2026-09-25, evening)
+
+From the maintainer's first evening with the panel.
+
+- **The panel opens where the bubble is.** `^K` drew the panel under the
+  prompt and left the bubble above it: the same failure twice, one copy
+  inert. Every printer of the bubble now leaves what it printed, as
+  printed, in `<state>/sessions/<id>.bubble` (`HookNotes`): the toast in
+  `triage`, the messages `subscribe` and `pending` deliver, `kintsu why`
+  and `kintsu fix`. zsh and fish remove it when a command starts, bash,
+  which has no preexec, after any command but `kintsu why` and `kintsu
+  fix`, and all three on an empty Enter. The
+  hook passes `kintsu panel --above <rows>` its own count to the prompt's
+  first line, plus one while an "asking…" line waits; kintsu adds the
+  bubble's rows (`screen_rows`: wrapping counted, escape sequences not),
+  climbs, clears, draws the panel where the bubble was, and on close
+  prints the bubble back and leaves the cursor where the prompt's first
+  line goes. With nothing to expand only the prompt is cleared for the
+  hook to redraw. The hooks no longer climb themselves. Verified by the
+  harness in fish, zsh and bash.
+- **A late answer names its command.** Two quick failures: the first's
+  "local had no fix" arrived under the second's bubble, next to the
+  second's own, indistinguishable. Once the model has answered,
+  `Messages::fix` asks whether the shell still looks at the case
+  (`Focus::holds`: no newer failure, no other command since). If not, the
+  message is still shown, as one line that names its command, "git
+  status: local had no fix for this one.", with no keys, since `^K` and
+  the words belong to the current failure; the proposal is kept for
+  `kintsu fix` while no newer failure replaced it. Dropping the message
+  was tried first and read as an answer that never came. What waited for
+  a bash prompt is marked late the same way when the next decision drains
+  it (`Focus::mark_late`), and `kintsu why` in bash answers in place,
+  since bash hears no message before its next prompt anyway. `Expand`
+  became `Focus`, the one place that says what the shell is still looking
+  at. The "asking…" line itself cannot be rewritten once another command
+  has printed under it, its row being unknown by then without a terminal
+  API; so when the next command starts, while the line is still one known
+  distance above the cursor, the zsh and fish hooks blank it, and the
+  answer arrives below, named. And the messages `kintsu pending` and
+  `kintsu subscribe` bring are coloured again: their stdout is the hook's
+  pipe, so their colour follows the terminal's existence and `NO_COLOR`,
+  not their own streams.
+- **`$pipestatus`.** The hooks send every stage's status.
+  `CommandOutcome::in_pipeline` makes the first stage that failed the
+  failure, a reader closing early (141) and interruptions aside, and
+  `CommandLine::stages` finds that stage's program. So `gti status | head`
+  is a typo although `head` exited 0, `foo | grep x` under `pipefail` is
+  accepted when grep found nothing, and the toast says "`grep` exited 2 in
+  cat log | grep x". Stored with the outcome, sent in the frame.
+- **Case ids** come from `/dev/urandom`, the hasher only if that is
+  unreadable: DAEMON.md's promise holds.
+- **aider** is launched with `--read {brief}`: the brief is in the chat as a
+  read-only file and the session stays open; `--message-file` processed it
+  and exited. The user types what they want done.
+- **No idle exit**, decided: the daemon lives until logout or
+  `kintsu daemon stop`; the service keeps it alive anyway.
+- **The wrapped-prompt miscount** (decision 19) is accepted and tracked as
+  issue #1.
+
 ## What is not built, by priority
 
-1. A click opening the panel on its action; `ui.hotkey`; the panel
-   growing as answers arrive.
-2. The stderr tee for terminals without a readable pane; `session_new`.
-3. `kintsu models`, `kintsu login`.
-4. Learning rules from accepted fixes; the cost ledger; budgets.
-5. A Homebrew tap, `cargo binstall` metadata, a Nix flake (the install
-   page lists them).
+1. The panel growing as answers arrive; `ui.hotkey`; streaming the
+   answers into the panel.
+2. `session_new`; the stderr tee, if the maintainer wants it (pending
+   above).
+3. SQLite behind the three storage ports; the pty harness in CI.
+4. `kintsu models` and `kintsu login` (pending); learning rules from
+   accepted fixes; the cost ledger; budgets.
+5. A Homebrew tap and an apt repository.

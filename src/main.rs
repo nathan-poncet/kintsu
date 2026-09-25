@@ -75,6 +75,8 @@ fn main() -> ExitCode {
             && std::io::stderr().is_terminal()
             && std::io::stdout().is_terminal(),
         tty_color: std::env::var_os("NO_COLOR").is_none() && std::io::stderr().is_terminal(),
+        terminal_color: std::env::var_os("NO_COLOR").is_none()
+            && std::fs::File::open("/dev/tty").is_ok(),
         debug: std::env::var_os("KINTSU_DEBUG").is_some(),
         daemon: std::env::var_os("KINTSU_NO_DAEMON").is_none(),
     };

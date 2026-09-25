@@ -7,8 +7,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::entities::{
-    CaseId, CommandLine, CommandOutcome, Confidence, Duration, ExitStatus, FailureCase, Fix,
-    FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, Session, SessionId, Shell, Timestamp,
+    CaseId, CommandLine, CommandOutcome, Confidence, Duration, ExitStatus, Explanation,
+    FailureCase, Fix, FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, Session, SessionId, Shell,
+    Timestamp,
 };
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, IgnoreStore, IgnoreStoreError, RegistryError, SessionRegistry,
@@ -82,6 +83,8 @@ struct OutcomeDto {
     status: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     duration_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pipestatus: Vec<i32>,
 }
 
 impl OutcomeDto {
@@ -90,6 +93,7 @@ impl OutcomeDto {
             command: o.command().as_str().to_string(),
             status: o.status().code(),
             duration_ms: o.duration().map(|d| d.as_millis()),
+            pipestatus: o.pipestatus().iter().map(|s| s.code()).collect(),
         }
     }
 
@@ -101,7 +105,7 @@ impl OutcomeDto {
         if let Some(ms) = self.duration_ms {
             outcome = outcome.lasting(Duration::from_millis(ms));
         }
-        Some(outcome)
+        Some(outcome.in_pipeline(self.pipestatus.into_iter().map(ExitStatus::new).collect()))
     }
 }
 
@@ -180,6 +184,12 @@ impl FixDto {
 }
 
 #[derive(Serialize, Deserialize)]
+struct ExplanationDto {
+    model: String,
+    text: String,
+}
+
+#[derive(Serialize, Deserialize)]
 struct CaseDto {
     id: String,
     at_ms: u64,
@@ -190,6 +200,8 @@ struct CaseDto {
     output: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     proposal: Option<FixDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    explanation: Option<ExplanationDto>,
 }
 
 impl CaseDto {
@@ -203,6 +215,10 @@ impl CaseDto {
             recent: c.recent().iter().map(|l| l.as_str().to_string()).collect(),
             output: c.output().map(String::from),
             proposal: c.proposal().map(FixDto::from),
+            explanation: c.explanation().map(|e| ExplanationDto {
+                model: e.model().to_string(),
+                text: e.text().to_string(),
+            }),
         }
     }
 
@@ -223,6 +239,9 @@ impl CaseDto {
         );
         if let Some(output) = self.output {
             case = case.with_output(output);
+        }
+        if let Some(e) = self.explanation {
+            case = case.with_explanation(Explanation::new(e.model, e.text));
         }
         Some(case)
     }
@@ -354,6 +373,21 @@ mod tests {
     }
 
     #[test]
+    fn a_pipelines_statuses_round_trip_with_the_outcome() {
+        let dir = scratch("pipeline");
+        let state = JsonState::new(&dir);
+        let pipeline = outcome("gti status | head", 0)
+            .in_pipeline(vec![ExitStatus::new(127), ExitStatus::new(0)]);
+        let session = Session::with_recent(SessionId::new("p"), None, vec![pipeline.clone()]);
+        SessionRegistry::save(&state, &session).unwrap();
+        let back = SessionRegistry::load(&state, &SessionId::new("p"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(back.recent(), &[pipeline]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn the_last_case_is_kept_per_session_and_overall() {
         let dir = scratch("cases");
         let state = JsonState::new(&dir);
@@ -371,7 +405,8 @@ mod tests {
             Confidence::new(0.6),
             FixSource::Model("local".into()),
             "suggested by local",
-        )));
+        )))
+        .with_explanation(Explanation::new("local", "the target is missing"));
         let b = FailureCase::new(
             CaseId::new("b"),
             Timestamp::from_millis(2),

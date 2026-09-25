@@ -20,6 +20,13 @@ impl Shell {
         matches!(self, Shell::Zsh | Shell::Fish)
     }
 
+    /// Whether a message can reach the shell while it waits at the prompt:
+    /// zsh watches a descriptor, fish takes a signal, bash hears nothing
+    /// before its next prompt.
+    pub fn delivers_live(self) -> bool {
+        matches!(self, Shell::Zsh | Shell::Fish)
+    }
+
     /// Every supported shell, in the order the documentation lists them.
     pub const ALL: [Self; 3] = [Self::Zsh, Self::Bash, Self::Fish];
 
@@ -52,6 +59,13 @@ impl fmt::Display for Shell {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bash_hears_messages_only_at_its_next_prompt() {
+        assert!(Shell::Zsh.delivers_live());
+        assert!(Shell::Fish.delivers_live());
+        assert!(!Shell::Bash.delivers_live());
+    }
 
     #[test]
     fn each_shell_round_trips_through_its_name() {

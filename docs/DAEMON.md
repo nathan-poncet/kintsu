@@ -6,9 +6,11 @@
 and bash, the on-demand start, the version handshake, the output capture
 from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and `service
 install`. `act` carries `case` and `action` and answers `ack` or `error`;
-the result arrives as a `bubble` in the case's shell. Not yet:
-`session_new`, `get_case`, the stderr tee, SQLite, the idle exit. See
-[DECISIONS.md](DECISIONS.md), sections 2, 17 and 20.*
+the result arrives as a `bubble` in the case's shell. `command_finished`
+carries `pipestatus`, and a message that lands once the shell moved on to
+another command names its command and offers no keys. Not yet:
+`session_new`, `get_case`, the stderr tee, SQLite. The idle exit is not
+wanted. See [DECISIONS.md](DECISIONS.md), sections 2, 17, 20 and 23.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and

@@ -2,9 +2,12 @@
 
 *Status (2026-09-25): the toast, ghost text, the clickable words and the
 panel are built as described, with the differences recorded in
-[DECISIONS.md](DECISIONS.md) sections 18, 20 and 21: a click answers in
-the shell rather than opening the panel, the panel's height is fixed
-when it opens, and `ui.hotkey` is not yet read (`^K`).*
+[DECISIONS.md](DECISIONS.md) sections 18 and 20 to 23: a click answers in
+the shell rather than opening the panel, by decision; the panel opens in
+the bubble's place, only while the failure is the shell's last command,
+remembers the answers it got and puts the bubble back on close; its height
+is fixed when it opens and `ui.hotkey` is not yet read (`^K`), both to
+come.*
 
 Kintsu talks in small messages that land in the terminal, like a quiet
 colleague leaning over: one line when it has something, silence

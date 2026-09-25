@@ -1,7 +1,7 @@
 //! What the commands print: fix, why, agent, ignore, privacy, errors.
 
 use crate::entities::{CaseDocument, Danger, FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget};
-use crate::use_cases::{Explanation, FixProposal, HandOffPlan};
+use crate::use_cases::{Explained, FixProposal, HandOffPlan};
 
 use super::Style;
 
@@ -57,7 +57,7 @@ pub fn raw_fix(proposal: &FixProposal) -> Option<String> {
 }
 
 /// `kintsu why`: the answer, then who said it.
-pub fn explanation(e: &Explanation, style: &Style) -> String {
+pub fn explanation(e: &Explained, style: &Style) -> String {
     let mut out = style.lines(&e.text);
     let redacted = match e.redactions {
         0 => String::new(),
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn an_explanation_is_seamed_and_signed() {
-        let e = Explanation {
+        let e = Explained {
             case: case("x"),
             model: "haiku".into(),
             text: "Line one.\nLine two.".into(),

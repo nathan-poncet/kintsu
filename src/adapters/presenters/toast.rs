@@ -31,7 +31,15 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
                 .filter(|d| d.as_millis() >= 1_000)
                 .map(|d| format!(" after {d}"))
                 .unwrap_or_default();
-            format!("{} exited {}{after}.", style.bold(&echo), outcome.status())
+            match outcome.failed_stage() {
+                Some(_) => format!(
+                    "{} exited {}{after} in {}.",
+                    style.bold(outcome.program()),
+                    outcome.status(),
+                    echo
+                ),
+                None => format!("{} exited {}{after}.", style.bold(&echo), outcome.status()),
+            }
         }
     };
     let dot = style.dot();
@@ -63,16 +71,31 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
     })
 }
 
-/// A message that arrives later: a model's fix or explanation for a case
-/// the shell already moved past.
+/// A message that arrives later: a model's fix or explanation for a case.
+/// A late one, landing once the shell looks at something else, names its
+/// command and offers no keys: `^K` and the words belong to the current
+/// failure.
 pub fn message_toast(message: &Message, style: &Style) -> String {
     let dot = style.dot();
+    let label = message
+        .command()
+        .filter(|_| message.is_late())
+        .map(|command| format!("{}: ", style.bold(&style.abbreviate(command.as_str(), 40))))
+        .unwrap_or_default();
     match message.body() {
         MessageBody::Fix(fix) => {
             let who = match fix.source() {
                 crate::entities::FixSource::Model(name) => format!("{name}{dot}not verified"),
                 crate::entities::FixSource::Rule(name) => format!("rule{dot}{name}"),
             };
+            if message.is_late() {
+                return style.line(&format!(
+                    "{label}try {}?{} {}",
+                    style.bold(fix.command().as_str()),
+                    danger_note(fix, style),
+                    style.dim(&format!("({who})"))
+                ));
+            }
             let sentence = format!(
                 "Try {}?{} {}",
                 style.bold(fix.command().as_str()),
@@ -91,12 +114,12 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
             )
         }
         MessageBody::Explanation { model, text } => {
-            let mut out = style.lines(text.trim());
+            let mut out = style.lines(&format!("{label}{}", text.trim()));
             out.push('\n');
             out.push_str(&style.line(&style.dim(&format!("— {model}"))));
             out
         }
-        MessageBody::Note(text) => style.line(&style.dim(text)),
+        MessageBody::Note(text) => style.line(&format!("{label}{}", style.dim(text))),
     }
 }
 
@@ -239,6 +262,28 @@ mod tests {
     }
 
     #[test]
+    fn a_pipelines_failing_stage_is_named() {
+        use crate::entities::{
+            CaseId, CommandLine, CommandOutcome, ExitStatus, FailureCase, Timestamp,
+        };
+        let outcome = CommandOutcome::new(
+            CommandLine::new("cat log | grep x").unwrap(),
+            ExitStatus::new(1),
+        )
+        .in_pipeline(vec![ExitStatus::new(0), ExitStatus::new(2)]);
+        let case = FailureCase::new(CaseId::new("c"), Timestamp::from_millis(0), outcome, None);
+        let decision = TriageDecision::Offer {
+            case: Box::new(case),
+            fix: None,
+        };
+        let text = toast(&decision, &Style::PLAIN, false).unwrap();
+        assert!(
+            text.starts_with("| grep exited 2 in cat log | grep x.\n"),
+            "{text}"
+        );
+    }
+
+    #[test]
     fn a_destructive_fix_carries_a_red_warning_and_hint_mode_is_one_line() {
         let colour = Style {
             color: true,
@@ -312,6 +357,49 @@ mod tests {
             "| haiku had no fix for this one."
         );
         assert_eq!(pending_line("haiku", &Style::PLAIN), "| asking haiku...");
+    }
+
+    #[test]
+    fn a_late_message_names_its_command_and_offers_no_keys() {
+        let about = CommandLine::new("git status").unwrap();
+        let note = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Note("local had no fix for this one.".into()),
+        )
+        .about(about.clone())
+        .late();
+        assert_eq!(
+            message_toast(&note, &Style::PLAIN),
+            "| git status: local had no fix for this one."
+        );
+        let fix = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Fix(Fix::new(
+                CommandLine::new("git init").unwrap(),
+                Confidence::new(0.6),
+                FixSource::Model("local".into()),
+                "",
+            )),
+        )
+        .about(about.clone())
+        .late();
+        assert_eq!(
+            message_toast(&fix, &Style::PLAIN),
+            "| git status: try git init? (local - not verified)"
+        );
+        let on_time = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Note("local had no fix for this one.".into()),
+        )
+        .about(about);
+        assert_eq!(
+            message_toast(&on_time, &Style::PLAIN),
+            "| local had no fix for this one.",
+            "known command, but not late: no label"
+        );
     }
 
     #[test]

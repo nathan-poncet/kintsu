@@ -97,8 +97,8 @@ mod tests {
     fn the_placeholder_is_the_file_and_its_absence_means_the_content() {
         let p = Path::new("/tmp/b.md");
         assert_eq!(
-            shell_line("aider --message-file {brief}", p),
-            "aider --message-file /tmp/b.md"
+            shell_line("aider --read {brief}", p),
+            "aider --read /tmp/b.md"
         );
         assert_eq!(
             shell_line("claude \"$(cat {brief})\"", p),
@@ -124,7 +124,7 @@ mod tests {
             ("opencode", &["--prompt", "BRIEF"]),
             ("gemini", &["-i", "BRIEF"]),
             ("copilot", &["-i", "BRIEF"]),
-            ("aider", &["--message-file", "FILE"]),
+            ("aider", &["--read", "FILE"]),
         ];
         for (name, expected) in cases {
             let record = dir.join(format!("{name}.args"));

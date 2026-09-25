@@ -9,9 +9,10 @@ use thiserror::Error;
 use crate::entities::{CaseId, FailureCase, Message, MessageBody, SessionId, Settings};
 use crate::use_cases::explain::{Explain, ExplainError};
 use crate::use_cases::fix_last::{FixError, FixLast};
+use crate::use_cases::focus::{Focus, FocusError};
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, Environment, ModelError, ModelGateway, Notifier, NotifyError,
-    Secrets,
+    Secrets, SessionRegistry,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{ask_first, model_candidates};
@@ -37,6 +38,8 @@ pub enum MessagesError {
     Notify(#[from] NotifyError),
     #[error(transparent)]
     Cases(#[from] CaseStoreError),
+    #[error(transparent)]
+    Focus(#[from] FocusError),
 }
 
 /// Asks models in the background and delivers what they said.
@@ -47,6 +50,7 @@ pub struct Messages<'a> {
     pub models: &'a dyn ModelGateway,
     pub notifier: &'a dyn Notifier,
     pub cases: &'a dyn CaseStore,
+    pub sessions: &'a dyn SessionRegistry,
 }
 
 impl Messages<'_> {
@@ -59,7 +63,10 @@ impl Messages<'_> {
             .then(|| first.name.clone())
     }
 
-    /// Runs when a case was offered without a rule fix.
+    /// Runs when a case was offered without a rule fix. The model is slow
+    /// and the user may have typed on: an answer that lands once the shell
+    /// moved past the failure is still shown, but late, naming its command,
+    /// so it never reads as being about the current one.
     pub fn fix(&self, case: &FailureCase) -> Result<Message, MessagesError> {
         let session = case
             .session()
@@ -75,29 +82,31 @@ impl Messages<'_> {
             return Err(MessagesError::NotRunning(candidates[0].name.clone()));
         }
         let first = candidates[0].name.clone();
-        let (name, answer) = match ask_first(
+        let answer = ask_first(
             self.models,
             self.secrets,
             &candidates,
             &quick_fix_prompt(case),
-        ) {
+        );
+        let in_focus = self.focus().holds(case)?;
+        let (name, answer) = match answer {
             Ok(answered) => answered,
             Err(failures) => {
                 let detail: Vec<String> =
                     failures.iter().map(|(n, e)| format!("{n}: {e}")).collect();
-                self.note(
+                let text = format!("{first} did not answer ({})", detail.join("; "));
+                self.notifier.deliver(
                     session,
-                    case.id(),
-                    format!("{first} did not answer ({})", detail.join("; ")),
+                    self.message(case, MessageBody::Note(text), in_focus),
                 )?;
                 return Err(MessagesError::AllFailed(failures));
             }
         };
         let Some(fix) = parse_quick_fix(&answer, &name, case.outcome().command()) else {
-            self.note(
+            let text = format!("{name} had no fix for this one.");
+            self.notifier.deliver(
                 session,
-                case.id(),
-                format!("{name} had no fix for this one."),
+                self.message(case, MessageBody::Note(text), in_focus),
             )?;
             return Err(MessagesError::NoFix);
         };
@@ -105,7 +114,7 @@ impl Messages<'_> {
             self.cases
                 .save(&case.clone().with_proposal(Some(fix.clone())))?;
         }
-        let message = Message::new(case.id().clone(), self.clock.now(), MessageBody::Fix(fix));
+        let message = self.message(case, MessageBody::Fix(fix), in_focus);
         self.notifier.deliver(session, message.clone())?;
         Ok(message)
     }
@@ -116,11 +125,11 @@ impl Messages<'_> {
     }
 
     /// Explains the session's last failure and sends the answer, or the
-    /// reason there is none, as a message.
+    /// reason there is none, as a message; late and labelled when the
+    /// shell has moved on meanwhile.
     pub fn explain(&self, session: &SessionId) -> Result<Message, MessagesError> {
-        let case_id = match self.cases.last(Some(session))? {
-            Some(case) => case.id().clone(),
-            None => return Err(ExplainError::NoCase.into()),
+        let Some(case) = self.cases.last(Some(session))? else {
+            return Err(ExplainError::NoCase.into());
         };
         let body = match self.explain_use_case().run(Some(session)) {
             Ok(explanation) => MessageBody::Explanation {
@@ -129,9 +138,24 @@ impl Messages<'_> {
             },
             Err(e) => MessageBody::Note(e.to_string()),
         };
-        let message = Message::new(case_id, self.clock.now(), body);
+        let in_focus = self.focus().holds(&case)?;
+        let message = self.message(&case, body, in_focus);
         self.notifier.deliver(session, message.clone())?;
         Ok(message)
+    }
+
+    /// A message about `case`, dated now, late when the shell has moved on.
+    fn message(&self, case: &FailureCase, body: MessageBody, in_focus: bool) -> Message {
+        let message = Message::new(case.id().clone(), self.clock.now(), body)
+            .about(case.outcome().command().clone());
+        if in_focus { message } else { message.late() }
+    }
+
+    fn focus(&self) -> Focus<'_> {
+        Focus {
+            sessions: self.sessions,
+            cases: self.cases,
+        }
     }
 
     fn explain_use_case(&self) -> Explain<'_> {
@@ -187,7 +211,7 @@ impl Messages<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{EagerFix, Provider, Routing, SessionId, Tier, UiSettings};
+    use crate::entities::{EagerFix, Provider, Routing, Session, SessionId, Tier, UiSettings};
     use crate::use_cases::testing::*;
 
     fn settings(eager: EagerFix, quick_fix: &[&str]) -> Settings {
@@ -210,6 +234,7 @@ mod tests {
 
     #[test]
     fn an_eager_fix_is_asked_and_delivered_to_the_shell() {
+        let sessions = MemoryRegistry::default();
         let models = ScriptedModels::answering(&[("local", Ok("nvm use 22 && npm run build"))]);
         let notifier = MemoryNotifier::default();
         let cases = MemoryCases::default();
@@ -220,8 +245,10 @@ mod tests {
             models: &models,
             notifier: &notifier,
             cases: &cases,
+            sessions: &sessions,
         };
         let message = uc.fix(&case("npm run build", 1, Some("42"))).unwrap();
+        assert!(!message.is_late(), "nothing ran since");
         assert!(
             cases
                 .last(Some(&SessionId::new("42")))
@@ -241,7 +268,8 @@ mod tests {
     }
 
     #[test]
-    fn a_late_answer_is_delivered_but_not_saved_over_a_newer_failure() {
+    fn a_late_answer_names_its_command_and_is_not_saved_over_a_newer_failure() {
+        let sessions = MemoryRegistry::default();
         use crate::entities::{CaseId, Timestamp};
         let models = ScriptedModels::answering(&[("local", Ok("make -j4"))]);
         let notifier = MemoryNotifier::default();
@@ -263,14 +291,12 @@ mod tests {
             models: &models,
             notifier: &notifier,
             cases: &cases,
+            sessions: &sessions,
         };
         let message = uc.fix(&old).unwrap();
-        assert_eq!(message.case().as_str(), "c");
-        assert_eq!(
-            notifier.delivered.borrow().len(),
-            1,
-            "the shell still hears it"
-        );
+        assert!(message.is_late(), "the shell looks at another failure");
+        assert_eq!(message.command().map(|c| c.as_str()), Some("make"));
+        assert_eq!(notifier.delivered.borrow().len(), 1, "shown, labelled");
         let last = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
         assert_eq!(last.id().as_str(), "c2");
         assert!(
@@ -280,7 +306,42 @@ mod tests {
     }
 
     #[test]
+    fn a_late_answer_after_a_success_is_kept_for_kintsu_fix_and_shown_labelled() {
+        let sessions = MemoryRegistry::default();
+        sessions
+            .save(&Session::with_recent(
+                SessionId::new("42"),
+                None,
+                vec![outcome("make", 2), outcome("ls", 0)],
+            ))
+            .unwrap();
+        let models = ScriptedModels::answering(&[("local", Ok("make -j4"))]);
+        let notifier = MemoryNotifier::default();
+        let cases = MemoryCases::default();
+        let failure = case("make", 2, Some("42"));
+        cases.save(&failure).unwrap();
+        let uc = Messages {
+            settings: &settings(EagerFix::On, &["local"]),
+            clock: &FakeClock::at(5),
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            notifier: &notifier,
+            cases: &cases,
+            sessions: &sessions,
+        };
+        let message = uc.fix(&failure).unwrap();
+        assert!(message.is_late());
+        assert_eq!(notifier.delivered.borrow().len(), 1);
+        let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!(
+            kept.proposal().map(|f| f.command().as_str()),
+            Some("make -j4")
+        );
+    }
+
+    #[test]
     fn nothing_is_sent_when_off_unrouted_declined_or_sensitive_without_local() {
+        let sessions = MemoryRegistry::default();
         let notifier = MemoryNotifier::default();
         let secrets = MapSecrets::with(&[]);
         let clock = FakeClock::at(0);
@@ -293,6 +354,7 @@ mod tests {
             models: &declined,
             notifier: &notifier,
             cases: &cases,
+            sessions: &sessions,
         };
         assert_eq!(
             off.fix(&case("make", 2, Some("42"))).unwrap_err(),
@@ -409,6 +471,7 @@ mod tests {
 
     #[test]
     fn an_explanation_or_the_reason_there_is_none_is_sent_as_a_message() {
+        let sessions = MemoryRegistry::default();
         let cases = MemoryCases::default();
         cases.save(&case("make", 2, Some("42"))).unwrap();
         let models = ScriptedModels::answering(&[
@@ -433,6 +496,7 @@ mod tests {
             models: &models,
             notifier: &notifier,
             cases: &cases,
+            sessions: &sessions,
         };
         assert_eq!(
             uc.explain_candidate(&SessionId::new("42")).unwrap(),

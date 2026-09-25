@@ -167,7 +167,10 @@ impl Panel {
                 None => Loading::Idle,
             },
             can_ask_fix,
-            explanation: Loading::Idle,
+            explanation: match case.explanation() {
+                Some(e) => Loading::Ready((e.model().to_string(), e.text().to_string())),
+                None => Loading::Idle,
+            },
             agents,
             agent_focus,
             ignore_choices,
@@ -692,7 +695,8 @@ fn wrapped_rows(lines: &[Line<'_>], width: u16) -> u16 {
 mod tests {
     use super::*;
     use crate::entities::{
-        CaseId, CommandLine, CommandOutcome, Confidence, ExitStatus, FixSource, Timestamp, UiMode,
+        CaseId, CommandLine, CommandOutcome, Confidence, ExitStatus, Explanation, FixSource,
+        Timestamp, UiMode,
     };
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
@@ -831,6 +835,20 @@ mod tests {
         panel.receive(Arrival::Fix(Err("no model answered".into())));
         panel.press(Key::Section(Action::Fix));
         assert_eq!(rows(&mut panel, &Style::PLAIN, 9)[2], "| no model answered");
+    }
+
+    #[test]
+    fn opens_on_the_explanation_the_case_already_holds_without_asking_again() {
+        let explained = case("make test", None)
+            .with_explanation(Explanation::new("local", "The target is missing."));
+        let mut panel = Panel::new(&explained, None, true, vec![], None, String::new());
+        assert_eq!(panel.open(), Effect::Nothing, "answered last time");
+        assert_eq!(panel.section(), Action::Why);
+        let screen = rows(&mut panel, &Style::PLAIN, 8);
+        assert_eq!(
+            (screen[2].as_str(), screen[3].as_str()),
+            ("| The target is missing.", "| — local")
+        );
     }
 
     #[test]

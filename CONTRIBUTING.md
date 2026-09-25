@@ -51,7 +51,7 @@ Clean Architecture in one crate, the rings are folders; see
 | Entities | `src/entities/` | nothing |
 | Use cases + ports | `src/use_cases/`, `src/use_cases/ports/` | entities |
 | Adapters: controllers, gateways, presenters | `src/adapters/` | entities, use cases |
-| Composition root | `src/app.rs`, `src/main.rs` | everything |
+| Composition root | `src/app/`, `src/daemon.rs`, `src/main.rs` | everything |
 
 `tests/dependency_rule.rs` fails the build when an inner ring reaches
 outward or touches I/O, a runtime, a terminal or the clock. Ground rules:
