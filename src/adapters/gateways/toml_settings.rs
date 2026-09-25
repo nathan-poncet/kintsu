@@ -98,6 +98,7 @@ pub fn render_settings(settings: &Settings) -> String {
         }
     ));
     out.push_str(&format!("ascii     = {}\n", settings.ui.ascii));
+    out.push_str(&format!("links     = {}\n", settings.ui.links));
     out.push_str(&format!(
         "eager_fix = {}\n",
         match settings.ui.eager_fix {
@@ -203,6 +204,7 @@ struct UiDto {
     mode: Option<String>,
     ascii: Option<bool>,
     eager_fix: Option<EagerDto>,
+    links: Option<bool>,
 }
 
 /// `eager_fix = true`, `false`, or `"auto"`.
@@ -290,6 +292,7 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             }
         },
         ascii: file.ui.ascii.unwrap_or(false),
+        links: file.ui.links.unwrap_or(true),
         eager_fix: match file.ui.eager_fix {
             None => EagerFix::Auto,
             Some(EagerDto::Flag(true)) => EagerFix::On,
@@ -661,7 +664,8 @@ eager_fix = true
             UiSettings {
                 mode: UiMode::Hint,
                 ascii: true,
-                eager_fix: EagerFix::On
+                eager_fix: EagerFix::On,
+                links: true,
             }
         );
     }

@@ -6,10 +6,12 @@
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, Message, MessageBody, SessionId, Settings};
+use crate::entities::{CaseId, FailureCase, Message, MessageBody, SessionId, Settings};
 use crate::use_cases::explain::{Explain, ExplainError};
+use crate::use_cases::fix_last::{FixError, FixLast};
 use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Clock, ModelError, ModelGateway, Notifier, NotifyError, Secrets,
+    CaseStore, CaseStoreError, Clock, Environment, ModelError, ModelGateway, Notifier, NotifyError,
+    Secrets,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{ask_first, model_candidates};
@@ -19,6 +21,8 @@ use crate::use_cases::routing::{ask_first, model_candidates};
 pub enum MessagesError {
     #[error(transparent)]
     Explain(#[from] ExplainError),
+    #[error(transparent)]
+    Fix(#[from] FixError),
     #[error("eager fixes are off for this model")]
     Disabled,
     #[error("no model is routed for quick fixes, or none may see this case")]
@@ -83,14 +87,18 @@ impl Messages<'_> {
                     failures.iter().map(|(n, e)| format!("{n}: {e}")).collect();
                 self.note(
                     session,
-                    case,
+                    case.id(),
                     format!("{first} did not answer ({})", detail.join("; ")),
                 )?;
                 return Err(MessagesError::AllFailed(failures));
             }
         };
         let Some(fix) = parse_quick_fix(&answer, &name) else {
-            self.note(session, case, format!("{name} had no fix for this one."))?;
+            self.note(
+                session,
+                case.id(),
+                format!("{name} had no fix for this one."),
+            )?;
             return Err(MessagesError::NoFix);
         };
         self.cases
@@ -133,16 +141,44 @@ impl Messages<'_> {
         }
     }
 
-    fn note(
+    /// One line about a case, sent to its shell.
+    pub fn note(
         &self,
         session: &SessionId,
-        case: &FailureCase,
+        case: &CaseId,
         text: String,
     ) -> Result<(), NotifyError> {
         self.notifier.deliver(
             session,
-            Message::new(case.id().clone(), self.clock.now(), MessageBody::Note(text)),
+            Message::new(case.clone(), self.clock.now(), MessageBody::Note(text)),
         )
+    }
+
+    /// The fix for the session's last failure, sent as a message: what a
+    /// click on the word does.
+    pub fn fix_now(
+        &self,
+        session: &SessionId,
+        environment: &dyn Environment,
+    ) -> Result<Message, MessagesError> {
+        let fix_last = FixLast {
+            settings: self.settings,
+            cases: self.cases,
+            environment,
+            secrets: self.secrets,
+            models: self.models,
+        };
+        let proposal = fix_last.run(Some(session))?;
+        let body = match proposal.fix {
+            Some(fix) => MessageBody::Fix(fix),
+            None => MessageBody::Note(format!(
+                "no fix known for {}",
+                proposal.case.outcome().command()
+            )),
+        };
+        let message = Message::new(proposal.case.id().clone(), self.clock.now(), body);
+        self.notifier.deliver(session, message.clone())?;
+        Ok(message)
     }
 }
 

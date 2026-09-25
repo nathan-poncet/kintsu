@@ -103,6 +103,8 @@
         <tr><td><code>kintsu mute 1h</code></td><td>no bubbles for one hour</td></tr>
         <tr><td><code>kintsu setup</code> · <code>doctor</code> · <code>default-config</code> · <code>config path</code></td><td>configure in three questions; check the hook, the models and the keys; print the default file; show where the files are</td></tr>
         <tr><td><code>kintsu daemon status</code> · <code>stop</code></td><td>the resident process; the hooks start it on their own, messages from your model arrive through it</td></tr>
+        <tr><td><code>kintsu service install</code> · <code>uninstall</code></td><td>keep the daemon alive across logins (launchd, systemd) and register the <code>kintsu://</code> scheme so the bubble's words are clickable</td></tr>
+        <tr><td><code>kintsu open kintsu://act?case=…&amp;do=…</code></td><td>what the desktop runs when you click a word; the answer lands in the shell the failure happened in</td></tr>
         <tr><td><code>kintsu init zsh|bash|fish</code></td><td>the hook, to eval or source</td></tr>
         <tr><td><code>KINTSU_DISABLE=1</code></td><td>disables the hook in that shell</td></tr>
       </tbody>

@@ -367,6 +367,49 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
         "{text}"
     );
 
+    // A click on a word: the desktop runs `kintsu open kintsu://act?…`; the
+    // daemon answers in the shell the case came from, never elsewhere.
+    let case = decision[0]["offer"]["case"].as_str().unwrap().to_string();
+    let (code, _, err) = f.run(&["open", &format!("kintsu://act?case={case}&do=why")], None);
+    assert_eq!((code, err.as_str()), (0, ""));
+    line.clear();
+    reader.read_line(&mut line).unwrap();
+    let bubble: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert!(
+        bubble["text"].as_str().unwrap().contains("— local"),
+        "the click's explanation lands on the subscription: {line}"
+    );
+    let (code, _, err) = f.run(&["open", &format!("kintsu://act?case={case}&do=fix")], None);
+    assert_eq!((code, err.as_str()), (0, ""));
+    line.clear();
+    reader.read_line(&mut line).unwrap();
+    let bubble: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert!(
+        bubble["text"]
+            .as_str()
+            .unwrap()
+            .contains("Try make -j4 test?"),
+        "a click on fix sends the stored proposal: {line}"
+    );
+    let (code, _, err) = f.run(
+        &["open", &format!("kintsu://act?case={case}&do=ignore")],
+        None,
+    );
+    assert_eq!((code, err.as_str()), (0, ""));
+    line.clear();
+    reader.read_line(&mut line).unwrap();
+    let bubble: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert!(
+        bubble["text"].as_str().unwrap().contains("make test"),
+        "a click on ignore says what is now quiet: {line}"
+    );
+    let (code, _, err) = f.run(&["open", "kintsu://act?case=gone&do=why"], None);
+    assert_eq!(code, 1);
+    assert!(err.contains("this case is gone"), "{err}");
+    let (code, _, err) = f.run(&["open", "https://example.com"], None);
+    assert_eq!(code, 1);
+    assert!(err.contains("not a kintsu:// URL"), "{err}");
+
     let refused = f.exchange(r#"{"v":1,"type":"explain","session":"nobody"}"#);
     assert_eq!(refused[0]["type"], "error");
     assert!(

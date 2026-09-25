@@ -80,14 +80,15 @@ kintsu/
     │
     └── adapters/                 depends on the entities and the use cases
         ├── controllers/              cli.rs (argv → Command; the environment is main's job) ·
-        │   │                         socket.rs (daemon frames → Request)
-        │   └── (planned)             url_scheme.rs (kintsu://)
+        │                             socket.rs (daemon frames → Request) · url_scheme.rs (kintsu://act) ·
+        │                             setup_prompts.rs (the three questions)
         ├── presenters/               style.rs (the seam) · toast.rs (toast, message_toast) · plain.rs ·
         │   │                         doctor.rs · shell_hook.rs · frames.rs (daemon → client frames)
         │   └── (planned)             panel/ (ratatui, inline viewport) · ghost_text.rs · json.rs
         └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
             │                         sessions.rs (Notifier: subscribers, SIGUSR1, pending messages) ·
-            │                         asking_marker.rs (the file the hooks read) · ndjson.rs · unix.rs (libc) ·
+            │                         hook_notes.rs (the files the hooks read) · ndjson.rs · unix.rs (libc) ·
+            │                         service.rs (launchd, systemd, the kintsu:// handler) ·
             │                         terminals.rs (OutputSource: herdr, tmux, wezterm, kitty, iterm2) ·
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·

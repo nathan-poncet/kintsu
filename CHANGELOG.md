@@ -8,6 +8,15 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- The bubble's words are clickable: `kintsu why`, `fix`, `agent` and
+  `ignore` are OSC 8 links to `kintsu://act?case=…&do=…` on terminals
+  that render them (`[ui] links = false` turns them off). `kintsu open
+  <url>` is what the desktop runs on a click; the daemon answers in the
+  shell the failure happened in, and a click never starts an agent nor
+  inserts a command.
+- `kintsu service install|uninstall`: the daemon as a launchd agent or a
+  systemd user unit, and the `kintsu://` scheme handled by `kintsu open`
+  (an app bundle on macOS, a `.desktop` entry on Linux).
 - `kintsu setup`: three questions (a local model with Ollama, a cloud
   model and where its key is, the agent for `kintsu agent`), then the
   configuration file and doctor's report; `--yes` takes the defaults.

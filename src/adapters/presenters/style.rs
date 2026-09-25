@@ -11,6 +11,8 @@ pub struct Style {
     pub ascii: bool,
     /// Toast, hint or silent.
     pub mode: UiMode,
+    /// Words become OSC 8 hyperlinks; needs a terminal, so `color` too.
+    pub links: bool,
 }
 
 const GOLD: &str = "\x1b[38;5;179m";
@@ -26,6 +28,7 @@ impl Style {
         color: false,
         ascii: true,
         mode: UiMode::Toast,
+        links: false,
     };
 
     pub fn seam(&self) -> String {
@@ -75,6 +78,15 @@ impl Style {
         }
     }
 
+    /// `text` as a clickable word pointing to `url`, when links are drawn.
+    pub fn link(&self, url: &str, text: &str) -> String {
+        if self.links && self.color {
+            format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+        } else {
+            text.to_string()
+        }
+    }
+
     pub fn ellipsis(&self) -> &'static str {
         if self.ascii { "..." } else { "…" }
     }
@@ -108,12 +120,41 @@ mod tests {
             color: true,
             ascii: false,
             mode: UiMode::Toast,
+            links: false,
         };
         assert_eq!(colour.line("hi"), "\x1b[38;5;179m▎\x1b[0m hi");
         assert_eq!(Style::PLAIN.line("hi"), "| hi");
         assert_eq!(Style::PLAIN.lines("a\nb"), "| a\n| b");
         assert_eq!(Style::PLAIN.bold("x"), "x");
         assert_eq!(colour.warn("x"), "\x1b[31mx\x1b[0m");
+    }
+
+    #[test]
+    fn a_link_is_an_osc_8_hyperlink_only_on_a_colour_terminal_that_wants_them() {
+        let linked = Style {
+            color: true,
+            ascii: false,
+            mode: UiMode::Toast,
+            links: true,
+        };
+        assert_eq!(
+            linked.link("kintsu://act?case=c&do=why", "kintsu why"),
+            "\x1b]8;;kintsu://act?case=c&do=why\x1b\\kintsu why\x1b]8;;\x1b\\"
+        );
+        let no_links = Style {
+            links: false,
+            ..linked
+        };
+        assert_eq!(no_links.link("kintsu://x", "kintsu why"), "kintsu why");
+        let piped = Style {
+            color: false,
+            ..linked
+        };
+        assert_eq!(
+            piped.link("kintsu://x", "kintsu why"),
+            "kintsu why",
+            "no escapes into a pipe"
+        );
     }
 
     #[test]
@@ -124,6 +165,7 @@ mod tests {
             color: false,
             ascii: false,
             mode: UiMode::Toast,
+            links: false,
         };
         assert_eq!(s.abbreviate("abcdefghij", 5), "abcd…");
     }

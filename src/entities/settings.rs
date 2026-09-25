@@ -183,7 +183,7 @@ impl EagerFix {
 }
 
 /// Presentation choices.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UiSettings {
     pub mode: UiMode,
     /// `| Enter ->` instead of `▎ ⏎ →`.
@@ -191,6 +191,19 @@ pub struct UiSettings {
     /// Ask the quick-fix model after every offer without a rule fix, and
     /// deliver the answer as a message.
     pub eager_fix: EagerFix,
+    /// The bubble's words are OSC 8 links to `kintsu://` actions.
+    pub links: bool,
+}
+
+impl Default for UiSettings {
+    fn default() -> Self {
+        Self {
+            mode: UiMode::default(),
+            ascii: false,
+            eager_fix: EagerFix::default(),
+            links: true,
+        }
+    }
 }
 
 /// Reading the failed command's output from the terminal.

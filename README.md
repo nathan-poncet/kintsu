@@ -40,7 +40,9 @@ $ git status
 ```
 
 A small bubble, one gold seam on the left, one sentence, a line of
-actions. A confident, harmless fix is already on your next prompt, dim:
+actions; on a terminal that renders hyperlinks, each word is clickable
+once `kintsu service install` has registered the `kintsu://` scheme.
+A confident, harmless fix is already on your next prompt, dim:
 Tab takes it, you press Enter. Otherwise `^K` puts the fix in your prompt. Nothing ever
 steals a keystroke from your prompt, and nothing runs on its own. When no
 rule knows and a local model is routed for quick fixes (or `eager_fix =
@@ -152,6 +154,7 @@ The commands, all about the last failure of the current shell:
 | `kintsu mute [1h]` | nothing for a while |
 | `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
 | `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |
+| `kintsu service install`, `service uninstall` | keep the daemon alive as a launchd agent or systemd user unit, and let the desktop hand `kintsu://` clicks to `kintsu open` |
 
 ## Roadmap
 

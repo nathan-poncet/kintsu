@@ -4,6 +4,7 @@
 //! no I/O, no clock, no terminal. Everything else depends on this; this
 //! depends on nothing else in the crate.
 
+pub mod action;
 pub mod brief;
 pub mod capture;
 pub mod case;
@@ -23,6 +24,7 @@ pub mod shell;
 pub mod time;
 pub mod triage;
 
+pub use action::Action;
 pub use brief::{CaseDocument, case_document, hand_off_brief};
 pub use capture::{TerminalIdentity, output_after};
 pub use case::{CaseId, FailureCase};

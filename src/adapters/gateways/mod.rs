@@ -9,6 +9,7 @@ pub mod http_models;
 pub mod json_state;
 pub mod ndjson;
 pub mod random_ids;
+pub mod service;
 pub mod sessions;
 pub mod shell_agents;
 pub mod system_clock;

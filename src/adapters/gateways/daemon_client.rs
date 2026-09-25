@@ -11,7 +11,7 @@ use std::time::{Duration, Instant, SystemTime};
 use serde_json::{Value, json};
 
 use crate::adapters::gateways::ndjson::{read_line, send_line};
-use crate::entities::SessionId;
+use crate::entities::{Action, CaseId, SessionId};
 use crate::use_cases::TriageInput;
 
 /// What the daemon decided, already rendered for this terminal.
@@ -158,6 +158,27 @@ impl DaemonClient {
                 .as_str()
                 .unwrap_or("the model")
                 .to_string())),
+            Some("error") => Some(Err(answer["message"]
+                .as_str()
+                .unwrap_or("the daemon refused")
+                .to_string())),
+            _ => None,
+        }
+    }
+
+    /// A click's action on a case. `None` when no daemon runs; `Err` is the
+    /// daemon's refusal.
+    pub fn act(&self, case: &CaseId, action: Action) -> Option<Result<(), String>> {
+        let mut stream = self.connect().ok()?;
+        stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+        let frame = json!({
+            "v": 1, "type": "act", "version": self.version,
+            "case": case.as_str(), "action": action.name(),
+        });
+        send_line(&mut stream, &frame.to_string()).ok()?;
+        let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;
+        match answer["type"].as_str() {
+            Some("ack") => Some(Ok(())),
             Some("error") => Some(Err(answer["message"]
                 .as_str()
                 .unwrap_or("the daemon refused")

@@ -138,9 +138,13 @@ Clicking works in two different ways, and both keep the keyboard promise.
   hyperlinks make the word clickable with no mouse tracking at all, so
   text selection in the terminal keeps working. `kintsu service install`
   registers the scheme handler: a small app bundle on macOS, a `.desktop`
-  entry with `x-scheme-handler/kintsu` on Linux. The handler forwards the
-  URL to the daemon, which opens or focuses the panel on that action. A
-  click can never run a command or start an agent by itself.
+  entry with `x-scheme-handler/kintsu` on Linux. The handler (`kintsu
+  open <url>`) forwards the URL to the daemon, which answers in the shell
+  the failure happened in: `why` explains, `fix` sends the fix as a
+  bubble, `ignore` silences that command line; once the panel exists, a
+  click opens it on that action instead. A click can never run a command
+  or start an agent by itself, so `agent` and `privacy` answer with a
+  note pointing at the command.
 - **In the panel**, ratatui enables mouse tracking while the panel is
   open and releases it on close: click an action, a suggestion, a link in
   the explanation; wheel to scroll.

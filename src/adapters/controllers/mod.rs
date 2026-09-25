@@ -3,7 +3,9 @@
 pub mod cli;
 pub mod setup_prompts;
 pub mod socket;
+pub mod url_scheme;
 
-pub use cli::{Command, DaemonAction, ScopeFlag, parse_args};
+pub use cli::{Command, DaemonAction, ScopeFlag, ServiceAction, parse_args};
 pub use setup_prompts::Prompter;
 pub use socket::{Request, parse_frame};
+pub use url_scheme::{act_url, parse_act_url};

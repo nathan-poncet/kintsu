@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::adapters::gateways::ndjson::send_line;
 use crate::adapters::gateways::unix;
-use crate::entities::{Message, SessionId};
+use crate::entities::{CaseId, Message, SessionId};
 use crate::use_cases::ports::{Notifier, NotifyError};
 
 /// Renders a message into the frame line a subscriber receives; the bool
@@ -23,8 +23,13 @@ struct SessionState {
     signal_pid: Option<u32>,
 }
 
+/// Clicks on older bubbles than this get "this case is gone".
+const REMEMBERED_CASES: usize = 1000;
+
 pub struct Sessions {
     inner: Mutex<HashMap<String, SessionState>>,
+    /// Which session each offered case belongs to, for clicks.
+    cases: Mutex<HashMap<String, SessionId>>,
     render: RenderBubble,
     ping: String,
     silent: AtomicBool,
@@ -35,10 +40,30 @@ impl Sessions {
     pub fn new(render: RenderBubble, ping: String) -> Self {
         Self {
             inner: Mutex::new(HashMap::new()),
+            cases: Mutex::new(HashMap::new()),
             render,
             ping,
             silent: AtomicBool::new(false),
         }
+    }
+
+    /// A case was offered in a session; a click on it comes back here.
+    pub fn remember_case(&self, case: &CaseId, session: &SessionId) {
+        let mut cases = self.cases.lock().unwrap_or_else(|e| e.into_inner());
+        if cases.len() >= REMEMBERED_CASES {
+            if let Some(victim) = cases.keys().next().cloned() {
+                cases.remove(&victim);
+            }
+        }
+        cases.insert(case.as_str().to_string(), session.clone());
+    }
+
+    pub fn session_of(&self, case: &CaseId) -> Option<SessionId> {
+        self.cases
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(case.as_str())
+            .cloned()
     }
 
     /// Silent shells keep their proposals but get no message.
@@ -141,6 +166,14 @@ mod tests {
             Timestamp::from_millis(0),
             MessageBody::Note(text.into()),
         )
+    }
+
+    #[test]
+    fn a_case_remembers_its_session_for_clicks() {
+        let s = sessions();
+        assert_eq!(s.session_of(&CaseId::new("c")), None);
+        s.remember_case(&CaseId::new("c"), &SessionId::new("42"));
+        assert_eq!(s.session_of(&CaseId::new("c")), Some(SessionId::new("42")));
     }
 
     #[test]

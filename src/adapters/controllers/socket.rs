@@ -5,7 +5,9 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::entities::TerminalIdentity;
-use crate::entities::{CommandLine, CommandOutcome, Duration, ExitStatus, SessionId, Shell};
+use crate::entities::{
+    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, SessionId, Shell,
+};
 use crate::use_cases::TriageInput;
 
 /// The protocol version every frame carries.
@@ -35,6 +37,8 @@ pub enum Request {
     Pending { session: SessionId, color: bool },
     /// `kintsu why`: explain the session's last failure later, as a message.
     Explain { session: SessionId },
+    /// A click on a bubble's word, or `kintsu open`: do this about that case.
+    Act { case: CaseId, action: Action },
     /// Stop the daemon.
     Shutdown,
 }
@@ -154,6 +158,13 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
         "explain" => Ok(Request::Explain {
             session: SessionId::new(required("session")?),
         }),
+        "act" => {
+            let action = required("action")?;
+            Ok(Request::Act {
+                case: CaseId::new(required("case")?),
+                action: Action::from_name(&action).ok_or(FrameError::Invalid("action"))?,
+            })
+        }
         "shutdown" => Ok(Request::Shutdown),
         other => Err(FrameError::UnknownType(other.to_string())),
     }
@@ -255,6 +266,17 @@ mod tests {
             Request::Explain {
                 session: SessionId::new("7")
             }
+        );
+        assert_eq!(
+            parse_frame(r#"{"type":"act","case":"c1","action":"why"}"#).unwrap(),
+            Request::Act {
+                case: CaseId::new("c1"),
+                action: Action::Why
+            }
+        );
+        assert_eq!(
+            parse_frame(r#"{"type":"act","case":"c1","action":"dance"}"#),
+            Err(FrameError::Invalid("action"))
         );
     }
 

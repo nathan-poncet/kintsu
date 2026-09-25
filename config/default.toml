@@ -64,5 +64,6 @@ max_lines = 400                                                # 0 disables capt
 [ui]
 mode  = "toast"                          # toast · hint (one dim line) · silent (commands only)
 ascii = false                            # true swaps ▎ ⚠ … for | ! ...
+links = true                             # the bubble's words are clickable (OSC 8 → kintsu://); kintsu service install registers the handler
 eager_fix = "auto"                       # after a failure no rule can fix, ask the quick_fix model and deliver the answer as a message:
                                          # auto = only when that model is local · true = always · false = never

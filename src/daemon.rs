@@ -20,9 +20,12 @@ use crate::adapters::gateways::{
     EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds, Sessions, SystemClock,
     TerminalOutput, load_settings, unix,
 };
+use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
-use crate::entities::{SessionId, Settings, Shell, TriageDecision, UiMode};
-use crate::use_cases::{CaptureOutput, Messages, Triage, TriageInput};
+use crate::entities::{Action, CaseId, SessionId, Settings, Shell, TriageDecision, UiMode};
+use crate::use_cases::{
+    CaptureOutput, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Subscribers are pinged this often so dead ones are noticed.
@@ -55,13 +58,16 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         cfg.socket.display()
     ));
     let ascii = Arc::new(AtomicBool::new(false));
+    let links = Arc::new(AtomicBool::new(true));
     let render_ascii = Arc::clone(&ascii);
+    let render_links = Arc::clone(&links);
     let sessions = Sessions::new(
         Box::new(move |message, color| {
             let style = Style {
                 color,
                 ascii: render_ascii.load(Ordering::Relaxed),
                 mode: UiMode::Toast,
+                links: render_links.load(Ordering::Relaxed),
             };
             frames::bubble(message.case(), &message_toast(message, &style))
         }),
@@ -71,6 +77,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         cfg,
         sessions,
         ascii,
+        links,
         settings: Mutex::new(None),
     });
     daemon.settings();
@@ -97,6 +104,7 @@ struct Daemon {
     cfg: DaemonConfig,
     sessions: Sessions,
     ascii: Arc<AtomicBool>,
+    links: Arc<AtomicBool>,
     settings: Mutex<Option<(Settings, Option<SystemTime>)>>,
 }
 
@@ -120,6 +128,7 @@ impl Daemon {
             }
         };
         self.ascii.store(settings.ui.ascii, Ordering::Relaxed);
+        self.links.store(settings.ui.links, Ordering::Relaxed);
         self.sessions.set_silent(settings.ui.mode == UiMode::Silent);
         *cached = Some((settings.clone(), mtime));
         settings
@@ -134,6 +143,7 @@ impl Daemon {
             color,
             ascii: settings.ui.ascii,
             mode: settings.ui.mode,
+            links: settings.ui.links,
         }
     }
 
@@ -201,6 +211,7 @@ fn handle(daemon: &Arc<Daemon>, mut stream: UnixStream) {
             let _ = send_line(&mut stream, &frames::done());
         }
         Request::Explain { session } => on_explain(daemon, &mut stream, session),
+        Request::Act { case, action } => on_act(daemon, &mut stream, case, action),
         Request::Shutdown => {
             let _ = send_line(&mut stream, &frames::bye());
             daemon.quit();
@@ -243,6 +254,9 @@ fn on_command_finished(
             return;
         }
     };
+    if let (TriageDecision::Offer { case, .. }, Some(session)) = (&decision, &session) {
+        daemon.sessions.remember_case(case.id(), session);
+    }
     let pending = match &decision {
         TriageDecision::Offer { case, fix: None } => {
             messages(daemon, &settings, &state).fix_candidate(case)
@@ -311,6 +325,78 @@ fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId)
             });
         }
     }
+}
+
+/// A click on a word, or `kintsu open`: never runs a command, never starts
+/// an agent; it answers in the shell the case came from.
+fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: Action) {
+    let Some(session) = daemon.sessions.session_of(&case) else {
+        let _ = send_line(
+            stream,
+            &frames::error(
+                "this case is gone; act on the last failure with kintsu why, fix, agent or ignore",
+            ),
+        );
+        return;
+    };
+    let _ = send_line(stream, &frames::ack());
+    let daemon = Arc::clone(daemon);
+    std::thread::spawn(move || {
+        let settings = daemon.settings();
+        let state = daemon.state();
+        let messages = messages(&daemon, &settings, &state);
+        let result = match action {
+            Action::Why => messages.explain(&session).map(|_| ()),
+            Action::Fix => {
+                let environment = FsEnvironment::new(daemon.cfg.path_var.clone());
+                messages.fix_now(&session, &environment).map(|_| ())
+            }
+            Action::Ignore => {
+                let ignore = Ignore {
+                    clock: &SystemClock,
+                    cases: &state,
+                    ignores: &state,
+                };
+                let request = IgnoreRequest::Last {
+                    program: None,
+                    scope: ScopeChoice::Command,
+                };
+                let bare = Style {
+                    color: false,
+                    ascii: true,
+                    mode: UiMode::Toast,
+                    links: false,
+                };
+                let note = match ignore.run(Some(&session), request) {
+                    Ok(entry) => ignored(&entry, &bare)
+                        .lines()
+                        .next()
+                        .unwrap_or_default()
+                        .trim_start_matches("| ")
+                        .to_string(),
+                    Err(e) => e.to_string(),
+                };
+                messages.note(&session, &case, note).map_err(Into::into)
+            }
+            Action::Agent => messages
+                .note(
+                    &session,
+                    &case,
+                    "a click cannot start an agent; run kintsu agent in this shell".into(),
+                )
+                .map_err(Into::into),
+            Action::Privacy => messages
+                .note(
+                    &session,
+                    &case,
+                    "kintsu privacy shows exactly what a model or an agent would receive".into(),
+                )
+                .map_err(Into::into),
+        };
+        if let Err(e) = result {
+            log(&format!("act {action} on {}: {e}", case.as_str()));
+        }
+    });
 }
 
 fn messages<'a>(daemon: &'a Daemon, settings: &'a Settings, state: &'a JsonState) -> Messages<'a> {

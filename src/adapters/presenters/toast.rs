@@ -1,6 +1,7 @@
 //! The bubble under a failed command: one sentence, one line of actions.
 
-use crate::entities::{Danger, Fix, Message, MessageBody, TriageDecision, UiMode};
+use crate::adapters::controllers::act_url;
+use crate::entities::{Action, CaseId, Danger, Fix, Message, MessageBody, TriageDecision, UiMode};
 
 use super::Style;
 
@@ -35,12 +36,12 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
     };
     let dot = style.dot();
     let pretyped = ghost && fix.as_ref().is_some_and(Fix::is_ghostable);
+    let word = |action: Action| word_for(case.id(), action, style);
+    let (why, agent, ignore) = (word(Action::Why), word(Action::Agent), word(Action::Ignore));
     let actions = match fix {
-        Some(_) if pretyped => {
-            format!("Tab to fix{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore")
-        }
-        Some(_) => format!("^K to insert{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore"),
-        None => format!("kintsu fix{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore"),
+        Some(_) if pretyped => format!("Tab to fix{dot}{why}{dot}{agent}{dot}{ignore}"),
+        Some(_) => format!("^K to insert{dot}{why}{dot}{agent}{dot}{ignore}"),
+        None => format!("{}{dot}{why}{dot}{agent}{dot}{ignore}", word(Action::Fix)),
     };
     Some(match style.mode {
         UiMode::Hint => {
@@ -75,7 +76,11 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
                 danger_note(fix, style),
                 style.dim(&format!("({who})"))
             );
-            let actions = format!("^K to insert{dot}kintsu why{dot}kintsu agent");
+            let actions = format!(
+                "^K to insert{dot}{}{dot}{}",
+                word_for(message.case(), Action::Why, style),
+                word_for(message.case(), Action::Agent, style)
+            );
             format!(
                 "{}\n{}",
                 style.line(&sentence),
@@ -96,6 +101,11 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
 /// replaces it.
 pub fn pending_line(model: &str, style: &Style) -> String {
     style.line(&style.dim(&format!("asking {model}{}", style.ellipsis())))
+}
+
+/// `kintsu why`, as a word the terminal may make clickable.
+fn word_for(case: &CaseId, action: Action, style: &Style) -> String {
+    style.link(&act_url(case, action), &format!("kintsu {action}"))
 }
 
 fn danger_note(fix: &Fix, style: &Style) -> String {
@@ -231,6 +241,7 @@ mod tests {
             color: true,
             ascii: false,
             mode: UiMode::Toast,
+            links: false,
         };
         let text = toast(
             &offer("rm -rf buidl", 1, None, Some("rm -rf build")),
@@ -298,6 +309,35 @@ mod tests {
             "| haiku had no fix for this one."
         );
         assert_eq!(pending_line("haiku", &Style::PLAIN), "| asking haiku...");
+    }
+
+    #[test]
+    fn on_a_terminal_that_wants_them_the_words_are_links_to_the_case() {
+        let linked = Style {
+            color: true,
+            ascii: false,
+            mode: UiMode::Toast,
+            links: true,
+        };
+        let text = toast(&offer("make", 2, None, None), &linked, false).unwrap();
+        assert!(
+            text.contains("\x1b]8;;kintsu://act?case=c&do=why\x1b\\kintsu why\x1b]8;;\x1b\\"),
+            "{text:?}"
+        );
+        assert!(text.contains("kintsu://act?case=c&do=fix"));
+        let late = Message::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            MessageBody::Fix(Fix::new(
+                CommandLine::new("nvm use 22").unwrap(),
+                Confidence::new(0.6),
+                FixSource::Model("local".into()),
+                "",
+            )),
+        );
+        assert!(message_toast(&late, &linked).contains("kintsu://act?case=c&do=agent"));
+        let plain = toast(&offer("make", 2, None, None), &Style::PLAIN, false).unwrap();
+        assert!(!plain.contains("kintsu://"), "no links without a terminal");
     }
 
     #[test]

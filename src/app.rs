@@ -7,7 +7,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use crate::adapters::controllers::{Command, DaemonAction, Prompter, ScopeFlag, parse_args};
+use crate::adapters::controllers::{
+    Command, DaemonAction, Prompter, ScopeFlag, ServiceAction, parse_act_url, parse_args,
+};
+use crate::adapters::gateways::service;
 use crate::adapters::gateways::{
     DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
     RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings, render_settings,
@@ -41,6 +44,9 @@ Usage:
   kintsu default-config           the commented default configuration
   kintsu config path              where the files are
   kintsu daemon [run|stop|status] the resident process the hooks talk to
+  kintsu service install|uninstall
+                                  the daemon as a service; kintsu:// links handled by the desktop
+  kintsu open <kintsu://…>        what the desktop runs when you click a word
   kintsu --version | --help
 
 Environment: KINTSU_CONFIG, KINTSU_STATE_DIR, KINTSU_SOCKET, KINTSU_NO_DAEMON,
@@ -88,6 +94,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         color: rt.color,
         ascii: false,
         mode: UiMode::Toast,
+        links: false,
     };
     match command {
         Command::Help => {
@@ -126,6 +133,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Command::Setup { yes } => return setup(rt, yes, out, err),
+        Command::Open { url } => return open(rt, &url, err, &plain),
+        Command::Service(action) => return service_command(rt, action, out, err, &plain),
         Command::Daemon(DaemonAction::Run) => {
             return daemon::run(DaemonConfig {
                 socket: rt.socket_path.clone(),
@@ -201,6 +210,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         color: rt.color,
         ascii: settings.ui.ascii,
         mode: settings.ui.mode,
+        links: settings.ui.links,
     };
     let state = JsonState::new(&rt.state_dir);
     let environment = FsEnvironment::new(rt.path_var.clone());
@@ -347,6 +357,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         | Command::ConfigPath
         | Command::Daemon(_)
         | Command::Setup { .. }
+        | Command::Open { .. }
+        | Command::Service(_)
         | Command::Subscribe { .. }
         | Command::Pending { .. } => ExitCode::SUCCESS,
     }
@@ -459,12 +471,66 @@ fn subscribe(rt: &Runtime, session: Option<SessionId>, out: &mut dyn Write) -> E
 }
 
 /// `kintsu setup`: what the machine has, three questions, one file, and
+/// `kintsu open kintsu://act?case=…&do=…`: a click, handed to the daemon,
+/// which answers in the shell the case came from.
+fn open(rt: &Runtime, url: &str, err: &mut dyn Write, plain: &Style) -> ExitCode {
+    let (case, action) = match parse_act_url(url) {
+        Ok(parsed) => parsed,
+        Err(e) => return failure(err, &e.to_string(), plain, false),
+    };
+    match rt.client().act(&case, action) {
+        Some(Ok(())) => ExitCode::SUCCESS,
+        Some(Err(reason)) => failure(err, &reason, plain, false),
+        None => failure(
+            err,
+            "no daemon is running; open a hooked shell first",
+            plain,
+            false,
+        ),
+    }
+}
+
+/// `kintsu service install|uninstall`: launchd or systemd keeps the daemon
+/// up, and the desktop hands `kintsu://` links to `kintsu open`.
+fn service_command(
+    rt: &Runtime,
+    action: ServiceAction,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+    plain: &Style,
+) -> ExitCode {
+    let Some(home) = rt.home.clone() else {
+        return failure(err, "HOME is not set", plain, false);
+    };
+    let paths = service::ServicePaths {
+        home: PathBuf::from(home),
+        state_dir: rt.state_dir.clone(),
+        exe: rt.exe.clone(),
+    };
+    let macos = cfg!(target_os = "macos");
+    let mut run = |program: &str, args: &[String]| service::run_command(program, args);
+    let result = match action {
+        ServiceAction::Install => service::install(&paths, macos, &mut run),
+        ServiceAction::Uninstall => service::uninstall(&paths, macos, &mut run),
+    };
+    match result {
+        Ok(lines) => {
+            for line in lines {
+                let _ = writeln!(out, "{}", plain.line(&line));
+            }
+            ExitCode::SUCCESS
+        }
+        Err(e) => failure(err, &e.to_string(), plain, false),
+    }
+}
+
 /// doctor's verdict on it.
 fn setup(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     let plain = Style {
         color: rt.color,
         ascii: false,
         mode: UiMode::Toast,
+        links: false,
     };
     let environment = FsEnvironment::new(rt.path_var.clone());
     let detected = Detect {

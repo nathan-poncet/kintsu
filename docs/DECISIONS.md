@@ -390,12 +390,39 @@ otherwise; doctor's report follows. The questions live in a controller
 that reads any `BufRead` and writes any `Write`, so they are tested with
 in-memory answers.
 
+## 20. v0.2, step C1: clickable words, `kintsu open`, `kintsu service` (2026-09-25)
+
+Every action word of the bubble (`kintsu why`, `fix`, `agent`, `ignore`)
+is an OSC 8 hyperlink to `kintsu://act?case=<id>&do=<action>` when the
+output is a terminal and `[ui] links = true` (the default). The
+`Action` entity names the five words; `controllers/url_scheme.rs` parses
+and builds the URL; `Style::link` draws it, and never into a pipe or
+under `NO_COLOR`. The desktop hands the URL to `kintsu open <url>`, which
+sends an `act` frame; the daemon remembers which session each offered
+case came from (`Sessions::remember_case`, the last thousand) and answers
+**in that shell**, as a message: `why` explains, `fix` sends the stored
+or freshly computed fix as a "Try …?" bubble (`Messages::fix_now`),
+`ignore` silences that command line, `agent` and `privacy` answer with a
+note, because a click can neither start an agent nor insert a command
+(DAEMON.md, Security). An unknown or expired case gets "this case is
+gone". Without the panel yet, this is what a click does in v0.2; the
+panel (step C2) will open on the action instead.
+
+`kintsu service install` writes the pieces and runs the registrations:
+on macOS a launchd agent (`dev.kintsu.daemon`, KeepAlive) and a tiny
+AppleScript app compiled by `osacompile`, declared handler of the scheme
+through `plutil` and `lsregister`; on Linux a systemd user unit and a
+`.desktop` entry bound with `xdg-mime`. The file contents are pure
+functions of the binary's path, and the commands go through a runner,
+so the tests see what would run without running it. `uninstall` undoes
+it. The daemon still starts on demand without the service: the service
+only keeps it alive across logins and lets the desktop reach it.
+
 ## What is not built, by priority
 
-1. What the daemon unlocks next: the panel, clickable words,
-   `kintsu service install`.
+1. The panel (`^K`, a click opens it on the action).
 2. The stderr tee for terminals without a readable pane; `session_new`.
-3. `kintsu setup`, `kintsu models`, `kintsu login`, `kintsu service`.
+3. `kintsu models`, `kintsu login`.
 4. Learning rules from accepted fixes; the cost ledger; budgets.
 5. A Homebrew tap, `cargo binstall` metadata, a Nix flake (the install
    page lists them).

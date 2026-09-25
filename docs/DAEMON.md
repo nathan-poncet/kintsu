@@ -2,11 +2,13 @@
 
 *Status (2026-09-25): built as described below for the frames `hello`,
 `command_finished` (which carries the pane identity), `subscribe`,
-`pending`, `explain` and `shutdown`, the delivery into zsh, fish and bash,
-the on-demand start, the version handshake, and the output capture from
-Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer. Not yet:
-`session_new`, `act`, `get_case`, the stderr tee, SQLite, `service
-install`, the idle exit. See [DECISIONS.md](DECISIONS.md), sections 2 and 17.*
+`pending`, `explain`, `act` and `shutdown`, the delivery into zsh, fish
+and bash, the on-demand start, the version handshake, the output capture
+from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and `service
+install`. `act` carries `case` and `action` and answers `ack` or `error`;
+the result arrives as a `bubble` in the case's shell. Not yet:
+`session_new`, `get_case`, the stderr tee, SQLite, the idle exit. See
+[DECISIONS.md](DECISIONS.md), sections 2, 17 and 20.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and
@@ -93,7 +95,7 @@ Client to daemon:
 | `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd` | `decision` within the sync budget, else `later` |
 | `subscribe` | `session` | a stream of `bubble` frames until the connection closes |
 | `pending` | `session` | the `bubble` frames not yet delivered (bash, or after a reconnect) |
-| `act` | `case`, `action` (`fix`, `why`, `agent`, `ignore`, `privacy`, `dismiss`), `origin` (`key`, `click`, `command`) | `stream` frames, then `done` |
+| `act` | `case`, `action` (`fix`, `why`, `agent`, `ignore`, `privacy`) | `ack`, then a `bubble` on the case's session; `error` when the case is gone |
 | `get_case` | `case` or `session` | the case, redacted view included |
 | `shutdown` | | `bye` |
 

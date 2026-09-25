@@ -30,6 +30,13 @@ pub enum DaemonAction {
     Status,
 }
 
+/// What `kintsu service` should do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceAction {
+    Install,
+    Uninstall,
+}
+
 /// What the user or a hook asked the binary to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
@@ -47,6 +54,10 @@ pub enum Command {
     Pending { session: Option<SessionId> },
     /// `kintsu daemon [run|stop|status]`.
     Daemon(DaemonAction),
+    /// `kintsu open <kintsu://…>`: a click on a word, handed over by the desktop.
+    Open { url: String },
+    /// `kintsu service install|uninstall`: the daemon as a service, the scheme handler.
+    Service(ServiceAction),
     /// `kintsu fix [--raw]`: the corrected command for the last failure.
     Fix { raw: bool },
     /// `kintsu why`: an explanation.
@@ -106,6 +117,8 @@ pub enum CliError {
     UnknownDaemonAction,
     #[error("`{0}` needs a value")]
     MissingValue(String),
+    #[error("service knows install and uninstall")]
+    UnknownServiceAction,
 }
 
 fn supported_shells() -> String {
@@ -134,6 +147,13 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["daemon", "stop"] => Ok(Command::Daemon(DaemonAction::Stop)),
         ["daemon", "status"] => Ok(Command::Daemon(DaemonAction::Status)),
         ["daemon", ..] => Err(CliError::UnknownDaemonAction),
+        ["open", url] => Ok(Command::Open {
+            url: (*url).to_string(),
+        }),
+        ["open"] => Err(CliError::MissingValue("open <url>".into())),
+        ["service", "install"] => Ok(Command::Service(ServiceAction::Install)),
+        ["service", "uninstall"] => Ok(Command::Service(ServiceAction::Uninstall)),
+        ["service", ..] => Err(CliError::UnknownServiceAction),
         ["fix"] => Ok(Command::Fix { raw: false }),
         ["fix", "--raw"] => Ok(Command::Fix { raw: true }),
         ["fix", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
@@ -285,6 +305,29 @@ mod tests {
             Command::Triage { input, .. } => *input,
             other => panic!("expected triage, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn open_and_service_are_parsed() {
+        assert_eq!(
+            parse_args(["open", "kintsu://act?case=c&do=why"]),
+            Ok(Command::Open {
+                url: "kintsu://act?case=c&do=why".into()
+            })
+        );
+        assert_eq!(
+            parse_args(["open"]),
+            Err(CliError::MissingValue("open <url>".into()))
+        );
+        assert_eq!(
+            parse_args(["service", "install"]),
+            Ok(Command::Service(ServiceAction::Install))
+        );
+        assert_eq!(
+            parse_args(["service", "uninstall"]),
+            Ok(Command::Service(ServiceAction::Uninstall))
+        );
+        assert_eq!(parse_args(["service"]), Err(CliError::UnknownServiceAction));
     }
 
     #[test]
