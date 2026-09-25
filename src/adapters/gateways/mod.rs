@@ -15,6 +15,7 @@ pub mod shell_agents;
 pub mod system_clock;
 pub mod terminals;
 pub mod toml_settings;
+pub mod tty_panel;
 pub mod unix;
 
 pub use daemon_client::DaemonClient;

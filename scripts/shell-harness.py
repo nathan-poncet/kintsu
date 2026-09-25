@@ -12,6 +12,7 @@ binary (cargo build). Not part of CI: run it after touching shell/*.
     python3 scripts/shell-harness.py why        # kintsu why in both shells
     python3 scripts/shell-harness.py late       # the answer lands after another command
     python3 scripts/shell-harness.py ghost      # a typo, the pre-typed fix, Tab, Enter
+    python3 scripts/shell-harness.py panel      # ^K, the panel, Enter, w, Esc (fish, zsh, bash)
     DELAY=1.5 …                                 # slow the fake model down
 
 Environment: BIN (directory of the kintsu binary, default target/debug),
@@ -47,16 +48,18 @@ env = dict(os.environ, KINTSU_SOCKET=f"{ROOT}/d.sock", KINTSU_STATE_DIR=f"{ROOT}
            PATH=SHELL_PATH, KINTSU_DEBUG="1", TERM="xterm-256color", NO_COLOR="1", LINES="24", COLUMNS="80")
 env.pop("KINTSU_SESSION", None)
 
-def respond(fd, chunk):
+def respond(fd, chunk, screen=None):
     # answer the terminal queries fish 4 sends, so it shows a prompt
     if b"\x1b[c" in chunk or b"\x1b[0c" in chunk: os.write(fd, b"\x1b[?62;1;2;6;9;15;22c")
     if b"\x1b[>0q" in chunk or b"\x1b[>q" in chunk: os.write(fd, b"\x1bP>|pyte(0)\x1b\\")
     if b"\x1b]11;?" in chunk: os.write(fd, b"\x1b]11;rgb:0000/0000/0000\x1b\\")
     for m in re.finditer(rb"\x1bP\+q([0-9a-fA-F]+)\x1b\\", chunk): os.write(fd, b"\x1bP0+r" + m.group(1) + b"\x1b\\")
     if b"\x1b[?u" in chunk: os.write(fd, b"\x1b[?0u")
-    if b"\x1b[6n" in chunk: os.write(fd, b"\x1b[1;1R")
+    if b"\x1b[6n" in chunk:
+        row, col = (screen.cursor.y + 1, screen.cursor.x + 1) if screen else (1, 1)
+        os.write(fd, f"\x1b[{row};{col}R".encode())
 
-def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
+def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -78,7 +81,7 @@ def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=Fa
             if r:
                 try: chunk = os.read(fd, 65536)
                 except OSError: return
-                raw += chunk; stream.feed(chunk); respond(fd, chunk)
+                raw += chunk; stream.feed(chunk); respond(fd, chunk, screen)
     def send(s, t): os.write(fd, s.encode()); drain(t)
     drain(1.5)
     send(f"set -gx PATH {BIN} {ROOT}/bin /usr/bin /bin\n", 0.5)
@@ -97,6 +100,13 @@ def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=Fa
         send("\n", 0.8)                     # run it
         print("   before Tab:", snapshot[-1] if snapshot else "")
         print("   after Tab: ", accepted[-1] if accepted else "")
+    if panel:
+        panel_steps(send, screen, "fish")
+        os.write(fd, b"kintsu daemon stop\n"); drain(0.6)
+        os.write(fd, b"exit\n"); drain(0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen, raw
     send("false\n", 0.8)
     if enter_first: send("true\n", 0.3)    # another command, so a new prompt precedes the answer
     if typed: send(typed, 0.3)          # typed, not executed
@@ -140,7 +150,7 @@ end''',
     commandline -f repaint
 end''',
 }
-def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
+def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -161,7 +171,7 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
             if r:
                 try: chunk = os.read(fd, 65536)
                 except OSError: return
-                stream.feed(chunk); respond(fd, chunk)
+                stream.feed(chunk); respond(fd, chunk, screen)
     def send(s, t): os.write(fd, s.encode()); drain(t)
     drain(1.0)
     send(f"export PATH={SHELL_PATH}\n", 0.4)
@@ -177,6 +187,13 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
         send("\n", 0.8)
         print("   before Tab:", snapshot[-1] if snapshot else "")
         print("   after Tab: ", accepted[-1] if accepted else "")
+    if panel:
+        panel_steps(send, screen, "zsh")
+        send("kintsu daemon stop\n", 0.6)
+        send("exit\n", 0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen
     send("false\n", 0.8)
     if enter_first: send("true\n", 0.3)
     if typed: send(typed, 0.3)
@@ -192,7 +209,71 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
     except OSError: pass
     return screen
 
+def panel_steps(send, screen, shell):
+    """^K on a typo (a rule fix), Enter takes it; ^K after a plain failure,
+    w asks why, Esc closes. Prints the screen at each step."""
+    def snap(title):
+        print(f"----- {shell}: {title}")
+        for i, line in enumerate(screen.display):
+            if line.strip(): print(f"{i:2}| {line.rstrip()}")
+        print(f"   cursor at row {screen.cursor.y}, col {screen.cursor.x}")
+    send("gti status\n", 1.2)
+    snap("after the typo")
+    send("\x0b", 1.5)
+    snap("^K: the panel, on the fix")
+    send("\r", 1.0)
+    snap("Enter: the fix is in the line, the panel is gone")
+    send("\x15", 0.4)
+    send("false\n", 1.5)
+    send("\x0b", 1.5)
+    snap("^K after a plain failure")
+    send("w", 2.5)
+    snap("w: why, from the model")
+    send("\x1b", 1.0)
+    snap("Esc: closed")
+
+def run_bash():
+    import shutil, subprocess
+    subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
+    shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
+    for f in ("d.sock", "d.spawn"):
+        try: os.remove(f"{ROOT}/{f}")
+        except FileNotFoundError: pass
+    bash = os.environ.get("BASH_BIN") or shutil.which("bash") or "bash"
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execve(bash, ["bash", "--norc", "--noprofile", "-i"], env)
+    import fcntl, termios, struct
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
+    screen = pyte.Screen(80, 24); stream = pyte.ByteStream(screen)
+    def drain(t):
+        end = time.time() + t
+        while time.time() < end:
+            r, _, _ = select.select([fd], [], [], 0.05)
+            if r:
+                try: chunk = os.read(fd, 65536)
+                except OSError: return
+                stream.feed(chunk); respond(fd, chunk, screen)
+    def send(s, t): os.write(fd, s.encode()); drain(t)
+    drain(1.0)
+    send(f"export PATH={SHELL_PATH}\n", 0.4)
+    send("PS1=$'\\n~\\n❯ '\n", 0.4)
+    send('eval "$(kintsu init bash)"\n', 0.8)
+    send("true\n", 1.5)
+    send("clear\n", 0.5)
+    panel_steps(send, screen, f"bash ({bash})")
+    send("kintsu daemon stop\n", 0.6)
+    send("exit\n", 0.4)
+    try: os.close(fd)
+    except OSError: pass
+    return screen
+
 which = sys.argv[1:] or list(variants)
+if which == ["panel"]:
+    run(None, panel=True)
+    run_zsh(panel=True)
+    run_bash()
+    srv.shutdown(); sys.exit(0)
 if which == ["ghost"]:
     screen, raw = run(None, ghost=True, wait=1.0)
     show("fish, Tab takes the rule fix", screen)

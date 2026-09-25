@@ -39,9 +39,12 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
     let word = |action: Action| word_for(case.id(), action, style);
     let (why, agent, ignore) = (word(Action::Why), word(Action::Agent), word(Action::Ignore));
     let actions = match fix {
-        Some(_) if pretyped => format!("Tab to fix{dot}{why}{dot}{agent}{dot}{ignore}"),
-        Some(_) => format!("^K to insert{dot}{why}{dot}{agent}{dot}{ignore}"),
-        None => format!("{}{dot}{why}{dot}{agent}{dot}{ignore}", word(Action::Fix)),
+        Some(_) if pretyped => format!("Tab to fix{dot}{why}{dot}{agent}{dot}{ignore}{dot}^K more"),
+        Some(_) => format!("{why}{dot}{agent}{dot}{ignore}{dot}^K more"),
+        None => format!(
+            "{}{dot}{why}{dot}{agent}{dot}{ignore}{dot}^K more",
+            word(Action::Fix)
+        ),
     };
     Some(match style.mode {
         UiMode::Hint => {
@@ -77,7 +80,7 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
                 style.dim(&format!("({who})"))
             );
             let actions = format!(
-                "^K to insert{dot}{}{dot}{}",
+                "{}{dot}{}{dot}^K more",
                 word_for(message.case(), Action::Why, style),
                 word_for(message.case(), Action::Agent, style)
             );
@@ -175,7 +178,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             text,
-            "| Did you mean git status?\n| Tab to fix - kintsu why - kintsu agent - kintsu ignore"
+            "| Did you mean git status?\n| Tab to fix - kintsu why - kintsu agent - kintsu ignore - ^K more"
         );
         let rough = toast(
             &offer("rm -rf buidl", 1, None, Some("rm -rf build")),
@@ -184,7 +187,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            rough.contains("^K to insert"),
+            !rough.contains("Tab") && rough.ends_with("kintsu ignore - ^K more"),
             "destructive: never pre-typed, so no Tab: {rough}"
         );
         let hint = Style {
@@ -212,7 +215,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             text,
-            "| Did you mean git status?\n| ^K to insert - kintsu why - kintsu agent - kintsu ignore"
+            "| Did you mean git status?\n| kintsu why - kintsu agent - kintsu ignore - ^K more"
         );
     }
 
@@ -226,7 +229,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             text,
-            "| npm run build exited 1 after 12 s.\n| kintsu fix - kintsu why - kintsu agent - kintsu ignore"
+            "| npm run build exited 1 after 12 s.\n| kintsu fix - kintsu why - kintsu agent - kintsu ignore - ^K more"
         );
         let quick = toast(&offer("make", 2, Some(300), None), &Style::PLAIN, false).unwrap();
         assert!(
@@ -285,7 +288,7 @@ mod tests {
         );
         assert_eq!(
             message_toast(&m, &Style::PLAIN),
-            "| Try nvm use 22? (local - not verified)\n| ^K to insert - kintsu why - kintsu agent"
+            "| Try nvm use 22? (local - not verified)\n| kintsu why - kintsu agent - ^K more"
         );
         let e = Message::new(
             CaseId::new("c"),

@@ -3,6 +3,7 @@
 
 pub mod doctor;
 pub mod frames;
+pub mod panel;
 pub mod plain;
 pub mod shell_hook;
 pub mod style;

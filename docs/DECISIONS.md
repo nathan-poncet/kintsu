@@ -418,9 +418,47 @@ so the tests see what would run without running it. `uninstall` undoes
 it. The daemon still starts on demand without the service: the service
 only keeps it alive across logins and lets the desktop reach it.
 
+## 21. v0.2, step C2: the panel (2026-09-25)
+
+`^K` now expands the last bubble into the panel, as UI.md always said
+and as section 6 promised. The panel is `kintsu panel`, run by a widget
+the hooks bind: the binary draws on `/dev/tty` and writes to stdout only
+the text the user took, which the shell puts in its line editor. Two
+Enters, on purpose. It is a pure view model (`presenters/panel.rs`: keys
+in, effects out, rendered by ratatui and tested against `TestBackend`),
+a controller that maps crossterm events to those keys, and a gateway
+(`gateways/tty_panel.rs`) that owns raw mode, the mouse, the viewport
+and the clipboard (OSC 52). Sections: Why (asks the explain model on
+entry, once), Fix (a known rule or stored fix, else asks the quick-fix
+model on entry), Agent (the configured agents; ⏎ inserts
+`kintsu agent --with <name>`, the user starts it), Ignore (this command
+line, the program here / in this shell / everywhere, everything for an
+hour; ⏎ applies), Privacy (the redacted document). Models are asked from
+a thread; answers arrive through a channel while the panel keeps
+drawing. The bubble's actions line ends with `^K more`, always.
+
+Two things differ from the design. The viewport is pinned by asking the
+terminal for the cursor row on the tty (ratatui's inline viewport asks
+through stdout, which the shell is capturing), and the screen is scrolled
+first when the rows would not fit. While the panel runs, stdin and stdout
+point at the terminal's own device (`/dev/ttys003`, found through stderr,
+never the `/dev/tty` alias, which macOS cannot watch for input): zsh gives
+a widget's command substitution no stdin, crossterm reads keys from stdin
+and asks its questions through stdout, and both are put back before the
+text to insert is written. The pty harness (`scripts/shell-harness.py
+panel`) drives this in fish, zsh and bash. The height is fixed when the panel
+opens (six to fourteen rows: room for what is shown, or for the answer
+being asked for); long content scrolls rather than growing the panel.
+The hooks then climb back to the prompt's first line and clear, so the
+prompt is redrawn where it was; bash gets the same treatment through
+`${PS1@P}`. A click on a word still answers in the shell (section 20);
+opening the panel on the clicked action is left for the panel's next
+iteration, together with `ui.hotkey`.
+
 ## What is not built, by priority
 
-1. The panel (`^K`, a click opens it on the action).
+1. A click opening the panel on its action; `ui.hotkey`; the panel
+   growing as answers arrive.
 2. The stderr tee for terminals without a readable pane; `session_new`.
 3. `kintsu models`, `kintsu login`.
 4. Learning rules from accepted fixes; the cost ledger; budgets.

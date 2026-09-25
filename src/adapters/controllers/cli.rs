@@ -54,6 +54,8 @@ pub enum Command {
     Pending { session: Option<SessionId> },
     /// `kintsu daemon [run|stop|status]`.
     Daemon(DaemonAction),
+    /// `kintsu panel`: the last bubble, expanded under the prompt.
+    Panel,
     /// `kintsu open <kintsu://…>`: a click on a word, handed over by the desktop.
     Open { url: String },
     /// `kintsu service install|uninstall`: the daemon as a service, the scheme handler.
@@ -147,6 +149,7 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["daemon", "stop"] => Ok(Command::Daemon(DaemonAction::Stop)),
         ["daemon", "status"] => Ok(Command::Daemon(DaemonAction::Status)),
         ["daemon", ..] => Err(CliError::UnknownDaemonAction),
+        ["panel"] => Ok(Command::Panel),
         ["open", url] => Ok(Command::Open {
             url: (*url).to_string(),
         }),
@@ -309,6 +312,7 @@ mod tests {
 
     #[test]
     fn open_and_service_are_parsed() {
+        assert_eq!(parse_args(["panel"]), Ok(Command::Panel));
         assert_eq!(
             parse_args(["open", "kintsu://act?case=c&do=why"]),
             Ok(Command::Open {

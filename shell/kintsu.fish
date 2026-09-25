@@ -76,10 +76,26 @@ if status is-interactive
         commandline -f repaint
     end
 
-    function __kintsu_fix
-        set -l fix (command kintsu fix --raw 2>/dev/null); or return
-        commandline -r -- "$fix"
-        commandline -f end-of-line
+    # ^K expands the last bubble into the panel, drawn on the tty under the
+    # prompt; what the user takes with ⏎ comes back on stdout and lands in
+    # the command line. Nothing runs until they press Enter. The screen is
+    # then put back the way fish expects before a repaint (see above).
+    function __kintsu_panel
+        set -l prompt_lines (fish_prompt 2>/dev/null | string collect | string split \n | count)
+        set -l buffer_lines (commandline | count)
+        test $buffer_lines -lt 1; and set buffer_lines 1
+        printf '\n'
+        set -l out (command kintsu panel | string collect)
+        set -l up (math "$prompt_lines + $buffer_lines - 1")
+        test $up -gt 0; and printf '\e[%dA' $up
+        printf '\r\e[J'
+        set -l down (math "$prompt_lines + $buffer_lines - 2")
+        for i in (seq $down); printf '\n'; end
+        if test -n "$out"
+            commandline -r -- "$out"
+            commandline -f end-of-line
+        end
+        commandline -f repaint
     end
 
     # Tab on an empty line takes the fix a rule left for the last failure;
@@ -95,8 +111,8 @@ if status is-interactive
         end
     end
 
-    bind \ck __kintsu_fix
-    bind -M insert \ck __kintsu_fix 2>/dev/null
+    bind \ck __kintsu_panel
+    bind -M insert \ck __kintsu_panel 2>/dev/null
     bind \t __kintsu_tab
     bind -M insert \t __kintsu_tab 2>/dev/null
 end

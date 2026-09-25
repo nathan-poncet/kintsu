@@ -39,18 +39,24 @@ pub struct FixLast<'a> {
 }
 
 impl FixLast<'_> {
+    /// Rules, then the proposal a model already left: what is known
+    /// without asking anyone.
+    pub fn known(&self, case: &FailureCase) -> Option<Fix> {
+        let facts = gather_facts(self.environment, case.outcome(), case.cwd());
+        suggest_fix(case.outcome(), &facts).or_else(|| case.proposal().cloned())
+    }
+
+    /// The quick-fix model that would be asked first, if one is routed.
+    pub fn candidate(&self, case: &FailureCase) -> Option<String> {
+        model_candidates(self.settings, &self.settings.routing.quick_fix, case)
+            .first()
+            .map(|model| model.name.clone())
+    }
+
     /// Rules first; a quick-fix model only when no rule matched.
     pub fn run(&self, session: Option<&SessionId>) -> Result<FixProposal, FixError> {
         let case = self.cases.last(session)?.ok_or(FixError::NoCase)?;
-        let facts = gather_facts(self.environment, case.outcome(), case.cwd());
-        if let Some(fix) = suggest_fix(case.outcome(), &facts) {
-            return Ok(FixProposal {
-                case,
-                fix: Some(fix),
-                failures: Vec::new(),
-            });
-        }
-        if let Some(fix) = case.proposal().cloned() {
+        if let Some(fix) = self.known(&case) {
             return Ok(FixProposal {
                 case,
                 fix: Some(fix),
@@ -103,6 +109,42 @@ mod tests {
             },
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn what_is_known_comes_from_rules_or_a_stored_proposal_and_the_candidate_is_the_first_routed_model()
+     {
+        let cases = MemoryCases::default();
+        let models = ScriptedModels::default();
+        let secrets = MapSecrets::with(&[]);
+        let environment = FakeEnvironment::with_executables(&["git"]);
+        let routed = settings(&["local", "cloud"]);
+        let uc = FixLast {
+            settings: &routed,
+            cases: &cases,
+            environment: &environment,
+            secrets: &secrets,
+            models: &models,
+        };
+        let typo = case("gti status", 127, Some("42"));
+        assert_eq!(uc.known(&typo).unwrap().command().as_str(), "git status");
+        let proposal = Fix::new(
+            CommandLine::new("make -j4").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "",
+        );
+        let stored = case("make", 2, Some("42")).with_proposal(Some(proposal));
+        assert_eq!(uc.known(&stored).unwrap().command().as_str(), "make -j4");
+        assert_eq!(uc.known(&case("make", 2, Some("42"))), None);
+        assert_eq!(uc.candidate(&typo), Some("local".to_string()));
+        let unrouted = settings(&[]);
+        let quiet = FixLast {
+            settings: &unrouted,
+            ..uc
+        };
+        assert_eq!(quiet.candidate(&typo), None);
+        assert!(models.asked().is_empty(), "knowing asks nobody");
     }
 
     #[test]

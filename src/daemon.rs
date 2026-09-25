@@ -115,10 +115,10 @@ impl Daemon {
             .and_then(|m| m.modified())
             .ok();
         let mut cached = self.settings.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some((settings, seen)) = cached.as_ref() {
-            if *seen == mtime {
-                return settings.clone();
-            }
+        if let Some((settings, seen)) = cached.as_ref()
+            && *seen == mtime
+        {
+            return settings.clone();
         }
         let settings = match load_settings(&self.cfg.config_path, self.cfg.home.as_deref()) {
             Ok(settings) => settings,
@@ -297,10 +297,11 @@ fn on_command_finished(
                     return;
                 }
             };
-            if fix.is_none() && pending.is_some() {
-                if let Err(e) = messages(&daemon, &settings, &state).fix(&case) {
-                    log(&format!("fix for {}: {e}", case.outcome().command()));
-                }
+            if fix.is_none()
+                && pending.is_some()
+                && let Err(e) = messages(&daemon, &settings, &state).fix(&case)
+            {
+                log(&format!("fix for {}: {e}", case.outcome().command()));
             }
         });
     }

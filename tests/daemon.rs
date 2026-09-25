@@ -336,7 +336,7 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
     assert_eq!(bubble["type"], "bubble", "{line}");
     let text = bubble["text"].as_str().unwrap();
     assert!(
-        text.contains("Try make -j4 test?") && text.contains("^K to insert"),
+        text.contains("Try make -j4 test?") && text.contains("^K more"),
         "{text}"
     );
 

@@ -27,7 +27,7 @@ their own terminal and shell (Rust, Clean Architecture, TDD). The plan is
   served by GitHub Pages (source `main`, folder `/docs`). No framework, no
   build step. `scripts/docs-shell.py` regenerates the documentation shell.
 - `docs/DECISIONS.md` records what v0.1 built differently from the design
-  documents (hooks report every command, `^K` inserts the fix, JSON state
+  documents (hooks report every command, `^K` opens the panel, JSON state
   instead of SQLite, the daemon's actual scope…). Update it when a decision
   changes.
 - `src/daemon.rs` is the resident process (composition root, like `app.rs`);

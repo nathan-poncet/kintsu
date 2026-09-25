@@ -88,17 +88,19 @@
       <tbody>
         <tr><td>at the prompt, empty line</td><td><kbd>Tab</kbd> or <kbd>→</kbd></td><td>accept the ghost-text fix (zsh, fish)</td></tr>
         <tr><td>at the prompt</td><td><kbd>^K</kbd></td><td>open the last bubble as a panel, or close it</td></tr>
-        <tr><td>at the prompt</td><td>click a word</td><td>open the panel on that action (terminals that render OSC 8 links)</td></tr>
+        <tr><td>at the prompt</td><td>click a word</td><td>act on that case from the daemon: why explains, fix suggests, ignore silences, answered in that shell (terminals that render OSC 8 links, after <code>kintsu service install</code>)</td></tr>
         <tr><td>panel</td><td><kbd>w</kbd> <kbd>f</kbd> <kbd>a</kbd> <kbd>i</kbd> <kbd>p</kbd></td><td>Why · Fix · Agent · Ignore · Privacy</td></tr>
         <tr><td>panel</td><td><kbd>⏎</kbd></td><td>insert the focused suggestion in your line and close the panel; you press Enter again to run</td></tr>
         <tr><td>panel</td><td><kbd>c</kbd></td><td>copy the focused suggestion</td></tr>
-        <tr><td>panel</td><td><kbd>Tab</kbd> · <kbd>↑</kbd> <kbd>↓</kbd> · wheel</td><td>move focus · scroll</td></tr>
+        <tr><td>panel</td><td><kbd>Tab</kbd> <kbd>→</kbd> · <kbd>↑</kbd> <kbd>↓</kbd> · wheel</td><td>next section · move focus or scroll</td></tr>
+        <tr><td>panel</td><td><kbd>?</kbd></td><td>the key map, in the footer</td></tr>
         <tr><td>panel</td><td><kbd>Esc</kbd> or <kbd>q</kbd></td><td>close the panel</td></tr>
       </tbody>
     </table>
     <table class="ref">
       <tbody>
         <tr><td><code>kintsu why</code> · <code>fix</code> · <code>agent</code> · <code>privacy</code> · <code>ignore</code></td><td>act on the last failure; <code>why</code> answers above your prompt while you keep working</td></tr>
+        <tr><td><code>kintsu panel</code></td><td>the last bubble expanded under the prompt; what <kbd>^K</kbd> runs</td></tr>
         <tr><td><code>kintsu ignore --command|--dir|--session|--always</code></td><td>stop bubbles for that command, directory or session, or permanently</td></tr>
         <tr><td><code>kintsu mute 1h</code></td><td>no bubbles for one hour</td></tr>
         <tr><td><code>kintsu setup</code> · <code>doctor</code> · <code>default-config</code> · <code>config path</code></td><td>configure in three questions; check the hook, the models and the keys; print the default file; show where the files are</td></tr>

@@ -80,25 +80,40 @@ if [[ -o interactive ]]; then
     text="$line"$'\n'
     while IFS= read -r -t 0.05 -u "$fd" line; do text+="$line"$'\n'; done
     zle -I
-    local rendered="${(%%)PROMPT}"
-    local -a prompt_rows=("${(@f)rendered}") buffer_rows=("${(@f)BUFFER}")
-    local prompt_lines=${#prompt_rows} buffer_lines=${#buffer_rows} replace=0
-    (( prompt_lines < 1 )) && prompt_lines=1
-    (( buffer_lines < 1 )) && buffer_lines=1
+    local replace=0
     (( __kintsu_pending_seq == __kintsu_seq )) && replace=1
     __kintsu_pending_seq=-1
-    local up=$(( prompt_lines + buffer_lines - 1 + replace ))
+    __kintsu_rows_above
+    local up=$(( REPLY + replace ))
     (( up > 0 )) && print -n -- $'\e['"$up"'A'
     print -n -- $'\r\e[J'
     print -rn -- "$text"
   }
 
-  __kintsu_fix_widget() {
-    local fix
-    fix="$(command kintsu fix --raw 2>/dev/null)" || { zle -M "kintsu: no fix for the last failure"; return 1; }
-    BUFFER="$fix"
-    CURSOR=${#BUFFER}
-    zle redisplay
+  # Rows from the line after the edited text up to the prompt's first line.
+  __kintsu_rows_above() {
+    local rendered="${(%%)PROMPT}"
+    local -a prompt_rows=("${(@f)rendered}") buffer_rows=("${(@f)BUFFER}")
+    local prompt_lines=${#prompt_rows} buffer_lines=${#buffer_rows}
+    (( prompt_lines < 1 )) && prompt_lines=1
+    (( buffer_lines < 1 )) && buffer_lines=1
+    REPLY=$(( prompt_lines + buffer_lines - 1 ))
+  }
+
+  # ^K expands the last bubble into the panel, drawn on the tty under the
+  # prompt; what the user takes with ⏎ comes back on stdout and lands in
+  # the line editor. Nothing runs until they press Enter.
+  __kintsu_panel_widget() {
+    zle -I
+    local out
+    out="$(command kintsu panel)"
+    __kintsu_rows_above
+    (( REPLY > 0 )) && print -n -- $'\e['"$REPLY"'A'
+    print -n -- $'\r\e[J'
+    if [[ -n "$out" ]]; then
+      BUFFER="$out"
+      CURSOR=${#BUFFER}
+    fi
   }
 
   # Ghost text: a safe fix waits in a file; the next empty prompt shows it
@@ -145,6 +160,6 @@ if [[ -o interactive ]]; then
 
   add-zsh-hook preexec __kintsu_preexec
   add-zsh-hook precmd __kintsu_precmd
-  zle -N __kintsu_fix_widget
-  bindkey '^K' __kintsu_fix_widget
+  zle -N __kintsu_panel_widget
+  bindkey '^K' __kintsu_panel_widget
 fi

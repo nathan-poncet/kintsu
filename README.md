@@ -35,7 +35,7 @@ model and *your* key.
 $ gti status
 zsh: command not found: gti
 ▎ Did you mean git status?
-▎ ^K to insert · kintsu why · kintsu agent · kintsu ignore
+▎ Tab to fix · kintsu why · kintsu agent · kintsu ignore · ^K more
 $ git status
 ```
 
@@ -43,7 +43,9 @@ A small bubble, one gold seam on the left, one sentence, a line of
 actions; on a terminal that renders hyperlinks, each word is clickable
 once `kintsu service install` has registered the `kintsu://` scheme.
 A confident, harmless fix is already on your next prompt, dim:
-Tab takes it, you press Enter. Otherwise `^K` puts the fix in your prompt. Nothing ever
+Tab takes it, you press Enter. `^K` expands the bubble into a panel under
+your prompt: Why, Fix, Agent, Ignore, Privacy, one letter each; ⏎ puts the
+fix in your line and closes it, you press Enter to run. Nothing ever
 steals a keystroke from your prompt, and nothing runs on its own. When no
 rule knows and a local model is routed for quick fixes (or `eager_fix =
 true` for a remote one), a resident daemon asks it in the background; the
@@ -146,7 +148,8 @@ The commands, all about the last failure of the current shell:
 
 | command | does |
 |---|---|
-| `kintsu fix` | the corrected command, from a rule or your quick-fix model; `--raw` is what `^K` uses |
+| `kintsu fix` | the corrected command, from a rule or your quick-fix model; `--raw` prints only the command |
+| `kintsu panel` | the last bubble expanded under the prompt: what `^K` runs; ⏎ inserts, `c` copies, `esc` closes |
 | `kintsu why` | an explanation from the first configured model that answers, delivered above your prompt while you keep working; a case holding a secret only reaches local models |
 | `kintsu agent [--with name] [words…]` | writes the brief and launches your CLI agent (Claude Code, Codex, OpenCode, aider, Gemini CLI, Copilot CLI…) |
 | `kintsu privacy` | exactly what a model or an agent would receive, secrets masked |

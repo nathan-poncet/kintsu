@@ -1,5 +1,11 @@
 # The bubble
 
+*Status (2026-09-25): the toast, ghost text, the clickable words and the
+panel are built as described, with the differences recorded in
+[DECISIONS.md](DECISIONS.md) sections 18, 20 and 21: a click answers in
+the shell rather than opening the panel, the panel's height is fixed
+when it opens, and `ui.hotkey` is not yet read (`^K`).*
+
 Kintsu talks in small messages that land in the terminal, like a quiet
 colleague leaning over: one line when it has something, silence
 otherwise. Keyboard first, clickable for everyone else, and as plain as a

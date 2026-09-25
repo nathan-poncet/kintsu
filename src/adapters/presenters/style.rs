@@ -22,14 +22,16 @@ const DIM: &str = "\x1b[2m";
 const RESET: &str = "\x1b[0m";
 
 impl Style {
-    /// No colour, no glyphs: for tests.
-    #[cfg(test)]
-    pub const PLAIN: Style = Style {
+    /// No colour, no glyphs: for text that is reused rather than printed.
+    pub const BARE: Style = Style {
         color: false,
         ascii: true,
         mode: UiMode::Toast,
         links: false,
     };
+    /// The same, named for the tests.
+    #[cfg(test)]
+    pub const PLAIN: Style = Style::BARE;
 
     pub fn seam(&self) -> String {
         let bar = if self.ascii { "|" } else { "▎" };
@@ -85,6 +87,11 @@ impl Style {
         } else {
             text.to_string()
         }
+    }
+
+    /// The Enter key, as the panel names it.
+    pub fn enter(&self) -> &'static str {
+        if self.ascii { "Enter" } else { "⏎" }
     }
 
     pub fn ellipsis(&self) -> &'static str {

@@ -50,10 +50,10 @@ impl Sessions {
     /// A case was offered in a session; a click on it comes back here.
     pub fn remember_case(&self, case: &CaseId, session: &SessionId) {
         let mut cases = self.cases.lock().unwrap_or_else(|e| e.into_inner());
-        if cases.len() >= REMEMBERED_CASES {
-            if let Some(victim) = cases.keys().next().cloned() {
-                cases.remove(&victim);
-            }
+        if cases.len() >= REMEMBERED_CASES
+            && let Some(victim) = cases.keys().next().cloned()
+        {
+            cases.remove(&victim);
         }
         cases.insert(case.as_str().to_string(), session.clone());
     }
@@ -110,10 +110,10 @@ impl Sessions {
     pub fn ping(&self) {
         let mut map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         for state in map.values_mut() {
-            if let Some((stream, _)) = state.subscriber.as_mut() {
-                if send_line(stream, &self.ping).is_err() {
-                    state.subscriber = None;
-                }
+            if let Some((stream, _)) = state.subscriber.as_mut()
+                && send_line(stream, &self.ping).is_err()
+            {
+                state.subscriber = None;
             }
         }
     }
@@ -134,10 +134,10 @@ impl Notifier for Sessions {
                 state.subscriber = None;
             }
             state.pending.push_back(message);
-            if let Some(pid) = state.signal_pid {
-                if !unix::signal_usr1(pid) {
-                    state.signal_pid = None;
-                }
+            if let Some(pid) = state.signal_pid
+                && !unix::signal_usr1(pid)
+            {
+                state.signal_pid = None;
             }
         });
         Ok(())

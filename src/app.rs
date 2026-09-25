@@ -10,18 +10,22 @@ use std::time::Duration;
 use crate::adapters::controllers::{
     Command, DaemonAction, Prompter, ScopeFlag, ServiceAction, parse_act_url, parse_args,
 };
-use crate::adapters::gateways::service;
 use crate::adapters::gateways::{
     DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
     RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings, render_settings,
 };
+use crate::adapters::gateways::{service, tty_panel};
 use crate::adapters::presenters::doctor::Places;
+use crate::adapters::presenters::panel::{Arrival, Ask, Effect, Panel};
 use crate::adapters::presenters::{
     Style, doctor_report, error_line, explanation, fix_report, hand_off_notice, ignored,
     pending_line, privacy_report, raw_fix, shell_hook, toast,
 };
 use crate::daemon::{self, DaemonConfig};
-use crate::entities::{SessionId, Settings, Shell, TerminalIdentity, TriageDecision, UiMode};
+use crate::entities::{
+    Provider, SessionId, Settings, Shell, TerminalIdentity, TriageDecision, UiMode,
+};
+use crate::use_cases::ports::CaseStore;
 use crate::use_cases::{
     CaptureOutput, Detect, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy,
     ScopeChoice, Triage, TriageInput, compose,
@@ -32,6 +36,7 @@ kintsu — when a command fails, fix it, understand it, or hand it to your agent
 
 Usage:
   kintsu init <zsh|bash|fish>     the shell hook, to eval or source
+  kintsu panel                    the last bubble, expanded under the prompt (what ^K runs)
   kintsu fix [--raw]              the corrected command for the last failure
   kintsu why                      what happened, from your model
   kintsu agent [--with <name>] [words…]
@@ -69,6 +74,8 @@ pub struct Runtime {
     pub exe: PathBuf,
     pub path_var: String,
     pub color: bool,
+    /// Colour for what is drawn on the tty itself, whatever stdout is.
+    pub tty_color: bool,
     pub debug: bool,
     /// Whether hooks may talk to, and start, the daemon.
     pub daemon: bool,
@@ -229,6 +236,18 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             signal_pid,
             err,
         ),
+        Command::Panel => panel(
+            rt,
+            &Local {
+                settings: &settings,
+                state: &state,
+                environment: &environment,
+                style: &style,
+            },
+            session,
+            out,
+            err,
+        ),
         Command::Fix { raw } => {
             let fix_last = FixLast {
                 settings: &settings,
@@ -253,17 +272,17 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             }
         }
         Command::Why => {
-            if rt.daemon {
-                if let Some(session) = session {
-                    match rt.client().explain(session) {
-                        Some(Ok(model)) => {
-                            let _ = writeln!(err, "{}", pending_line(&model, &style));
-                            let _ = HookNotes::new(&rt.state_dir).set_asking(session);
-                            return ExitCode::SUCCESS;
-                        }
-                        Some(Err(reason)) => return failure(err, &reason, &style, false),
-                        None => {}
+            if rt.daemon
+                && let Some(session) = session
+            {
+                match rt.client().explain(session) {
+                    Some(Ok(model)) => {
+                        let _ = writeln!(err, "{}", pending_line(&model, &style));
+                        let _ = HookNotes::new(&rt.state_dir).set_asking(session);
+                        return ExitCode::SUCCESS;
                     }
+                    Some(Err(reason)) => return failure(err, &reason, &style, false),
+                    None => {}
                 }
             }
             let explain = Explain {
@@ -388,25 +407,24 @@ fn triage(
         style,
     } = *local;
     input.terminal = rt.terminal.clone();
-    if rt.daemon {
-        if let Some(view) = rt
+    if rt.daemon
+        && let Some(view) = rt
             .client()
             .command_finished(&input, rt.color, signal_pid, SYNC_BUDGET)
-        {
-            for text in view.toast.iter().chain(view.bubbles.iter()) {
-                let _ = writeln!(err, "{text}");
-            }
-            if let Some(session) = &input.session {
-                let notes = HookNotes::new(&rt.state_dir);
-                if view.pending.is_some() {
-                    let _ = notes.set_asking(session);
-                }
-                if let Some(ghost) = &view.ghost {
-                    let _ = notes.set_ghost(session, ghost);
-                }
-            }
-            return ExitCode::SUCCESS;
+    {
+        for text in view.toast.iter().chain(view.bubbles.iter()) {
+            let _ = writeln!(err, "{text}");
         }
+        if let Some(session) = &input.session {
+            let notes = HookNotes::new(&rt.state_dir);
+            if view.pending.is_some() {
+                let _ = notes.set_asking(session);
+            }
+            if let Some(ghost) = &view.ghost {
+                let _ = notes.set_ghost(session, ghost);
+            }
+        }
+        return ExitCode::SUCCESS;
     }
     let triage = Triage {
         settings,
@@ -426,11 +444,9 @@ fn triage(
             }
             if let (TriageDecision::Offer { fix: Some(fix), .. }, Some(session), true) =
                 (&decision, &session, ghost_shell)
+                && fix.is_ghostable()
             {
-                if fix.is_ghostable() {
-                    let _ =
-                        HookNotes::new(&rt.state_dir).set_ghost(session, fix.command().as_str());
-                }
+                let _ = HookNotes::new(&rt.state_dir).set_ghost(session, fix.command().as_str());
             }
             // The output is read after the bubble: it costs a program run,
             // and only an offered case is worth it.
@@ -471,6 +487,184 @@ fn subscribe(rt: &Runtime, session: Option<SessionId>, out: &mut dyn Write) -> E
 }
 
 /// `kintsu setup`: what the machine has, three questions, one file, and
+/// `kintsu panel`: the last bubble expanded under the prompt, drawn on the
+/// tty; what the user takes comes out on stdout for the hook to insert.
+fn panel(
+    rt: &Runtime,
+    local: &Local<'_>,
+    session: Option<&SessionId>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> ExitCode {
+    let Local {
+        settings,
+        state,
+        environment,
+        style,
+    } = *local;
+    let case = match state.last(session) {
+        Ok(Some(case)) => case,
+        Ok(None) => return failure(err, "no failure in this shell yet", style, false),
+        Err(e) => return failure(err, &e.to_string(), style, false),
+    };
+    let fix_last = FixLast {
+        settings,
+        cases: state,
+        environment,
+        secrets: &EnvSecrets,
+        models: &HttpModels,
+    };
+    let known = fix_last.known(&case);
+    let can_ask_fix = fix_last.candidate(&case).is_some();
+    let agents: Vec<String> = settings
+        .models
+        .iter()
+        .filter(|m| m.provider == Provider::CliAgent)
+        .map(|m| m.name.clone())
+        .collect();
+    let default_agent = settings
+        .routing
+        .investigate
+        .iter()
+        .find(|name| agents.contains(name))
+        .cloned();
+    let privacy = match (Privacy { cases: state }).run(session) {
+        Ok(doc) => without_seams(&privacy_report(&doc, &Style::BARE)),
+        Err(e) => e.to_string(),
+    };
+    let mut panel = Panel::new(
+        &case,
+        known,
+        can_ask_fix,
+        agents,
+        default_agent.as_deref(),
+        privacy,
+    );
+    let panel_style = Style {
+        color: rt.tty_color,
+        ascii: settings.ui.ascii,
+        mode: UiMode::Toast,
+        links: false,
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    let asker = Asker {
+        settings: settings.clone(),
+        state_dir: rt.state_dir.clone(),
+        path_var: rt.path_var.clone(),
+        session: session.cloned(),
+    };
+    let mut outside = |effect: Effect, panel: &mut Panel| match effect {
+        Effect::Ask(ask) => asker.ask(ask, tx.clone()),
+        Effect::Ignore(request) => {
+            let ignore = Ignore {
+                clock: &SystemClock,
+                cases: state,
+                ignores: state,
+            };
+            let text = match ignore.run(session, request) {
+                Ok(entry) => without_seams(&ignored(&entry, &Style::BARE)),
+                Err(e) => e.to_string(),
+            };
+            panel.receive(Arrival::Ignored(text));
+        }
+        Effect::Nothing | Effect::Insert(_) | Effect::Copy(_) | Effect::Close => {}
+    };
+    let first = panel.open();
+    outside(first, &mut panel);
+    match tty_panel::run(&mut panel, &panel_style, &rx, &mut outside) {
+        Ok(Some(text)) => {
+            let _ = writeln!(out, "{text}");
+            ExitCode::SUCCESS
+        }
+        Ok(None) => ExitCode::SUCCESS,
+        Err(e) => failure(err, &format!("panel: {e}"), style, false),
+    }
+}
+
+/// What the panel's questions to models need, owned, so a thread can ask
+/// while the panel keeps drawing.
+struct Asker {
+    settings: Settings,
+    state_dir: PathBuf,
+    path_var: String,
+    session: Option<SessionId>,
+}
+
+impl Asker {
+    fn ask(&self, ask: Ask, tx: std::sync::mpsc::Sender<Arrival>) {
+        let settings = self.settings.clone();
+        let state_dir = self.state_dir.clone();
+        let path_var = self.path_var.clone();
+        let session = self.session.clone();
+        std::thread::spawn(move || {
+            let state = JsonState::new(&state_dir);
+            match ask {
+                Ask::Explain => {
+                    let explain = Explain {
+                        settings: &settings,
+                        cases: &state,
+                        secrets: &EnvSecrets,
+                        models: &HttpModels,
+                    };
+                    match explain.candidate(session.as_ref()) {
+                        Ok(model) => {
+                            let _ = tx.send(Arrival::Asking(Ask::Explain, model));
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Arrival::Explanation(Err(e.to_string())));
+                            return;
+                        }
+                    }
+                    let answer = explain
+                        .run(session.as_ref())
+                        .map(|e| (e.model, e.text))
+                        .map_err(|e| e.to_string());
+                    let _ = tx.send(Arrival::Explanation(answer));
+                }
+                Ask::Fix => {
+                    let environment = FsEnvironment::new(path_var);
+                    let fix_last = FixLast {
+                        settings: &settings,
+                        cases: &state,
+                        environment: &environment,
+                        secrets: &EnvSecrets,
+                        models: &HttpModels,
+                    };
+                    if let Ok(Some(case)) = state.last(session.as_ref())
+                        && let Some(model) = fix_last.candidate(&case)
+                    {
+                        let _ = tx.send(Arrival::Asking(Ask::Fix, model));
+                    }
+                    let answer = fix_last
+                        .run(session.as_ref())
+                        .map_err(|e| e.to_string())
+                        .and_then(|proposal| {
+                            if proposal.fix.is_none() && !proposal.failures.is_empty() {
+                                let reasons: Vec<String> = proposal
+                                    .failures
+                                    .iter()
+                                    .map(|(name, e)| format!("{name}: {e}"))
+                                    .collect();
+                                Err(format!("no model answered ({})", reasons.join("; ")))
+                            } else {
+                                Ok(proposal.fix)
+                            }
+                        });
+                    let _ = tx.send(Arrival::Fix(answer));
+                }
+            }
+        });
+    }
+}
+
+/// Text meant for the panel: the seam is the panel's, not the line's.
+fn without_seams(text: &str) -> String {
+    text.lines()
+        .map(|line| line.strip_prefix("| ").unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// `kintsu open kintsu://act?case=…&do=…`: a click, handed to the daemon,
 /// which answers in the shell the case came from.
 fn open(rt: &Runtime, url: &str, err: &mut dyn Write, plain: &Style) -> ExitCode {
@@ -659,6 +853,7 @@ mod tests {
                 exe: PathBuf::from("/definitely/not/kintsu"),
                 path_var: self.dir.join("bin").display().to_string(),
                 color: false,
+                tty_color: false,
                 debug: true,
                 daemon: false,
                 terminal: TerminalIdentity::default(),
@@ -699,7 +894,7 @@ mod tests {
         assert!(out.is_empty());
         assert_eq!(
             err,
-            "▎ Did you mean git status?\n▎ Tab to fix · kintsu why · kintsu agent · kintsu ignore\n"
+            "▎ Did you mean git status?\n▎ Tab to fix · kintsu why · kintsu agent · kintsu ignore · ^K more\n"
         );
         assert_eq!(
             std::fs::read_to_string(b.dir.join("state").join("sessions").join("7.ghost")).unwrap(),
@@ -747,7 +942,7 @@ mod tests {
         );
         assert_eq!(
             err,
-            "▎ make test exited 2 after 12 s.\n▎ kintsu fix · kintsu why · kintsu agent · kintsu ignore\n"
+            "▎ make test exited 2 after 12 s.\n▎ kintsu fix · kintsu why · kintsu agent · kintsu ignore · ^K more\n"
         );
         let (code, _, err) = b.run(&["fix", "--raw"], Some("7"));
         assert_eq!((code, err.as_str()), (ExitCode::from(1), ""));

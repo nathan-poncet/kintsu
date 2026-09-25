@@ -8,6 +8,13 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- The panel: `^K` expands the last bubble under the prompt, with a
+  section per word (Why, Fix, Agent, Ignore, Privacy: `w f a i p`, Tab
+  cycles). Why and Fix ask your models on entry and show the answer as it
+  lands; ⏎ puts the fix (or `kintsu agent`) in your line and closes the
+  panel, `c` copies it, Ignore applies the scope you pick, `esc` closes.
+  `kintsu panel` is the command the hook runs. The bubble's actions line
+  now ends with `^K more`.
 - The bubble's words are clickable: `kintsu why`, `fix`, `agent` and
   `ignore` are OSC 8 links to `kintsu://act?case=…&do=…` on terminals
   that render them (`[ui] links = false` turns them off). `kintsu open
@@ -30,6 +37,9 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Changed
 
+- `^K` opens the panel instead of inserting the fix directly: ⏎ in the
+  panel inserts it. `kintsu fix --raw` still prints the bare command.
+- Rust 1.88 is the minimum toolchain (ratatui).
 - `kintsu triage` exits 0 in every case; the hooks learn that an "asking…"
   line is waiting from the marker file both `triage` and `why` leave.
 - Internal: the daemon's session registry, the `libc` calls and the marker
