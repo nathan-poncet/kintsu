@@ -35,6 +35,16 @@ All notable changes to kintsu are recorded here. The format follows
   the order of `[capture] sources`, at most `max_lines` lines. `why`, the
   quick fix, `privacy` and the agent's brief see it.
 
+### Fixed
+
+- The output kept with a failure no longer starts at kintsu's own bubble:
+  a line such as "git status exited 128." was taken for the prompt's echo,
+  so `why`, the quick fix and the agent saw the bubble instead of the
+  error. Kintsu's lines are now skipped and stripped from the output.
+- A pane read or a model's answer that lands after a newer failure no
+  longer overwrites that newer failure as the shell's last one; `why`,
+  `fix` and the panel act on what just failed.
+
 ### Changed
 
 - `^K` opens the panel instead of inserting the fix directly: ⏎ in the

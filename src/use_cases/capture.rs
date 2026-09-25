@@ -34,7 +34,9 @@ impl CaptureOutput<'_> {
             return Ok(case);
         };
         let case = case.with_output(output);
-        self.cases.save(&case)?;
+        if self.cases.still_current(&case)? {
+            self.cases.save(&case)?;
+        }
         Ok(case)
     }
 }
@@ -80,6 +82,37 @@ mod tests {
             screen.asked.borrow().as_slice(),
             &[(herdr(), settings.capture.max_lines + 50)]
         );
+    }
+
+    #[test]
+    fn a_slow_read_does_not_bring_back_a_failure_the_shell_moved_past() {
+        use crate::entities::{CaseId, Timestamp};
+        let cases = MemoryCases::default();
+        let old = case("make test", 2, Some("42"));
+        cases.save(&old).unwrap();
+        let newer = FailureCase::new(
+            CaseId::new("c2"),
+            Timestamp::from_millis(1),
+            outcome("ls nope", 1),
+            None,
+        )
+        .with_session(Some(SessionId::new("42")));
+        cases.save(&newer).unwrap();
+        let screen = FakeOutput::showing("$ make test\nmake: boom\n");
+        let settings = Settings::default();
+        let uc = CaptureOutput {
+            settings: &settings,
+            output: &screen,
+            cases: &cases,
+        };
+        let read = uc.run(old, &herdr()).unwrap();
+        assert_eq!(
+            read.output(),
+            Some("make: boom"),
+            "the caller still gets it"
+        );
+        let last = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!((last.id().as_str(), last.output()), ("c2", None));
     }
 
     #[test]

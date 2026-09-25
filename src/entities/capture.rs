@@ -37,16 +37,26 @@ impl TerminalIdentity {
 /// The output of `command` from a screen dump: what follows the last line
 /// that echoes the command (the prompt line), trailing blank lines dropped,
 /// at most `max_lines` kept from the end. When the command is not found on
-/// screen, the last `max_lines` are returned as they are.
+/// screen, the last `max_lines` are returned as they are. Lines kintsu
+/// wrote itself, the bubble under the failure, are neither the echo nor
+/// part of the output.
 pub fn output_after(screen: &str, command: &str, max_lines: usize) -> Option<String> {
     let lines: Vec<&str> = screen.lines().map(str::trim_end).collect();
     let command = command.trim();
-    let start = lines
-        .iter()
-        .rposition(|l| !command.is_empty() && l.contains(command))
-        .map_or(0, |i| i + 1);
+    let last_where = |matches: &dyn Fn(&str) -> bool| {
+        lines
+            .iter()
+            .rposition(|l| !command.is_empty() && !is_kintsu_line(l) && matches(l))
+    };
+    // A prompt line ends with the command; a right-hand prompt may follow it.
+    let echo =
+        last_where(&|l| l.ends_with(command)).or_else(|| last_where(&|l| l.contains(command)));
+    let start = echo.map_or(0, |i| i + 1);
     let mut kept: Vec<&str> = lines[start..].to_vec();
-    while kept.last().is_some_and(|l| l.is_empty()) {
+    while kept
+        .last()
+        .is_some_and(|l| l.is_empty() || is_kintsu_line(l))
+    {
         kept.pop();
     }
     while kept.first().is_some_and(|l| l.is_empty()) {
@@ -59,6 +69,12 @@ pub fn output_after(screen: &str, command: &str, max_lines: usize) -> Option<Str
         kept = kept[kept.len() - max_lines..].to_vec();
     }
     Some(kept.join("\n"))
+}
+
+/// A line kintsu wrote: the seam, in either alphabet.
+fn is_kintsu_line(line: &str) -> bool {
+    let line = line.trim_start();
+    line.starts_with('▎') || line.starts_with("| ")
 }
 
 #[cfg(test)]
@@ -100,6 +116,39 @@ error TS2307: Cannot find module 'left-pad'
             "nothing after the echo"
         );
         assert_eq!(output_after("", "x", 10), None);
+    }
+
+    #[test]
+    fn kintsus_own_bubble_is_neither_the_echo_nor_part_of_the_output() {
+        let after_typo = "❯ git statusss\ngit: 'statusss' is not a git command. See 'git --help'.\n▎ Did you mean git status?\n▎ Tab to fix · kintsu why · kintsu agent · kintsu ignore · ^K more\n";
+        assert_eq!(
+            output_after(after_typo, "git statusss", 400).unwrap(),
+            "git: 'statusss' is not a git command. See 'git --help'."
+        );
+        let after_failure = format!(
+            "{after_typo}❯ git status\nfatal: not a git repository (or any of the parent directories): .git\n▎ git status exited 128.\n▎ kintsu fix · kintsu why · kintsu agent · kintsu ignore · ^K more\n▎ asking local…\n"
+        );
+        assert_eq!(
+            output_after(&after_failure, "git status", 400).unwrap(),
+            "fatal: not a git repository (or any of the parent directories): .git",
+            "the bubble echoing the command is not the prompt's echo"
+        );
+        let ascii = "$ make\nmake: boom\n| make exited 2.\n| kintsu fix - kintsu why\n";
+        assert_eq!(output_after(ascii, "make", 400).unwrap(), "make: boom");
+        assert_eq!(
+            output_after("$ make\n▎ make exited 2.\n", "make", 400),
+            None,
+            "a bubble alone is no output"
+        );
+    }
+
+    #[test]
+    fn a_prompt_with_text_after_the_command_still_marks_the_echo() {
+        let screen = "❯ git status                                            14:59\nfatal: nope\n";
+        assert_eq!(
+            output_after(screen, "git status", 400).unwrap(),
+            "fatal: nope"
+        );
     }
 
     #[test]

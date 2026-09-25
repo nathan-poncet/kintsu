@@ -19,4 +19,13 @@ pub trait CaseStore {
     /// The last case of a session, or the last case at all when no
     /// session is known.
     fn last(&self, session: Option<&SessionId>) -> Result<Option<FailureCase>, CaseStoreError>;
+
+    /// Whether no newer failure has replaced `case` as its session's last:
+    /// what a late result checks before saving, so it never brings back a
+    /// failure the shell has moved past.
+    fn still_current(&self, case: &FailureCase) -> Result<bool, CaseStoreError> {
+        Ok(self
+            .last(case.session())?
+            .is_none_or(|last| last.id() == case.id()))
+    }
 }

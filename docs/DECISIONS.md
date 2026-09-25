@@ -361,6 +361,17 @@ by the same invocation tests. Ghostty has no way to read a pane, so a
 Ghostty user gets capture only inside Herdr or tmux. The opt-in stderr
 tee for shells without any source is not built.
 
+Two corrections after the first day of use. The echo of the command is
+the last line that *ends* with it, never a line kintsu wrote itself (the
+seam marks those): the bubble "git status exited 128." under a failure
+used to be taken for the prompt's echo, which left the model with kintsu's
+own words as the output and the real error gone. The bubble is stripped
+from the end of the output for the same reason. And a result that arrives
+late, the read of the pane or a model's proposal, is saved only while its
+case is still the session's last (`CaseStore::still_current`), so a slow read
+never brings back a failure the shell has moved past; the message is still
+delivered.
+
 ## 18. v0.2, step B1: ghost text (2026-09-25)
 
 A fix that is high-confidence and harmless (`Fix::is_ghostable`) is

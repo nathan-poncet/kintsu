@@ -101,8 +101,10 @@ impl Messages<'_> {
             )?;
             return Err(MessagesError::NoFix);
         };
-        self.cases
-            .save(&case.clone().with_proposal(Some(fix.clone())))?;
+        if self.cases.still_current(case)? {
+            self.cases
+                .save(&case.clone().with_proposal(Some(fix.clone())))?;
+        }
         let message = Message::new(case.id().clone(), self.clock.now(), MessageBody::Fix(fix));
         self.notifier.deliver(session, message.clone())?;
         Ok(message)
@@ -236,6 +238,45 @@ mod tests {
         assert_eq!(delivered.len(), 1);
         assert_eq!(delivered[0].0.as_str(), "42");
         assert_eq!(delivered[0].1, message);
+    }
+
+    #[test]
+    fn a_late_answer_is_delivered_but_not_saved_over_a_newer_failure() {
+        use crate::entities::{CaseId, Timestamp};
+        let models = ScriptedModels::answering(&[("local", Ok("make -j4"))]);
+        let notifier = MemoryNotifier::default();
+        let cases = MemoryCases::default();
+        let old = case("make", 2, Some("42"));
+        cases.save(&old).unwrap();
+        let newer = FailureCase::new(
+            CaseId::new("c2"),
+            Timestamp::from_millis(1),
+            outcome("ls nope", 1),
+            None,
+        )
+        .with_session(Some(SessionId::new("42")));
+        cases.save(&newer).unwrap();
+        let uc = Messages {
+            settings: &settings(EagerFix::On, &["local"]),
+            clock: &FakeClock::at(5),
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            notifier: &notifier,
+            cases: &cases,
+        };
+        let message = uc.fix(&old).unwrap();
+        assert_eq!(message.case().as_str(), "c");
+        assert_eq!(
+            notifier.delivered.borrow().len(),
+            1,
+            "the shell still hears it"
+        );
+        let last = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!(last.id().as_str(), "c2");
+        assert!(
+            last.proposal().is_none(),
+            "kintsu fix answers for the newer failure"
+        );
     }
 
     #[test]
