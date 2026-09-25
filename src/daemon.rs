@@ -21,7 +21,7 @@ use crate::adapters::gateways::{
     TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
-use crate::entities::{SessionId, Settings, TriageDecision, UiMode};
+use crate::entities::{SessionId, Settings, Shell, TriageDecision, UiMode};
 use crate::use_cases::{CaptureOutput, Messages, Triage, TriageInput};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -221,6 +221,7 @@ fn on_command_finished(
     let style = daemon.style(&settings, color);
     let session = input.session.clone();
     let terminal = input.terminal.clone();
+    let ghost_shell = input.shell.is_some_and(Shell::supports_ghost_text);
     if let (Some(session), Some(pid)) = (&session, signal_pid) {
         daemon.sessions.register_signal(session, pid);
     }
@@ -248,7 +249,7 @@ fn on_command_finished(
         }
         _ => None,
     };
-    let mut text = toast(&decision, &style);
+    let mut text = toast(&decision, &style, ghost_shell);
     if let (Some(t), Some(model)) = (text.as_mut(), pending.as_deref()) {
         t.push('\n');
         t.push_str(&pending_line(model, &style));

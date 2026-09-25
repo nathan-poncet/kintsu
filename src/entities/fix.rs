@@ -86,6 +86,12 @@ impl Fix {
     pub fn rationale(&self) -> &str {
         &self.rationale
     }
+
+    /// Safe to pre-type on the next prompt as ghost text: high confidence
+    /// and harmless. The user still presses Enter.
+    pub fn is_ghostable(&self) -> bool {
+        self.confidence.is_high() && matches!(self.danger, Danger::None)
+    }
 }
 
 impl fmt::Display for FixSource {
@@ -125,6 +131,18 @@ mod tests {
         );
         assert_eq!(safe.danger(), &Danger::None);
         assert!(matches!(rough.danger(), Danger::Destructive(_)));
+        assert!(safe.is_ghostable());
+        assert!(
+            !rough.is_ghostable(),
+            "never pre-type something destructive"
+        );
+        let guess = Fix::new(
+            CommandLine::new("git status").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("m".into()),
+            "",
+        );
+        assert!(!guess.is_ghostable(), "a model's guess is not pre-typed");
         assert_eq!(format!("{}", safe.source()), "rule · typo");
     }
 }

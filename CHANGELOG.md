@@ -8,6 +8,9 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- Ghost text: a fix that is confident and harmless is pre-typed, dim, on
+  the next zsh prompt; Tab or → accepts it. In fish, Tab on an empty line
+  inserts it. The bubble says "Tab to fix".
 - The failed command's output is read from the terminal after the bubble
   and kept with the case: Herdr, tmux, WezTerm, Kitty and iTerm2, tried in
   the order of `[capture] sources`, at most `max_lines` lines. `why`, the

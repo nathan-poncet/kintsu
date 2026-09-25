@@ -11,13 +11,14 @@ binary (cargo build). Not part of CI: run it after touching shell/*.
     python3 scripts/shell-harness.py zsh        # zsh scenarios
     python3 scripts/shell-harness.py why        # kintsu why in both shells
     python3 scripts/shell-harness.py late       # the answer lands after another command
+    python3 scripts/shell-harness.py ghost      # a typo, the pre-typed fix, Tab, Enter
     DELAY=1.5 …                                 # slow the fake model down
 
 Environment: BIN (directory of the kintsu binary, default target/debug),
 ROOT (scratch directory, default /tmp/kintsu-harness; keep it short, it
 holds a Unix socket), PYLIB (extra sys.path entry for pyte).
 """
-import os, pty, select, time, re, json, threading, socketserver, http.server, sys
+import os, pty, select, time, re, json, threading, socketserver, http.server, sys, shutil
 if os.environ.get("PYLIB"):
     sys.path.insert(0, os.environ["PYLIB"])
 import pyte
@@ -35,7 +36,15 @@ srv = socketserver.TCPServer(("127.0.0.1", 0), H); port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 os.makedirs(ROOT, exist_ok=True)
 open(f"{ROOT}/config.toml", "w").write(f'[models.local]\nprovider = "ollama"\nmodel = "m"\nbase_url = "http://127.0.0.1:{port}"\n[routing]\nquick_fix = ["local"]\nexplain = ["local"]\n[ui]\neager_fix = true\n')
-env = dict(os.environ, KINTSU_SOCKET=f"{ROOT}/d.sock", KINTSU_STATE_DIR=f"{ROOT}/state", KINTSU_CONFIG=f"{ROOT}/config.toml", TERM="xterm-256color", NO_COLOR="1", LINES="24", COLUMNS="80")
+# A small, known PATH: the binary under test, a fake `git` so `gti` has one
+# unambiguous neighbour, and the system directories.
+os.makedirs(f"{ROOT}/bin", exist_ok=True)
+with open(f"{ROOT}/bin/git", "w") as fake:
+    fake.write("#!/bin/sh\necho 'On branch main (fake git)'\n")
+os.chmod(f"{ROOT}/bin/git", 0o755)
+SHELL_PATH = f"{BIN}:{ROOT}/bin:/usr/bin:/bin"
+env = dict(os.environ, KINTSU_SOCKET=f"{ROOT}/d.sock", KINTSU_STATE_DIR=f"{ROOT}/state", KINTSU_CONFIG=f"{ROOT}/config.toml",
+           PATH=SHELL_PATH, KINTSU_DEBUG="1", TERM="xterm-256color", NO_COLOR="1", LINES="24", COLUMNS="80")
 env.pop("KINTSU_SESSION", None)
 
 def respond(fd, chunk):
@@ -47,7 +56,7 @@ def respond(fd, chunk):
     if b"\x1b[?u" in chunk: os.write(fd, b"\x1b[?0u")
     if b"\x1b[6n" in chunk: os.write(fd, b"\x1b[1;1R")
 
-def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False):
+def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -56,7 +65,7 @@ def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False):
         except FileNotFoundError: pass
     pid, fd = pty.fork()
     if pid == 0:
-        os.execvpe("fish", ["fish", "-N", "-i"], env)
+        os.execve(shutil.which("fish") or "fish", ["fish", "-N", "-i"], env)
     import fcntl, termios, struct
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
     screen = pyte.Screen(80, 24); stream = pyte.ByteStream(screen)
@@ -72,13 +81,22 @@ def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False):
                 raw += chunk; stream.feed(chunk); respond(fd, chunk)
     def send(s, t): os.write(fd, s.encode()); drain(t)
     drain(1.5)
-    send(f"set -gx PATH {BIN} $PATH\n", 0.5)
+    send(f"set -gx PATH {BIN} {ROOT}/bin /usr/bin /bin\n", 0.5)
     send("function fish_prompt; printf '\\n~\\n❯ '; end\n", 0.5)
     send("kintsu init fish | source\n", 0.8)
     if variant_fn: send(variant_fn + "\n", 0.5)
     send("clear\n", 0.5)
     send("true\n", 1.5)       # starts the daemon, out of the way of the timing
     send("clear\n", 0.5)
+    if ghost:
+        send("gti status\n", 1.0)          # a rule fix: the next prompt pre-types it (fish: Tab takes it)
+        snapshot = [l.rstrip() for l in screen.display if l.strip()]
+        print("   after the typo:", " | ".join(snapshot[-4:]))
+        send("\t", 0.5)                     # accept
+        accepted = [l.rstrip() for l in screen.display if l.strip()]
+        send("\n", 0.8)                     # run it
+        print("   before Tab:", snapshot[-1] if snapshot else "")
+        print("   after Tab: ", accepted[-1] if accepted else "")
     send("false\n", 0.8)
     if enter_first: send("true\n", 0.3)    # another command, so a new prompt precedes the answer
     if typed: send(typed, 0.3)          # typed, not executed
@@ -122,7 +140,7 @@ end''',
     commandline -f repaint
 end''',
 }
-def run_zsh(typed=None, wait=4.0, enter_first=False, why=False):
+def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -132,7 +150,7 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False):
     zenv = dict(env); zenv.pop("ZDOTDIR", None)
     pid, fd = pty.fork()
     if pid == 0:
-        os.execvpe("zsh", ["zsh", "-f", "-i"], zenv)
+        os.execve(shutil.which("zsh") or "zsh", ["zsh", "-f", "-i"], zenv)
     import fcntl, termios, struct
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
     screen = pyte.Screen(80, 24); stream = pyte.ByteStream(screen)
@@ -146,11 +164,19 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False):
                 stream.feed(chunk); respond(fd, chunk)
     def send(s, t): os.write(fd, s.encode()); drain(t)
     drain(1.0)
-    send(f"export PATH={BIN}:$PATH\n", 0.4)
+    send(f"export PATH={SHELL_PATH}\n", 0.4)
     send("PROMPT=$'\\n~\\n❯ '\n", 0.4)
     send('eval "$(kintsu init zsh)"\n', 0.8)
     send("true\n", 1.5)
     send("clear\n", 0.5)
+    if ghost:
+        send("gti status\n", 1.0)
+        snapshot = [l.rstrip() for l in screen.display if l.strip()]
+        send("\t", 0.5)
+        accepted = [l.rstrip() for l in screen.display if l.strip()]
+        send("\n", 0.8)
+        print("   before Tab:", snapshot[-1] if snapshot else "")
+        print("   after Tab: ", accepted[-1] if accepted else "")
     send("false\n", 0.8)
     if enter_first: send("true\n", 0.3)
     if typed: send(typed, 0.3)
@@ -167,6 +193,11 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False):
     return screen
 
 which = sys.argv[1:] or list(variants)
+if which == ["ghost"]:
+    screen, raw = run(None, ghost=True, wait=1.0)
+    show("fish, Tab takes the rule fix", screen)
+    show("zsh, ghost text then Tab", run_zsh(ghost=True, wait=1.0))
+    srv.shutdown(); sys.exit(0)
 if which == ["why"]:
     screen, raw = run(None, why=True)
     show("fish, kintsu why", screen)

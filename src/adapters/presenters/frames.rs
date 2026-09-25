@@ -33,6 +33,7 @@ pub fn decision(
             "toast": toast,
             "bubbles": bubbles,
             "pending": pending,
+            "ghost": fix.as_ref().filter(|f| f.is_ghostable()).map(|f| f.command().as_str()),
         })
         .to_string(),
     }
@@ -85,6 +86,7 @@ mod tests {
     use crate::entities::{
         CaseId, CommandLine, CommandOutcome, ExitStatus, FailureCase, Timestamp,
     };
+    use crate::entities::{Confidence, Fix, FixSource};
     use serde_json::Value;
 
     fn parse(s: &str) -> Value {
@@ -123,6 +125,32 @@ mod tests {
         assert_eq!(v["toast"], "▎ make exited 2.");
         assert_eq!(v["bubbles"][0], "▎ old");
         assert_eq!(v["v"], 1);
+        assert_eq!(v["ghost"], Value::Null, "no fix, nothing to pre-type");
+        let safe = Fix::new(
+            CommandLine::new("git status").unwrap(),
+            Confidence::new(0.9),
+            FixSource::Rule("typo".into()),
+            "",
+        );
+        let case = FailureCase::new(
+            CaseId::new("c2"),
+            Timestamp::from_millis(0),
+            CommandOutcome::new(
+                CommandLine::new("gti status").unwrap(),
+                ExitStatus::new(127),
+            ),
+            None,
+        );
+        let v = parse(&decision(
+            &TriageDecision::Offer {
+                case: Box::new(case),
+                fix: Some(safe),
+            },
+            None,
+            &[],
+            None,
+        ));
+        assert_eq!(v["ghost"], "git status");
     }
 
     #[test]

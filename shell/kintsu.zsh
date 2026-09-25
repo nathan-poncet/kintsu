@@ -15,6 +15,7 @@ if [[ -o interactive ]]; then
   export KINTSU_SESSION="$$"
   typeset -g __kintsu_command="" __kintsu_started="" __kintsu_fd="" __kintsu_last_subscribe=0
   typeset -gi __kintsu_seq=0 __kintsu_pending_seq=-1
+  typeset -g __kintsu_ghost_file="__KINTSU_STATE_DIR__/sessions/$$.ghost"
 
   __kintsu_preexec() {
     __kintsu_command="$1"
@@ -26,6 +27,7 @@ if [[ -o interactive ]]; then
     local cmdline="$__kintsu_command" started="$__kintsu_started" duration=""
     local -a timing
     (( __kintsu_seq++ ))
+    command rm -f -- "$__kintsu_ghost_file" 2>/dev/null   # a fix is for the failure just before
     __kintsu_command=""
     __kintsu_started=""
     [[ -n "${KINTSU_DISABLE:-}" ]] && return $__kintsu_status
@@ -98,6 +100,48 @@ if [[ -o interactive ]]; then
     CURSOR=${#BUFFER}
     zle redisplay
   }
+
+  # Ghost text: a safe fix waits in a file; the next empty prompt shows it
+  # dim after the cursor. Tab or → accepts it, anything else discards it,
+  # and only Enter runs it.
+  __kintsu_line_init() {
+    [[ -r "$__kintsu_ghost_file" && -z "$BUFFER" ]] || return 0
+    local ghost
+    ghost="$(<"$__kintsu_ghost_file")"
+    command rm -f -- "$__kintsu_ghost_file"
+    [[ -n "$ghost" ]] || return 0
+    POSTDISPLAY="$ghost"
+    region_highlight+=("${#BUFFER} $(( ${#BUFFER} + ${#ghost} )) fg=8")
+  }
+  __kintsu_line_pre_redraw() {
+    [[ -n "$POSTDISPLAY" && -n "$BUFFER" ]] || return 0
+    POSTDISPLAY=""
+    region_highlight=()
+  }
+  __kintsu_accept_ghost() {
+    if [[ -n "$POSTDISPLAY" && -z "$BUFFER" ]]; then
+      BUFFER="$POSTDISPLAY"
+      POSTDISPLAY=""
+      region_highlight=()
+      CURSOR=${#BUFFER}
+      return 0
+    fi
+    local previous="${1:-}"
+    [[ -n "$previous" && "$previous" != undefined-key ]] && zle "$previous"
+  }
+  __kintsu_tab() { __kintsu_accept_ghost "$__kintsu_previous_tab"; }
+  __kintsu_right() { __kintsu_accept_ghost "$__kintsu_previous_right"; }
+  typeset -g __kintsu_previous_tab="${${(z)$(bindkey '^I')}[2]}"
+  typeset -g __kintsu_previous_right="${${(z)$(bindkey '^[[C')}[2]}"
+  [[ "$__kintsu_previous_tab" == __kintsu_tab ]] && __kintsu_previous_tab=expand-or-complete
+  [[ "$__kintsu_previous_right" == __kintsu_right ]] && __kintsu_previous_right=forward-char
+  autoload -Uz add-zle-hook-widget
+  add-zle-hook-widget line-init __kintsu_line_init
+  add-zle-hook-widget line-pre-redraw __kintsu_line_pre_redraw
+  zle -N __kintsu_tab
+  zle -N __kintsu_right
+  bindkey '^I' __kintsu_tab
+  bindkey '^[[C' __kintsu_right
 
   add-zsh-hook preexec __kintsu_preexec
   add-zsh-hook precmd __kintsu_precmd

@@ -186,6 +186,12 @@ fn the_daemon_speaks_the_protocol() {
     let typo = f.exchange(r#"{"v":1,"type":"command_finished","session":"s1","command":"gti status","status":127,"cwd":"/","shell":"zsh"}"#);
     assert_eq!(typo[0]["type"], "decision");
     assert_eq!(typo[0]["offer"]["fix"], "git status");
+    assert_eq!(typo[0]["ghost"], "git status", "safe enough to pre-type");
+    assert!(
+        typo[0]["toast"].as_str().unwrap().contains("Tab to fix"),
+        "{}",
+        typo[0]["toast"]
+    );
     assert!(
         typo[0]["toast"]
             .as_str()

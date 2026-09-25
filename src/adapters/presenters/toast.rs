@@ -8,7 +8,8 @@ use super::Style;
 const ECHO_WIDTH: usize = 60;
 
 /// What to print under the failure, or nothing.
-pub fn toast(decision: &TriageDecision, style: &Style) -> Option<String> {
+/// `ghost` says the shell will pre-type a safe fix on the next prompt.
+pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<String> {
     let TriageDecision::Offer { case, fix } = decision else {
         return None;
     };
@@ -33,16 +34,20 @@ pub fn toast(decision: &TriageDecision, style: &Style) -> Option<String> {
         }
     };
     let dot = style.dot();
+    let pretyped = ghost && fix.as_ref().is_some_and(Fix::is_ghostable);
     let actions = match fix {
+        Some(_) if pretyped => {
+            format!("Tab to fix{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore")
+        }
         Some(_) => format!("^K to insert{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore"),
         None => format!("kintsu fix{dot}kintsu why{dot}kintsu agent{dot}kintsu ignore"),
     };
     Some(match style.mode {
         UiMode::Hint => {
-            let key = if fix.is_some() {
-                format!("{dot}^K")
-            } else {
-                String::new()
+            let key = match fix {
+                Some(_) if pretyped => format!("{dot}Tab"),
+                Some(_) => format!("{dot}^K"),
+                None => String::new(),
             };
             style.line(&style.dim(&format!("{sentence}{key}")))
         }
@@ -138,7 +143,8 @@ mod tests {
         assert_eq!(
             toast(
                 &TriageDecision::Quiet(QuietReason::Succeeded),
-                &Style::PLAIN
+                &Style::PLAIN,
+                false
             ),
             None
         );
@@ -146,7 +152,44 @@ mod tests {
             mode: UiMode::Silent,
             ..Style::PLAIN
         };
-        assert_eq!(toast(&offer("make", 2, None, None), &silent), None);
+        assert_eq!(toast(&offer("make", 2, None, None), &silent, false), None);
+    }
+
+    #[test]
+    fn a_safe_fix_in_a_shell_that_pre_types_says_tab() {
+        let text = toast(
+            &offer("gti status", 127, None, Some("git status")),
+            &Style::PLAIN,
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            text,
+            "| Did you mean git status?\n| Tab to fix - kintsu why - kintsu agent - kintsu ignore"
+        );
+        let rough = toast(
+            &offer("rm -rf buidl", 1, None, Some("rm -rf build")),
+            &Style::PLAIN,
+            true,
+        )
+        .unwrap();
+        assert!(
+            rough.contains("^K to insert"),
+            "destructive: never pre-typed, so no Tab: {rough}"
+        );
+        let hint = Style {
+            mode: UiMode::Hint,
+            ..Style::PLAIN
+        };
+        assert_eq!(
+            toast(
+                &offer("gti status", 127, None, Some("git status")),
+                &hint,
+                true
+            )
+            .unwrap(),
+            "| Did you mean git status? - Tab"
+        );
     }
 
     #[test]
@@ -154,6 +197,7 @@ mod tests {
         let text = toast(
             &offer("gti status", 127, None, Some("git status")),
             &Style::PLAIN,
+            false,
         )
         .unwrap();
         assert_eq!(
@@ -167,13 +211,14 @@ mod tests {
         let text = toast(
             &offer("npm run build", 1, Some(12_000), None),
             &Style::PLAIN,
+            false,
         )
         .unwrap();
         assert_eq!(
             text,
             "| npm run build exited 1 after 12 s.\n| kintsu fix - kintsu why - kintsu agent - kintsu ignore"
         );
-        let quick = toast(&offer("make", 2, Some(300), None), &Style::PLAIN).unwrap();
+        let quick = toast(&offer("make", 2, Some(300), None), &Style::PLAIN, false).unwrap();
         assert!(
             quick.starts_with("| make exited 2.\n"),
             "sub-second durations are noise: {quick}"
@@ -190,6 +235,7 @@ mod tests {
         let text = toast(
             &offer("rm -rf buidl", 1, None, Some("rm -rf build")),
             &colour,
+            false,
         )
         .unwrap();
         assert!(
@@ -200,10 +246,15 @@ mod tests {
             mode: UiMode::Hint,
             ..Style::PLAIN
         };
-        let text = toast(&offer("gti status", 127, None, Some("git status")), &hint).unwrap();
+        let text = toast(
+            &offer("gti status", 127, None, Some("git status")),
+            &hint,
+            false,
+        )
+        .unwrap();
         assert_eq!(text, "| Did you mean git status? - ^K");
         assert_eq!(
-            toast(&offer("make", 2, None, None), &hint).unwrap(),
+            toast(&offer("make", 2, None, None), &hint, false).unwrap(),
             "| make exited 2."
         );
     }
@@ -252,7 +303,7 @@ mod tests {
     #[test]
     fn long_commands_are_abbreviated_in_the_echo() {
         let long = "cargo run --release -- --input some/very/long/path/to/a/file.json --output out.json --verbose";
-        let text = toast(&offer(long, 1, None, None), &Style::PLAIN).unwrap();
+        let text = toast(&offer(long, 1, None, None), &Style::PLAIN, false).unwrap();
         assert!(
             text.starts_with(
                 "| cargo run --release -- --input some/very/long/path/to/a/fil... exited 1."

@@ -40,7 +40,8 @@ $ git status
 ```
 
 A small bubble, one gold seam on the left, one sentence, a line of
-actions. `^K` puts the fix in your prompt; you press Enter. Nothing ever
+actions. A confident, harmless fix is already on your next prompt, dim:
+Tab takes it, you press Enter. Otherwise `^K` puts the fix in your prompt. Nothing ever
 steals a keystroke from your prompt, and nothing runs on its own. When no
 rule knows and a local model is routed for quick fixes (or `eager_fix =
 true` for a remote one), a resident daemon asks it in the background; the

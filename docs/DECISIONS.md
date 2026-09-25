@@ -361,9 +361,24 @@ by the same invocation tests. Ghostty has no way to read a pane, so a
 Ghostty user gets capture only inside Herdr or tmux. The opt-in stderr
 tee for shells without any source is not built.
 
+## 18. v0.2, step B1: ghost text (2026-09-25)
+
+A fix that is high-confidence and harmless (`Fix::is_ghostable`) is
+pre-typed on the next prompt. The decision frame carries it as `ghost`;
+the client writes `<state>/sessions/<id>.ghost` (the `HookNotes`
+gateway, which also owns the "asking…" marker). zsh shows it dim after
+the cursor with `POSTDISPLAY`, the way zsh-autosuggestions does; Tab or →
+on an empty line accepts it, typing anything discards it, Enter runs it.
+fish has no way to draw a suggestion the shell did not compute, so Tab on
+an empty line inserts the fix instead, and the bubble says "Tab to fix"
+in both shells. bash keeps `^K`. The previous Tab and → bindings are
+remembered and called when there is nothing to accept, so completion
+plugins keep working. The file is removed at the next command, so a fix
+never applies to a later failure.
+
 ## What is not built, by priority
 
-1. What the daemon unlocks next: the panel, ghost text, clickable words,
+1. What the daemon unlocks next: the panel, clickable words,
    `kintsu service install`.
 2. The stderr tee for terminals without a readable pane; `session_new`.
 3. `kintsu setup`, `kintsu models`, `kintsu login`, `kintsu service`.

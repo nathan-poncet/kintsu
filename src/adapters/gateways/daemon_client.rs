@@ -21,6 +21,8 @@ pub struct DecisionView {
     pub bubbles: Vec<String>,
     /// The model being asked in the background, when one is.
     pub pending: Option<String>,
+    /// A fix safe enough for the shell to pre-type on the next prompt.
+    pub ghost: Option<String>,
 }
 
 pub struct DaemonClient {
@@ -95,6 +97,7 @@ impl DaemonClient {
             toast: answer["toast"].as_str().map(String::from),
             bubbles: texts(&answer["bubbles"]),
             pending: answer["pending"].as_str().map(String::from),
+            ghost: answer["ghost"].as_str().map(String::from),
         })
     }
 

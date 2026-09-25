@@ -14,6 +14,12 @@ pub enum Shell {
 }
 
 impl Shell {
+    /// Whether the hook can pre-type a fix on the next prompt: zsh and fish
+    /// have a line editor the hook can draw in; bash does not.
+    pub fn supports_ghost_text(self) -> bool {
+        matches!(self, Shell::Zsh | Shell::Fish)
+    }
+
     /// Every supported shell, in the order the documentation lists them.
     pub const ALL: [Self; 3] = [Self::Zsh, Self::Bash, Self::Fish];
 

@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
-    AskingMarker, DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HttpModels, JsonState,
+    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
     RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings,
 };
 use crate::adapters::presenters::doctor::Places;
@@ -18,7 +18,7 @@ use crate::adapters::presenters::{
     pending_line, privacy_report, raw_fix, shell_hook, toast,
 };
 use crate::daemon::{self, DaemonConfig};
-use crate::entities::{SessionId, Settings, TerminalIdentity, TriageDecision, UiMode};
+use crate::entities::{SessionId, Settings, Shell, TerminalIdentity, TriageDecision, UiMode};
 use crate::use_cases::{
     CaptureOutput, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy,
     ScopeChoice, Triage, TriageInput,
@@ -246,7 +246,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                     match rt.client().explain(session) {
                         Some(Ok(model)) => {
                             let _ = writeln!(err, "{}", pending_line(&model, &style));
-                            let _ = AskingMarker::new(&rt.state_dir).set(session);
+                            let _ = HookNotes::new(&rt.state_dir).set_asking(session);
                             return ExitCode::SUCCESS;
                         }
                         Some(Err(reason)) => return failure(err, &reason, &style, false),
@@ -381,8 +381,14 @@ fn triage(
             for text in view.toast.iter().chain(view.bubbles.iter()) {
                 let _ = writeln!(err, "{text}");
             }
-            if let (Some(_), Some(session)) = (&view.pending, &input.session) {
-                let _ = AskingMarker::new(&rt.state_dir).set(session);
+            if let Some(session) = &input.session {
+                let notes = HookNotes::new(&rt.state_dir);
+                if view.pending.is_some() {
+                    let _ = notes.set_asking(session);
+                }
+                if let Some(ghost) = &view.ghost {
+                    let _ = notes.set_ghost(session, ghost);
+                }
             }
             return ExitCode::SUCCESS;
         }
@@ -396,10 +402,20 @@ fn triage(
         ignores: state,
         environment,
     };
+    let ghost_shell = input.shell.is_some_and(Shell::supports_ghost_text);
+    let session = input.session.clone();
     match triage.run(input) {
         Ok(decision) => {
-            if let Some(text) = toast(&decision, style) {
+            if let Some(text) = toast(&decision, style, ghost_shell) {
                 let _ = writeln!(err, "{text}");
+            }
+            if let (TriageDecision::Offer { fix: Some(fix), .. }, Some(session), true) =
+                (&decision, &session, ghost_shell)
+            {
+                if fix.is_ghostable() {
+                    let _ =
+                        HookNotes::new(&rt.state_dir).set_ghost(session, fix.command().as_str());
+                }
             }
             // The output is read after the bubble: it costs a program run,
             // and only an offered case is worth it.
@@ -531,13 +547,19 @@ mod tests {
                 "gti status",
                 "--session",
                 "7",
+                "--shell",
+                "zsh",
             ],
             None,
         );
         assert!(out.is_empty());
         assert_eq!(
             err,
-            "▎ Did you mean git status?\n▎ ^K to insert · kintsu why · kintsu agent · kintsu ignore\n"
+            "▎ Did you mean git status?\n▎ Tab to fix · kintsu why · kintsu agent · kintsu ignore\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(b.dir.join("state").join("sessions").join("7.ghost")).unwrap(),
+            "git status"
         );
         let (code, out, _) = b.run(&["fix", "--raw"], Some("7"));
         assert_eq!((code, out.as_str()), (ExitCode::SUCCESS, "git status\n"));
