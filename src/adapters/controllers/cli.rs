@@ -67,6 +67,8 @@ pub enum Command {
     Mute(Duration),
     /// `kintsu doctor`.
     Doctor,
+    /// `kintsu setup [--yes]`: three questions, then the configuration file.
+    Setup { yes: bool },
     /// `kintsu default-config`.
     DefaultConfig,
     /// `kintsu config path`.
@@ -144,6 +146,9 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
             .map(Command::Mute)
             .ok_or_else(|| CliError::InvalidDuration((*text).to_string())),
         ["doctor"] => Ok(Command::Doctor),
+        ["setup"] => Ok(Command::Setup { yes: false }),
+        ["setup", "--yes" | "-y"] => Ok(Command::Setup { yes: true }),
+        ["setup", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
         ["default-config"] => Ok(Command::DefaultConfig),
         ["config", "path"] => Ok(Command::ConfigPath),
         ["config", ..] => Err(CliError::UnknownConfigSubcommand),
@@ -517,6 +522,15 @@ mod tests {
     #[test]
     fn the_setup_commands_parse() {
         assert_eq!(parse_args(["doctor"]), Ok(Command::Doctor));
+        assert_eq!(parse_args(["setup"]), Ok(Command::Setup { yes: false }));
+        assert_eq!(
+            parse_args(["setup", "--yes"]),
+            Ok(Command::Setup { yes: true })
+        );
+        assert_eq!(
+            parse_args(["setup", "--x"]),
+            Err(CliError::UnknownFlag("--x".into()))
+        );
         assert_eq!(parse_args(["default-config"]), Ok(Command::DefaultConfig));
         assert_eq!(parse_args(["config", "path"]), Ok(Command::ConfigPath));
         assert_eq!(

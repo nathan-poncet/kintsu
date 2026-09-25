@@ -376,6 +376,20 @@ remembered and called when there is nothing to accept, so completion
 plugins keep working. The file is removed at the next command, so a fix
 never applies to a later failure.
 
+## 19. v0.2, step B2: `kintsu setup` (2026-09-25)
+
+Three questions, shaped by what the machine has: a local model when
+Ollama is installed (default `qwen2.5-coder:7b`), a cloud model
+(Anthropic, OpenAI or Gemini, key in a variable or the keychain), and
+the agent for `kintsu agent` among the CLIs found on the PATH. `--yes`
+takes every default without asking. The answers become `Settings` in a
+pure function (`use_cases/setup.rs`), rendered to TOML by the gateway
+(`render_settings`, which parses back to the same settings) and written
+to the configuration path; an existing file is kept unless the user says
+otherwise; doctor's report follows. The questions live in a controller
+that reads any `BufRead` and writes any `Write`, so they are tested with
+in-memory answers.
+
 ## What is not built, by priority
 
 1. What the daemon unlocks next: the panel, clickable words,

@@ -8,6 +8,9 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- `kintsu setup`: three questions (a local model with Ollama, a cloud
+  model and where its key is, the agent for `kintsu agent`), then the
+  configuration file and doctor's report; `--yes` takes the defaults.
 - Ghost text: a fix that is confident and harmless is pre-typed, dim, on
   the next zsh prompt; Tab or → accepts it. In fish, Tab on an empty line
   inserts it. The bubble says "Tab to fix".

@@ -15,6 +15,104 @@ use crate::entities::{
 /// The commented default file, also printed by `kintsu default-config`.
 pub const DEFAULT_CONFIG: &str = include_str!("../../../config/default.toml");
 
+/// The file `kintsu setup` writes: the models, the routing, the ui, in
+/// the documented shape, with a short header. Parses back to the same
+/// settings.
+pub fn render_settings(settings: &Settings) -> String {
+    let mut out = String::from(
+        "# Kintsu configuration, written by `kintsu setup`.\n\
+         # `kintsu default-config` prints every option with its comment.\n\n",
+    );
+    for m in &settings.models {
+        out.push_str(&format!("[models.{}]\n", m.name));
+        match m.provider {
+            Provider::CliAgent => {
+                out.push_str("provider = \"cli_agent\"\n");
+                if crate::use_cases::setup::AGENT_PRESETS.contains(&m.model.as_str()) {
+                    out.push_str(&format!("command  = {}\n", toml_string(&m.model)));
+                } else {
+                    out.push_str(&format!("template = {}\n", toml_string(&m.model)));
+                }
+            }
+            provider => {
+                let name = match provider {
+                    Provider::Ollama => "ollama",
+                    Provider::Anthropic => "anthropic",
+                    _ => "openai_compatible",
+                };
+                out.push_str(&format!("provider = \"{name}\"\n"));
+                out.push_str(&format!("model    = {}\n", toml_string(&m.model)));
+                if let Some(url) = &m.base_url {
+                    out.push_str(&format!("base_url = {}\n", toml_string(url)));
+                }
+                match &m.key {
+                    KeySource::None => {}
+                    KeySource::Env(var) => {
+                        out.push_str(&format!("key      = {{ env = {} }}\n", toml_string(var)))
+                    }
+                    KeySource::Command(cmd) => out.push_str(&format!(
+                        "key      = {{ command = {} }}\n",
+                        toml_string(cmd)
+                    )),
+                    KeySource::Keychain(_) => out.push_str("key      = { keychain = true }\n"),
+                    KeySource::Literal(lit) => out.push_str(&format!(
+                        "key      = {{ literal = {} }}\n",
+                        toml_string(lit)
+                    )),
+                }
+            }
+        }
+        let tier = match m.tier {
+            Tier::Tiny => "tiny",
+            Tier::Small => "small",
+            Tier::Large => "large",
+            Tier::Agent => "agent",
+        };
+        out.push_str(&format!("tier     = \"{tier}\"\n\n"));
+    }
+    out.push_str("[routing]\n");
+    for (task, names) in [
+        ("quick_fix", &settings.routing.quick_fix),
+        ("explain", &settings.routing.explain),
+        ("investigate", &settings.routing.investigate),
+    ] {
+        let list: Vec<String> = names.iter().map(|n| toml_string(n)).collect();
+        out.push_str(&format!("{task:<11} = [{}]\n", list.join(", ")));
+    }
+    out.push_str("\n[routing.constraints]\n");
+    out.push_str(&format!(
+        "sensitive_output = \"{}\"\n\n",
+        if settings.sensitive_local_only {
+            "local_only"
+        } else {
+            "allow"
+        }
+    ));
+    out.push_str("[ui]\n");
+    out.push_str(&format!(
+        "mode      = \"{}\"\n",
+        match settings.ui.mode {
+            UiMode::Toast => "toast",
+            UiMode::Hint => "hint",
+            UiMode::Silent => "silent",
+        }
+    ));
+    out.push_str(&format!("ascii     = {}\n", settings.ui.ascii));
+    out.push_str(&format!(
+        "eager_fix = {}\n",
+        match settings.ui.eager_fix {
+            EagerFix::Auto => "\"auto\"".to_string(),
+            EagerFix::On => "true".to_string(),
+            EagerFix::Off => "false".to_string(),
+        }
+    ));
+    out
+}
+
+fn toml_string(s: &str) -> String {
+    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SettingsError {
     #[error("cannot read {0}")]
@@ -374,6 +472,44 @@ fn expand_dir(dir: &str, home: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn what_setup_renders_parses_back_to_the_same_settings() {
+        use crate::use_cases::setup::{CloudChoice, CloudKind, SetupAnswers, compose};
+        let answers = SetupAnswers {
+            local_model: Some("qwen2.5-coder:7b".into()),
+            cloud: Some(CloudChoice {
+                kind: CloudKind::Anthropic,
+                model: "claude-haiku-4-5-20251001".into(),
+                key: KeySource::Keychain("claude".into()),
+            }),
+            agent: Some("codex".into()),
+        };
+        let settings = compose(&answers);
+        let text = render_settings(&settings);
+        let parsed = parse_settings(&text, None).unwrap();
+        let mut expected = settings.clone();
+        expected
+            .models
+            .iter_mut()
+            .find(|m| m.name == "codex-cli")
+            .unwrap()
+            .model = "codex \"$(cat {brief})\"".into();
+        assert_eq!(parsed, expected, "{text}");
+        assert!(
+            text.contains("[models.local]\nprovider = \"ollama\"\nmodel    = \"qwen2.5-coder:7b\""),
+            "{text}"
+        );
+        assert!(text.contains("key      = { keychain = true }"));
+        assert!(text.contains("command  = \"codex\""));
+        assert!(text.contains("explain     = [\"claude\", \"local\"]"));
+        let bare = render_settings(&Settings::default());
+        assert_eq!(
+            parse_settings(&bare, None).unwrap(),
+            Settings::default(),
+            "{bare}"
+        );
+    }
 
     #[test]
     fn the_default_file_routes_the_local_model_and_keeps_the_other_defaults() {

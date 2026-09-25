@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
+use crate::adapters::controllers::{Command, DaemonAction, Prompter, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
     DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
-    RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings,
+    RandomIds, ShellAgents, SystemClock, TerminalOutput, load_settings, render_settings,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -20,8 +20,8 @@ use crate::adapters::presenters::{
 use crate::daemon::{self, DaemonConfig};
 use crate::entities::{SessionId, Settings, Shell, TerminalIdentity, TriageDecision, UiMode};
 use crate::use_cases::{
-    CaptureOutput, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy,
-    ScopeChoice, Triage, TriageInput,
+    CaptureOutput, Detect, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy,
+    ScopeChoice, Triage, TriageInput, compose,
 };
 
 pub const USAGE: &str = "\
@@ -36,6 +36,7 @@ Usage:
   kintsu privacy                  what a model or an agent would receive
   kintsu ignore [--command|--dir|--session|--always] [program]
   kintsu mute [30m|1h|…]          nothing for a while (default 1h)
+  kintsu setup [--yes]            three questions, then the configuration file
   kintsu doctor                   check the hook, the models, the keys
   kintsu default-config           the commented default configuration
   kintsu config path              where the files are
@@ -124,6 +125,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             );
             return ExitCode::SUCCESS;
         }
+        Command::Setup { yes } => return setup(rt, yes, out, err),
         Command::Daemon(DaemonAction::Run) => {
             return daemon::run(DaemonConfig {
                 socket: rt.socket_path.clone(),
@@ -344,6 +346,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         | Command::DefaultConfig
         | Command::ConfigPath
         | Command::Daemon(_)
+        | Command::Setup { .. }
         | Command::Subscribe { .. }
         | Command::Pending { .. } => ExitCode::SUCCESS,
     }
@@ -452,6 +455,81 @@ fn subscribe(rt: &Runtime, session: Option<SessionId>, out: &mut dyn Write) -> E
         let _ = writeln!(out, "{text}");
         let _ = out.flush();
     });
+    ExitCode::SUCCESS
+}
+
+/// `kintsu setup`: what the machine has, three questions, one file, and
+/// doctor's verdict on it.
+fn setup(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
+    let plain = Style {
+        color: rt.color,
+        ascii: false,
+        mode: UiMode::Toast,
+    };
+    let environment = FsEnvironment::new(rt.path_var.clone());
+    let detected = Detect {
+        environment: &environment,
+        models: &HttpModels,
+    }
+    .run();
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
+    let mut prompter = Prompter {
+        input: &mut input,
+        output: out,
+        assume_yes: yes,
+    };
+    if rt.config_path.is_file() && !yes {
+        let _ = writeln!(
+            prompter.output,
+            "{}",
+            plain.line(&format!("{} exists.", rt.config_path.display()))
+        );
+        let mut line = String::new();
+        let _ = write!(prompter.output, "▎ Replace it? [y/N] ");
+        let _ = prompter.output.flush();
+        let _ = prompter.input.read_line(&mut line);
+        if !matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+            let _ = writeln!(prompter.output, "{}", plain.line("kept as is."));
+            return ExitCode::SUCCESS;
+        }
+    }
+    let answers = prompter.run(&detected);
+    let settings = compose(&answers);
+    if let Some(parent) = rt.config_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(&rt.config_path, render_settings(&settings)) {
+        return failure(
+            err,
+            &format!("cannot write {}: {e}", rt.config_path.display()),
+            &plain,
+            false,
+        );
+    }
+    let _ = writeln!(
+        out,
+        "{}",
+        plain.line(&format!("written to {}", rt.config_path.display()))
+    );
+    let checks = Diagnose {
+        settings: &settings,
+        secrets: &EnvSecrets,
+        environment: &environment,
+        models: &HttpModels,
+    }
+    .run(rt.session.as_ref());
+    let places = Places {
+        config: &rt.config_path.display().to_string(),
+        config_exists: true,
+        state: &rt.state_dir.display().to_string(),
+    };
+    let _ = writeln!(
+        out,
+        "
+{}",
+        doctor_report(&checks, &places, &plain)
+    );
     ExitCode::SUCCESS
 }
 
@@ -725,6 +803,32 @@ mod tests {
         let (code, _, err) = b.run(&["agent"], Some("7"));
         assert_eq!(code, ExitCode::from(1));
         assert!(err.contains("no agent is configured"));
+    }
+
+    #[test]
+    fn setup_with_yes_writes_a_file_from_what_the_path_offers() {
+        let b = Bench::new("setup");
+        for tool in ["ollama", "codex"] {
+            std::fs::write(b.dir.join("bin").join(tool), "").unwrap();
+        }
+        let (code, out, err) = b.run(&["setup", "--yes"], Some("7"));
+        assert_eq!(code, ExitCode::SUCCESS, "{err}");
+        let written = std::fs::read_to_string(b.dir.join("config.toml")).unwrap();
+        assert!(
+            written.contains("[models.local]") && written.contains("[models.codex-cli]"),
+            "{written}"
+        );
+        assert!(
+            written.contains("investigate = [\"codex-cli\"]"),
+            "{written}"
+        );
+        assert!(
+            out.contains("written to") && out.contains("model codex-cli"),
+            "{out}"
+        );
+        let (code, out, _) = b.run(&["doctor"], Some("7"));
+        assert_eq!(code, ExitCode::SUCCESS);
+        assert!(out.contains("model local"), "{out}");
     }
 
     #[test]

@@ -27,4 +27,4 @@ pub use sessions::Sessions;
 pub use shell_agents::ShellAgents;
 pub use system_clock::SystemClock;
 pub use terminals::TerminalOutput;
-pub use toml_settings::{DEFAULT_CONFIG, load_settings};
+pub use toml_settings::{DEFAULT_CONFIG, load_settings, render_settings};

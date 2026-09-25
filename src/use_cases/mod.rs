@@ -15,6 +15,7 @@ pub mod ports;
 pub mod privacy;
 pub mod prompts;
 pub mod routing;
+pub mod setup;
 #[cfg(test)]
 pub mod testing;
 pub mod triage;
@@ -27,4 +28,5 @@ pub use hand_off::{HandOff, HandOffPlan};
 pub use ignore::{Ignore, IgnoreRequest, ScopeChoice};
 pub use messages::Messages;
 pub use privacy::Privacy;
+pub use setup::{Detect, compose};
 pub use triage::{Triage, TriageInput};

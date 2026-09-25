@@ -210,4 +210,5 @@ else
 fi
 
 say "done. Open a new shell; the next failure gets a bubble."
+note "add a cloud model or an agent later with:  kintsu setup"
 note "remove everything later with:  sh install.sh --uninstall   (or the same curl | sh -s -- --uninstall)"

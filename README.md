@@ -150,7 +150,7 @@ The commands, all about the last failure of the current shell:
 | `kintsu privacy` | exactly what a model or an agent would receive, secrets masked |
 | `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |
 | `kintsu mute [1h]` | nothing for a while |
-| `kintsu doctor`, `default-config`, `config path` | setup |
+| `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
 | `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |
 
 ## Roadmap
