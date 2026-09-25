@@ -93,7 +93,7 @@ impl Messages<'_> {
                 return Err(MessagesError::AllFailed(failures));
             }
         };
-        let Some(fix) = parse_quick_fix(&answer, &name) else {
+        let Some(fix) = parse_quick_fix(&answer, &name, case.outcome().command()) else {
             self.note(
                 session,
                 case.id(),

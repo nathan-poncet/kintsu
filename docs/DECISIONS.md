@@ -370,7 +370,11 @@ from the end of the output for the same reason. And a result that arrives
 late, the read of the pane or a model's proposal, is saved only while its
 case is still the session's last (`CaseStore::still_current`), so a slow read
 never brings back a failure the shell has moved past; the message is still
-delivered.
+delivered. The prompts name the sections: the failure to explain is
+the one under "Command", its "Output" is what it printed, and "Earlier
+commands in this shell" are context that was already dealt with; a small
+model otherwise re-explains the typo from two commands ago. A quick-fix
+answer equal to the failed command line is read as no fix.
 
 ## 18. v0.2, step B1: ghost text (2026-09-25)
 

@@ -80,7 +80,7 @@ pub fn hand_off_notice(plan: &HandOffPlan, style: &Style) -> String {
     if plan.brief.contains("## Output") {
         parts.push("output");
     }
-    if plan.brief.contains("## Commands before it") {
+    if plan.brief.contains("## Earlier commands in this shell") {
         parts.push("recent commands");
     }
     let sent = parts.join(", ");
@@ -246,7 +246,7 @@ mod tests {
         let plan = HandOffPlan {
             case: CaseId::new("c"),
             agent,
-            brief: "## Commands before it".into(),
+            brief: "## Earlier commands in this shell".into(),
             redactions: 1,
         };
         let text = hand_off_notice(&plan, &Style::PLAIN);

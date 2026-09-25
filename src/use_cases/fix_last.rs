@@ -78,7 +78,7 @@ impl FixLast<'_> {
             &quick_fix_prompt(&case),
         ) {
             Ok((name, answer)) => Ok(FixProposal {
-                fix: parse_quick_fix(&answer, &name),
+                fix: parse_quick_fix(&answer, &name, case.outcome().command()),
                 case,
                 failures: Vec::new(),
             }),

@@ -44,6 +44,10 @@ All notable changes to kintsu are recorded here. The format follows
 - A pane read or a model's answer that lands after a newer failure no
   longer overwrites that newer failure as the shell's last one; `why`,
   `fix` and the panel act on what just failed.
+- `why` is told to explain the command that failed and to treat the
+  earlier commands of the shell as context only, so a typo you already
+  fixed is not explained again. A model proposing the very command that
+  just failed is no longer shown as a fix.
 
 ### Changed
 
