@@ -6,8 +6,8 @@ panel are built as described, with the differences recorded in
 the shell rather than opening the panel, by decision; the panel opens in
 the bubble's place, only while the failure is the shell's last command,
 remembers the answers it got and puts the bubble back on close; its height
-is fixed when it opens and `ui.hotkey` is not yet read (`^K`), both to
-come.*
+is fixed when it opens, to come. `ui.hotkey` is read since 2026-09-29,
+section 28.*
 
 Kintsu talks in small messages that land in the terminal, like a quiet
 colleague leaning over: one line when it has something, silence
@@ -135,8 +135,11 @@ if `ui.learning_notes` is on.
 | panel | `esc`, `q` | collapse |
 | panel | `?` | the key map, in place |
 
-`^K` is the default hotkey and is configurable (`ui.hotkey`); in zsh and
-fish it is a widget the hook binds, in bash a `bind -x`.
+`^K` is the default hotkey and is configurable (`ui.hotkey`, written `^O`,
+`ctrl-o` or `C-o`: one control letter, and not Tab, Enter, Backspace nor the
+terminal's `^C`, `^D`, `^Z`, `^S`, `^Q`, which are refused by name); in zsh
+and fish it is a widget the hook binds, in bash a `bind -x`. The bubble's
+`^K more` and the hint line name the configured key.
 
 ## Mouse
 

@@ -139,8 +139,9 @@ should be softened, or a `store_redacted = true` option added.
 `kintsu fix --raw` and puts the result in the line editor (zsh widget on
 `BUFFER`, bash `bind -x` on `READLINE_LINE`, fish `commandline -r`).
 Nothing runs until Enter, which keeps the "two Enters" promise. `^K`
-shadows `kill-line` in emacs mode; `ui.hotkey` is parsed and ignored for
-now. When the panel arrives, `^K` should open it with the fix focused.
+shadows `kill-line` in emacs mode; `ui.hotkey` was parsed and ignored until
+section 28 read it. When the panel arrives, `^K` should open it with the fix
+focused.
 
 ## 7. Output capture is not in v0.1
 
@@ -684,10 +685,26 @@ tests use such ids. Reads of the registry (`path_of`, `env_of`,
 `terminal_of`) create nothing, so a forgotten session does not come back
 as an empty entry when a late click asks about it.
 
+## 29. `ui.hotkey` is read (2026-09-29)
+
+Open question 3 of 2026-09-25, answered "read it; `^K` stays the default".
+A `Hotkey` newtype is built at the edge from `[ui] hotkey`, in the notations
+people write (`^O`, `ctrl-o`, `C-o`): one control letter, and not the ones
+the terminal driver or the line editor own (Tab, Enter, Backspace, `^C`,
+`^D`, `^Z`, `^S`, `^Q`), refused by name. `kintsu init` puts the key in
+each shell's bind syntax (`bindkey '^O'`, `bind \co`, `bind -x '"\C-o"'`),
+fish's vi-mode binding included. A broken configuration still gets a hook,
+with `^K`: a shell without its hook is worse than a shell with the default
+key, and `kintsu doctor` names the mistake. Every text that names the key
+(`^K more`, the hint line, the last line of `kintsu fix`) reads it from the
+style; the daemon refreshes it with the settings for the subscriber
+renderer, next to `ascii` and `links`. The configuration page wrote
+`hotkey = "ctrl-k"`; that spelling is accepted, `^K` is the one printed.
+
 ## What is not built, by priority
 
-1. The panel growing as answers arrive; `ui.hotkey`; streaming the
-   answers into the panel.
+1. The panel growing as answers arrive; streaming the answers into the
+   panel.
 2. The stderr tee, if the maintainer wants it (pending above).
 3. SQLite behind the three storage ports; the pty harness in CI.
 4. `kintsu models` and `kintsu login` (pending); learning rules from
