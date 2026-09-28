@@ -20,6 +20,7 @@ pub mod outcome;
 pub mod output_rules;
 pub mod redaction;
 pub mod rules;
+pub mod secret;
 pub mod session;
 pub mod settings;
 pub mod shell;
@@ -45,6 +46,7 @@ pub use outcome::CommandOutcome;
 pub use output_rules::suggest_fix_from_output;
 pub use redaction::redact;
 pub use rules::{DirEntry, Facts, Os, suggest_fix};
+pub use secret::SecretKey;
 pub use session::{Session, SessionDetails, SessionId};
 pub use settings::{
     CaptureSettings, EagerFix, Hotkey, KeySource, ModelSpec, Provider, QuietSettings, Routing,

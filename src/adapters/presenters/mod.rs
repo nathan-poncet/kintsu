@@ -4,6 +4,7 @@
 pub mod costs;
 pub mod doctor;
 pub mod frames;
+pub mod models;
 pub mod panel;
 pub mod plain;
 pub mod shell_hook;
@@ -12,6 +13,7 @@ pub mod toast;
 
 pub use costs::{costs_json, costs_report};
 pub use doctor::doctor_report;
+pub use models::{login_notice, models_json, models_table, probes_json, probes_report};
 pub use plain::{
     error_line, explanation, fix_report, hand_off_notice, ignored, privacy_report, raw_fix,
 };

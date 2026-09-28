@@ -166,7 +166,7 @@ ignored so a file written for the full schema loads. `provider = "gemini"`
 uses Gemini's OpenAI-compatible endpoint. `key = { keychain = true }`
 reads `security find-generic-password -s kintsu -a <model>` on macOS and
 `secret-tool lookup service kintsu account <model>` on Linux; `kintsu
-login` to *write* there is not built.
+login` to *write* there came on 2026-09-29 (section 27).
 
 Removed from the entity while reviewing: `dismiss_cooldown`, because
 nothing can be dismissed without a panel.
@@ -785,9 +785,39 @@ it just paid for, and one that cannot be read counts as empty: the budget
 is a comfort, not a lock. Failed calls are not recorded: the providers
 report no usage for them.
 
+## 33. `kintsu models` and `kintsu login` (2026-09-29)
+
+Brought forward from v0.3 (open question 11). `kintsu models` is the
+table `docs/MODELS.md` describes, without the cost columns the ledger
+will bring: provider, tier, key status, reach. It calls no model; the
+key is looked up through the `Secrets` port and reported as found or
+missing, never shown. `kintsu models test` asks each model one word
+through the `ModelGateway` port and times it with the `Clock` port; a
+CLI agent is left out with a note, a remote model without a key is not
+asked. Exit 1 when a model that should have answered did not.
+
+`kintsu login <model>` is the write side of `{ keychain = true }`: a new
+`SecretStore` port (role noun, its error type, an in-memory fake that also
+reads back, and the contract every store passes), one gateway over
+`security add-generic-password -U` on macOS and `secret-tool store` on
+Linux, both found on the shell's PATH. The key is a `SecretKey` newtype
+whose `Debug` is redacted; it is read with the terminal's echo off through
+`gateways/unix.rs`, the module allowed `libc`, or from stdin when piped.
+macOS's `security` takes the password as an argument, so it is visible in
+the process list for the instant the command runs; Linux's `secret-tool`
+reads it on stdin. `--write-config` edits the one `key` line of the
+model's table as text, so the user's comments and layout survive, instead
+of re-rendering the file. Models that take no key (Ollama, CLI agents) are
+refused before anything is asked.
+
+Tests: the use cases against the fakes, the gateway against a fake
+`security`/`secret-tool` that records the exact command line, and an
+integration test through the real binary where the fake keychain is on a
+scratch PATH: `login`, then `models` finds the key, and no output ever
+contains it.
+
 ## What is not built, by priority
 
 1. SQLite behind the three storage ports; the pty harness in CI.
-2. `kintsu models` and `kintsu login` (pending); learning rules from
-   accepted fixes.
+2. Learning rules from accepted fixes.
 3. A Homebrew tap and an apt repository.

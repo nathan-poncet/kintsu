@@ -26,6 +26,7 @@ use crate::use_cases::{
 
 mod desktop;
 mod hooks;
+mod models;
 mod panel;
 mod setup;
 
@@ -59,6 +60,9 @@ Usage:
   kintsu setup [--yes]            three questions, then the configuration file
   kintsu doctor                   check the hook, the models, the keys
   kintsu costs [--json]           what the models cost today and over 30 days
+  kintsu models [test] [--json]   the configured models, their keys and their reach; test asks each one word
+  kintsu login <model> [--write-config]
+                                  put a model's key in the OS keychain, and point the configuration at it
   kintsu default-config           the commented default configuration
   kintsu config path              where the files are
   kintsu daemon [run|stop|status] the resident process the hooks talk to
@@ -456,6 +460,14 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             let _ = writeln!(out, "{}", doctor_report(&checks, &places, &style));
             ExitCode::SUCCESS
         }
+        Command::Models { test: false, json } => {
+            models::list(&settings, &environment, json, &style, out)
+        }
+        Command::Models { test: true, json } => models::test(&settings, json, &style, out),
+        Command::Login {
+            model,
+            write_config,
+        } => models::login(rt, &settings, &model, write_config, &style, out, err),
         Command::Help
         | Command::Version
         | Command::Init(_)

@@ -94,6 +94,11 @@ pub enum Command {
     Doctor,
     /// `kintsu costs [--json]`: what the models cost today and this month.
     Costs { json: bool },
+    /// `kintsu models [test] [--json]`: the configured models, their keys
+    /// and their reach; `test` asks each one word.
+    Models { test: bool, json: bool },
+    /// `kintsu login <model> [--write-config]`: the key goes to the keychain.
+    Login { model: String, write_config: bool },
     /// `kintsu setup [--yes]`: three questions, then the configuration file.
     Setup { yes: bool },
     /// `kintsu default-config`.
@@ -191,6 +196,9 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["costs"] => Ok(Command::Costs { json: false }),
         ["costs", "--json"] => Ok(Command::Costs { json: true }),
         ["costs", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
+        ["models", rest @ ..] => parse_models(rest),
+        ["login"] => Err(CliError::MissingValue("login <model>".into())),
+        ["login", model, rest @ ..] => parse_login(model, rest),
         ["setup"] => Ok(Command::Setup { yes: false }),
         ["setup", "--yes" | "-y"] => Ok(Command::Setup { yes: true }),
         ["setup", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
@@ -309,6 +317,35 @@ fn parse_agent(rest: &[&str]) -> Result<Command, CliError> {
     Ok(Command::Agent {
         with,
         words: Some(words).filter(|w| !w.trim().is_empty()),
+    })
+}
+
+fn parse_models(rest: &[&str]) -> Result<Command, CliError> {
+    let (mut test, mut json) = (false, false);
+    for arg in rest {
+        match *arg {
+            "test" => test = true,
+            "--json" => json = true,
+            other => return Err(CliError::UnknownFlag(other.to_string())),
+        }
+    }
+    Ok(Command::Models { test, json })
+}
+
+fn parse_login(model: &str, rest: &[&str]) -> Result<Command, CliError> {
+    if model.starts_with('-') {
+        return Err(CliError::MissingValue("login <model>".into()));
+    }
+    let mut write_config = false;
+    for arg in rest {
+        match *arg {
+            "--write-config" => write_config = true,
+            other => return Err(CliError::UnknownFlag(other.to_string())),
+        }
+    }
+    Ok(Command::Login {
+        model: model.to_string(),
+        write_config,
     })
 }
 
@@ -481,6 +518,54 @@ mod tests {
             parse_args(["session"]),
             Err(CliError::MissingValue(_))
         ));
+    }
+
+    #[test]
+    fn models_and_login_parse_with_their_flags_and_refuse_the_rest() {
+        assert_eq!(
+            parse_args(["models"]).unwrap(),
+            Command::Models {
+                test: false,
+                json: false
+            }
+        );
+        assert_eq!(
+            parse_args(["models", "test", "--json"]).unwrap(),
+            Command::Models {
+                test: true,
+                json: true
+            }
+        );
+        assert_eq!(
+            parse_args(["models", "--verbose"]),
+            Err(CliError::UnknownFlag("--verbose".into()))
+        );
+        assert_eq!(
+            parse_args(["login", "haiku"]).unwrap(),
+            Command::Login {
+                model: "haiku".into(),
+                write_config: false
+            }
+        );
+        assert_eq!(
+            parse_args(["login", "haiku", "--write-config"]).unwrap(),
+            Command::Login {
+                model: "haiku".into(),
+                write_config: true
+            }
+        );
+        assert_eq!(
+            parse_args(["login"]),
+            Err(CliError::MissingValue("login <model>".into()))
+        );
+        assert_eq!(
+            parse_args(["login", "--write-config"]),
+            Err(CliError::MissingValue("login <model>".into()))
+        );
+        assert_eq!(
+            parse_args(["login", "haiku", "--force"]),
+            Err(CliError::UnknownFlag("--force".into()))
+        );
     }
 
     #[test]

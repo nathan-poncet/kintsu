@@ -182,6 +182,32 @@ pub fn signal_usr1(pid: u32) -> bool {
     unsafe { libc::kill(pid, libc::SIGUSR1) == 0 }
 }
 
+/// Whether the descriptor is a terminal.
+pub fn is_tty(fd: &impl AsRawFd) -> bool {
+    // SAFETY: isatty takes a descriptor by value and touches no memory of ours.
+    unsafe { libc::isatty(fd.as_raw_fd()) == 1 }
+}
+
+/// Runs `f` with the terminal's echo off, so a key typed in is not shown;
+/// on anything that is not a terminal, just runs `f`.
+pub fn with_echo_off<T>(fd: &impl AsRawFd, f: impl FnOnce() -> T) -> T {
+    let fd = fd.as_raw_fd();
+    // SAFETY: an all-zero termios is a valid value for tcgetattr to fill.
+    let mut original: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: the pointer is to our own termios, alive for the call.
+    if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
+        return f();
+    }
+    let mut quiet = original;
+    quiet.c_lflag &= !libc::ECHO;
+    // SAFETY: same descriptor, a termios we own; a failure leaves the terminal as it was.
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &quiet) };
+    let result = f();
+    // SAFETY: restores the value read above.
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &original) };
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,5 +267,15 @@ mod tests {
         let (a, _b) = UnixStream::pair().unwrap();
         assert_eq!(peer_uid(&a), Some(uid()));
         assert!(!signal_usr1(u32::MAX), "no such process");
+    }
+
+    #[test]
+    fn a_socket_is_no_tty_and_echo_off_still_runs_the_closure_there() {
+        let (a, _b) = UnixStream::pair().unwrap();
+        assert!(!is_tty(&a));
+        assert_eq!(with_echo_off(&a, || 42), 42);
+        let (_master, slave) = open_pty().expect("a pseudo-terminal");
+        assert!(is_tty(&slave));
+        assert_eq!(with_echo_off(&slave, || "typed"), "typed");
     }
 }
