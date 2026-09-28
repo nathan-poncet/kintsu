@@ -20,6 +20,13 @@ All notable changes to kintsu are recorded here. The format follows
   per command, and stderr is no longer a tty for the command. fish cannot
   redirect its own stderr; `kintsu doctor` says so. Re-run `kintsu init`
   after switching it on.
+- The panel grows as the explanation streams in: the Why section shows
+  the model's words as they land, with a marker while more is coming,
+  and the panel takes the rows its text needs, up to fourteen, scrolling
+  the screen when they would not fit below. Ollama's NDJSON and the
+  server-sent events of OpenAI-compatible and Anthropic endpoints are
+  read line by line; `kintsu why` and the eager fix still take the whole
+  answer.
 
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,

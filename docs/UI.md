@@ -5,9 +5,10 @@ panel are built as described, with the differences recorded in
 [DECISIONS.md](DECISIONS.md) sections 18 and 20 to 23: a click answers in
 the shell rather than opening the panel, by decision; the panel opens in
 the bubble's place, only while the failure is the shell's last command,
-remembers the answers it got and puts the bubble back on close; its height
-is fixed when it opens, to come. `ui.hotkey` is read since 2026-09-29,
-section 28.*
+remembers the answers it got and puts the bubble back on close; it opens
+at the height of what it shows and grows as the explanation streams in
+(section 31), up to fourteen rows. `ui.hotkey` is read since 2026-09-29,
+section 29.*
 
 Kintsu talks in small messages that land in the terminal, like a quiet
 colleague leaning over: one line when it has something, silence

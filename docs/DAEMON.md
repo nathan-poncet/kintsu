@@ -131,7 +131,7 @@ Daemon to client:
 |---|---|
 | `decision` | `quiet` with a reason, or `offer` with the case id, the toast view state and, when a rule knew, the `fix` |
 | `bubble` | `case`, `sender`, view state, `replaces` (to update in place) |
-| `stream` | `case`, `chunk` |
+| `stream` | `case`, `chunk` — reserved, unused: the panel asks its models itself and streams through its own channel (DECISIONS §27) |
 | `done`, `ack`, `error` | |
 
 The sync budget on `command_finished` is 40 ms by default. If the daemon
