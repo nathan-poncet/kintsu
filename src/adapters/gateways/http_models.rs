@@ -1,6 +1,9 @@
 //! One HTTP request per question: Ollama, anything OpenAI-compatible, or
-//! the Anthropic Messages API. Blocking, non-streaming, with a timeout.
+//! the Anthropic Messages API. Blocking, with a timeout; the answer comes
+//! whole, or line by line when the caller wants it as it is produced
+//! (Ollama's NDJSON, the others' server-sent events).
 
+use std::io::{BufRead, BufReader};
 use std::time::Duration as StdDuration;
 
 use serde_json::{Value, json};
@@ -26,6 +29,24 @@ pub fn build_request(
     key: Option<&str>,
     prompt: &Prompt,
 ) -> Result<Request, ModelError> {
+    build_request_with(spec, key, prompt, false)
+}
+
+/// The same request, asking for the answer as it is produced.
+pub fn build_stream_request(
+    spec: &ModelSpec,
+    key: Option<&str>,
+    prompt: &Prompt,
+) -> Result<Request, ModelError> {
+    build_request_with(spec, key, prompt, true)
+}
+
+fn build_request_with(
+    spec: &ModelSpec,
+    key: Option<&str>,
+    prompt: &Prompt,
+    streaming: bool,
+) -> Result<Request, ModelError> {
     let base = spec
         .base_url
         .as_deref()
@@ -44,7 +65,7 @@ pub fn build_request(
         Provider::Ollama => Request {
             url: format!("{base}/api/chat"),
             headers: vec![],
-            body: json!({"model": spec.model, "messages": messages, "stream": false, "options": {"num_predict": max_tokens}}),
+            body: json!({"model": spec.model, "messages": messages, "stream": streaming, "options": {"num_predict": max_tokens}}),
         },
         Provider::OpenAiCompatible => {
             let mut headers = vec![("content-type".to_string(), "application/json".to_string())];
@@ -55,6 +76,9 @@ pub fn build_request(
             }
             let mut body = json!({"model": spec.model, "messages": messages});
             body[output_limit_field(base)] = json!(max_tokens);
+            if streaming {
+                body["stream"] = json!(true);
+            }
             Request {
                 url: format!("{base}/chat/completions"),
                 headers,
@@ -63,6 +87,15 @@ pub fn build_request(
         }
         Provider::Anthropic => {
             let key = key.ok_or_else(|| key_name("x-api-key"))?;
+            let mut body = json!({
+                "model": spec.model,
+                "system": prompt.system,
+                "max_tokens": max_tokens,
+                "messages": [{"role": "user", "content": prompt.user}],
+            });
+            if streaming {
+                body["stream"] = json!(true);
+            }
             Request {
                 url: format!("{base}/v1/messages"),
                 headers: vec![
@@ -70,12 +103,7 @@ pub fn build_request(
                     ("x-api-key".to_string(), key.to_string()),
                     ("anthropic-version".to_string(), "2023-06-01".to_string()),
                 ],
-                body: json!({
-                    "model": spec.model,
-                    "system": prompt.system,
-                    "max_tokens": max_tokens,
-                    "messages": [{"role": "user", "content": prompt.user}],
-                }),
+                body,
             }
         }
         Provider::CliAgent => {
@@ -169,6 +197,123 @@ fn post(agent: &ureq::Agent, request: &Request) -> Result<(u16, Value), ModelErr
     Ok((status, body))
 }
 
+/// One line of a streamed answer: the text it carries, if any, and
+/// whether it is the last. Ollama writes one JSON object per line; the
+/// others write server-sent events, `data: {…}` lines between blank ones
+/// and `event:` names, which are skipped.
+pub fn parse_stream_line(
+    provider: Provider,
+    line: &str,
+) -> Result<(Option<String>, bool), ModelError> {
+    let payload = match provider {
+        Provider::Ollama => line.trim(),
+        _ => match line.trim().strip_prefix("data:") {
+            Some(data) => data.trim(),
+            None => return Ok((None, false)),
+        },
+    };
+    if payload.is_empty() {
+        return Ok((None, false));
+    }
+    if payload == "[DONE]" {
+        return Ok((None, true));
+    }
+    let Ok(event) = serde_json::from_str::<Value>(payload) else {
+        return Ok((None, false));
+    };
+    if let Some(error) = event.get("error") {
+        let detail = error
+            .pointer("/message")
+            .and_then(Value::as_str)
+            .map(String::from)
+            .unwrap_or_else(|| {
+                error
+                    .as_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| error.to_string())
+            });
+        return Err(ModelError::Refused(detail));
+    }
+    let text = |pointer: &str| {
+        event
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .filter(|t| !t.is_empty())
+            .map(String::from)
+    };
+    Ok(match provider {
+        Provider::Ollama => (
+            text("/message/content"),
+            event.get("done").and_then(Value::as_bool).unwrap_or(false),
+        ),
+        Provider::OpenAiCompatible => (
+            text("/choices/0/delta/content"),
+            event
+                .pointer("/choices/0/finish_reason")
+                .is_some_and(|reason| !reason.is_null()),
+        ),
+        Provider::Anthropic => match event.get("type").and_then(Value::as_str) {
+            Some("content_block_delta") => (text("/delta/text"), false),
+            Some("message_stop") => (None, true),
+            _ => (None, false),
+        },
+        Provider::CliAgent => (None, true),
+    })
+}
+
+/// Sends one request and reads the answer line by line, handing each piece
+/// of text over as it lands; the whole text at the end. A status outside
+/// 2xx is read as a refusal, like a whole answer would be.
+fn post_stream(
+    agent: &ureq::Agent,
+    request: &Request,
+    provider: Provider,
+    on_chunk: &mut dyn FnMut(&str),
+) -> Result<String, ModelError> {
+    let mut call = agent.post(&request.url);
+    for (name, value) in &request.headers {
+        call = call.header(name.as_str(), value.as_str());
+    }
+    let mut response = call
+        .send_json(&request.body)
+        .map_err(|e| ModelError::Unreachable(e.to_string()))?;
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        let body: Value = response.body_mut().read_json().unwrap_or(Value::Null);
+        return Err(parse_answer(provider, status, &body)
+            .err()
+            .unwrap_or_else(|| ModelError::Refused(format!("HTTP {status}"))));
+    }
+    let reader = BufReader::new(response.body_mut().as_reader());
+    let mut text = String::new();
+    for line in reader.lines() {
+        let line = line.map_err(|e| ModelError::Unreachable(e.to_string()))?;
+        let (piece, done) = parse_stream_line(provider, &line)?;
+        if let Some(piece) = piece {
+            text.push_str(&piece);
+            on_chunk(&piece);
+        }
+        if done {
+            break;
+        }
+    }
+    Ok(text.trim().to_string())
+}
+
+/// The agent for one question: the model's timeout, or the default one.
+fn agent_for(spec: &ModelSpec) -> ureq::Agent {
+    let timeout = spec
+        .timeout
+        .map_or(StdDuration::from_secs(DEFAULT_TIMEOUT_SECS), |d| {
+            StdDuration::from_millis(d.as_millis())
+        });
+    ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .http_status_as_error(false)
+        .build()
+        .into()
+}
+
 /// `host:port` of a base URL, with the scheme's default port.
 fn authority(base_url: &str) -> Option<(String, u16)> {
     let (scheme, rest) = base_url.split_once("://")?;
@@ -207,16 +352,7 @@ impl ModelGateway for HttpModels {
         prompt: &Prompt,
     ) -> Result<String, ModelError> {
         let request = build_request(spec, key, prompt)?;
-        let timeout = spec
-            .timeout
-            .map_or(StdDuration::from_secs(DEFAULT_TIMEOUT_SECS), |d| {
-                StdDuration::from_millis(d.as_millis())
-            });
-        let config = ureq::Agent::config_builder()
-            .timeout_global(Some(timeout))
-            .http_status_as_error(false)
-            .build();
-        let agent: ureq::Agent = config.into();
+        let agent = agent_for(spec);
         let (status, body) = post(&agent, &request)?;
         let answer = parse_answer(spec.provider, status, &body);
         let Err(ModelError::Refused(refusal)) = &answer else {
@@ -227,6 +363,25 @@ impl ModelGateway for HttpModels {
         };
         let (status, body) = post(&agent, &renamed)?;
         parse_answer(spec.provider, status, &body)
+    }
+
+    fn stream(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+        on_chunk: &mut dyn FnMut(&str),
+    ) -> Result<String, ModelError> {
+        let request = build_stream_request(spec, key, prompt)?;
+        let agent = agent_for(spec);
+        let answer = post_stream(&agent, &request, spec.provider, on_chunk);
+        let Err(ModelError::Refused(refusal)) = &answer else {
+            return answer;
+        };
+        let Some(renamed) = renamed_output_limit(&request, refusal) else {
+            return answer;
+        };
+        post_stream(&agent, &renamed, spec.provider, on_chunk)
     }
 }
 
@@ -446,6 +601,196 @@ mod tests {
             Some(("::1".into(), 1234))
         );
         assert_eq!(authority("nope"), None);
+    }
+
+    #[test]
+    fn a_streamed_request_asks_for_the_answer_as_it_comes() {
+        let ollama = build_stream_request(
+            &spec(Provider::Ollama, "http://127.0.0.1:11434"),
+            None,
+            &prompt(),
+        )
+        .unwrap();
+        assert_eq!(ollama.body["stream"], true);
+        let openai = build_stream_request(
+            &spec(Provider::OpenAiCompatible, "http://localhost:1234/v1"),
+            None,
+            &prompt(),
+        )
+        .unwrap();
+        assert_eq!(openai.body["stream"], true);
+        assert_eq!(openai.body["max_tokens"], 100);
+        let anthropic = build_stream_request(
+            &spec(Provider::Anthropic, "https://api.anthropic.com"),
+            Some("k"),
+            &prompt(),
+        )
+        .unwrap();
+        assert_eq!(anthropic.body["stream"], true);
+        let whole = build_request(
+            &spec(Provider::Anthropic, "https://api.anthropic.com"),
+            Some("k"),
+            &prompt(),
+        )
+        .unwrap();
+        assert!(whole.body.get("stream").is_none());
+    }
+
+    #[test]
+    fn each_providers_stream_lines_are_read_for_text_and_the_end() {
+        let line = |provider, text: &str| parse_stream_line(provider, text).unwrap();
+        assert_eq!(
+            line(
+                Provider::Ollama,
+                r#"{"message":{"role":"assistant","content":"Node "},"done":false}"#
+            ),
+            (Some("Node ".into()), false)
+        );
+        assert_eq!(
+            line(
+                Provider::Ollama,
+                r#"{"message":{"content":""},"done":true}"#
+            ),
+            (None, true)
+        );
+        assert_eq!(
+            parse_stream_line(Provider::Ollama, r#"{"error":"model not found"}"#).unwrap_err(),
+            ModelError::Refused("model not found".into())
+        );
+        assert_eq!(
+            line(
+                Provider::OpenAiCompatible,
+                r#"data: {"choices":[{"delta":{"content":"Hi"},"finish_reason":null}]}"#
+            ),
+            (Some("Hi".into()), false)
+        );
+        assert_eq!(
+            line(
+                Provider::OpenAiCompatible,
+                r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#
+            ),
+            (None, true)
+        );
+        assert_eq!(
+            line(Provider::OpenAiCompatible, "data: [DONE]"),
+            (None, true)
+        );
+        assert_eq!(
+            line(Provider::OpenAiCompatible, "event: ping"),
+            (None, false)
+        );
+        assert_eq!(line(Provider::OpenAiCompatible, ""), (None, false));
+        assert_eq!(
+            parse_stream_line(
+                Provider::OpenAiCompatible,
+                r#"data: {"error":{"message":"rate limited"}}"#
+            )
+            .unwrap_err(),
+            ModelError::Refused("rate limited".into())
+        );
+        assert_eq!(
+            line(Provider::Anthropic, "event: content_block_delta"),
+            (None, false)
+        );
+        assert_eq!(
+            line(
+                Provider::Anthropic,
+                r#"data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Node"}}"#
+            ),
+            (Some("Node".into()), false)
+        );
+        assert_eq!(
+            line(Provider::Anthropic, r#"data: {"type":"ping"}"#),
+            (None, false)
+        );
+        assert_eq!(
+            line(Provider::Anthropic, r#"data: {"type":"message_stop"}"#),
+            (None, true)
+        );
+        assert_eq!(
+            parse_stream_line(
+                Provider::Anthropic,
+                r#"data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#
+            )
+            .unwrap_err(),
+            ModelError::Refused("Overloaded".into())
+        );
+    }
+
+    /// One HTTP exchange on the loopback: reads the request, writes
+    /// `response`, closes. The port to ask.
+    fn serve_once(response: &'static str) -> u16 {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0u8; 1];
+            while !request.ends_with(b"\r\n\r\n") && socket.read(&mut byte).unwrap_or(0) == 1 {
+                request.push(byte[0]);
+            }
+            let head = String::from_utf8_lossy(&request).to_lowercase();
+            let length: usize = head
+                .lines()
+                .find_map(|l| l.strip_prefix("content-length:"))
+                .and_then(|v| v.trim().parse().ok())
+                .unwrap_or(0);
+            let mut body = vec![0u8; length];
+            socket.read_exact(&mut body).unwrap();
+            socket.write_all(response.as_bytes()).unwrap();
+            socket.flush().unwrap();
+        });
+        port
+    }
+
+    #[test]
+    fn a_streamed_answer_is_handed_over_line_by_line_and_returned_whole() {
+        let body = concat!(
+            r#"{"message":{"content":"Node "},"done":false}"#,
+            "\n",
+            r#"{"message":{"content":"is old."},"done":false}"#,
+            "\n",
+            r#"{"message":{"content":""},"done":true}"#,
+            "\n"
+        );
+        let response: &'static str = Box::leak(
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .into_boxed_str(),
+        );
+        let port = serve_once(response);
+        let mut chunks = Vec::new();
+        let answer = HttpModels
+            .stream(
+                &spec(Provider::Ollama, &format!("http://127.0.0.1:{port}")),
+                None,
+                &prompt(),
+                &mut |chunk| chunks.push(chunk.to_string()),
+            )
+            .unwrap();
+        assert_eq!(chunks, vec!["Node ", "is old."]);
+        assert_eq!(answer, "Node is old.");
+
+        let refusal = r#"{"error":{"message":"boom"}}"#;
+        let response: &'static str = Box::leak(
+            format!(
+                "HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{refusal}",
+                refusal.len()
+            )
+            .into_boxed_str(),
+        );
+        let port = serve_once(response);
+        let refused = HttpModels.stream(
+            &spec(Provider::Ollama, &format!("http://127.0.0.1:{port}")),
+            None,
+            &prompt(),
+            &mut |_| {},
+        );
+        assert_eq!(refused, Err(ModelError::Refused("HTTP 500 boom".into())));
     }
 
     #[test]
