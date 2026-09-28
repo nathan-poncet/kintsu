@@ -81,8 +81,8 @@ for the same failure.
   local one to decide whether a failure deserves your attention, a small
   one for one-line fixes, a large one to explain, your CLI agent to
   investigate. Anthropic, OpenAI, Gemini, any OpenAI-compatible endpoint,
-  Ollama for fully local. Keys from the keychain, env or config. Or no key
-  at all: reuse the agent you already pay for.
+  Ollama for fully local. Keys from the keychain (`kintsu login`), env or
+  config. Or no key at all: reuse the agent you already pay for.
 - **Agent-agnostic hand-off.** kintsu is not another chat TUI. It prepares
   the case and delegates to the agent you like.
 - **Never runs anything on its own.** Suggestions are shown, you confirm.
@@ -157,6 +157,8 @@ The commands, all about the last failure of the current shell:
 | `kintsu mute [1h]` | nothing for a while |
 | `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
 | `kintsu costs [--json]` | what the models cost today and over the last thirty days, per model, against `max_daily_cost` |
+| `kintsu models [test] [--json]` | every configured model: provider, tier, whether its key is found and where, whether its server answers; `test` asks each one word and times it |
+| `kintsu login <model> [--write-config]` | type a model's key once, without echo; it goes to the macOS Keychain or Linux secret-service, and the configuration reads it from there |
 | `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |
 | `kintsu service install`, `service uninstall` | keep the daemon alive as a launchd agent or systemd user unit, and let the desktop hand `kintsu://` clicks to `kintsu open` |
 

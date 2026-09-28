@@ -27,6 +27,16 @@ All notable changes to kintsu are recorded here. The format follows
   server-sent events of OpenAI-compatible and Anthropic endpoints are
   read line by line; `kintsu why` and the eager fix still take the whole
   answer.
+- `kintsu models`: one line per configured model with its provider, its
+  tier, whether its key is found and where, and whether its server
+  answers, without calling any model; `--json` for scripts. `kintsu
+  models test` asks each model one word and reports the latency, or why
+  it did not answer.
+- `kintsu login <model>`: the key is typed once, without echo, and goes
+  to the macOS Keychain or the Linux secret-service under the model's
+  name, where `key = { keychain = true }` already reads it;
+  `--write-config` points the configuration at it, leaving every other
+  line of the file as it was. Nothing prints the key.
 
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,

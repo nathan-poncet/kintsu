@@ -48,6 +48,7 @@ kintsu/
     │   ├── session.rs                Session · SessionId (the last 20 outcomes of a shell)
     │   ├── case.rs                   FailureCase · CaseId (outcome, cwd, session, recent, output)
     │   ├── fix.rs                    Fix · Confidence · FixSource
+    │   ├── secret.rs                 SecretKey (a key on its way to the keychain; Debug redacted)
     │   ├── danger.rs                 Danger · classify_danger
     │   ├── distance.rs               edit distance, closest candidate with tie rules
     │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the instant rules: what the line, the status, the PATH and the directory tell)
@@ -75,12 +76,14 @@ kintsu/
     │   ├── privacy.rs                what would be sent
     │   ├── diagnose.rs               doctor's checks
     │   ├── costs.rs                  today and the last thirty days, per model, against the cap
+    │   ├── models.rs                 the models table (key found or not, reach), the one-word probe
+    │   ├── login.rs                  a key into the keychain under the model's name
     │   ├── facts.rs · prompts.rs · routing.rs
     │   ├── testing.rs                in-memory fakes of every port (cfg(test))
     │   ├── (planned)                 register_session · classify_failure · recall_case · learn_rule
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
-    │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
+    │       ├── ignore_store.rs · secrets.rs · secret_store.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
     │       ├── output_source.rs · cost_ledger.rs
     │       └── (planned)             RuleBook
     │
@@ -89,7 +92,8 @@ kintsu/
         │                             socket.rs (daemon frames → Request) · url_scheme.rs (kintsu://act) ·
         │                             setup_prompts.rs (the three questions) · panel_keys.rs (crossterm → panel keys)
         ├── presenters/               style.rs (the seam) · toast.rs (toast, message_toast) · plain.rs ·
-        │   │                         doctor.rs · costs.rs (text and JSON) · shell_hook.rs · frames.rs (daemon → client frames) ·
+        │   │                         doctor.rs · costs.rs (text and JSON) · models.rs (the models table, probes, the login notice; plain and JSON) ·
+        │   │                         shell_hook.rs · frames.rs (daemon → client frames) ·
         │   │                         panel.rs (the panel's view model, drawn by ratatui)
         │   └── (planned)             json.rs
         └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
@@ -101,8 +105,8 @@ kintsu/
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
-            │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs ·
-            │                         jsonl_ledger.rs (CostLedger: one JSON line per call)
+            │                         env_secrets.rs (env, command, keychain) · keychain.rs (SecretStore: security, secret-tool) ·
+            │                         system_clock.rs · random_ids.rs · jsonl_ledger.rs (CostLedger: one JSON line per call)
             └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2}.rs ·
                                       store/sqlite.rs · notify/{zle_fd,signal,next_prompt}.rs
 ```

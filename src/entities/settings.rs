@@ -19,6 +19,18 @@ pub enum Provider {
     CliAgent,
 }
 
+impl Provider {
+    /// The name the configuration file uses.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Provider::Ollama => "ollama",
+            Provider::OpenAiCompatible => "openai_compatible",
+            Provider::Anthropic => "anthropic",
+            Provider::CliAgent => "cli_agent",
+        }
+    }
+}
+
 /// What a model may be asked to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tier {
@@ -30,6 +42,18 @@ pub enum Tier {
     Large,
     /// A CLI with tools, for investigations.
     Agent,
+}
+
+impl Tier {
+    /// The name the configuration file uses.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Tier::Tiny => "tiny",
+            Tier::Small => "small",
+            Tier::Large => "large",
+            Tier::Agent => "agent",
+        }
+    }
 }
 
 /// Where a key comes from.

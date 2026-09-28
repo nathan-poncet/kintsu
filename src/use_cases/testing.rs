@@ -386,3 +386,74 @@ pub fn case(text: &str, code: i32, session: Option<&str>) -> FailureCase {
     )
     .with_session(session.map(SessionId::new))
 }
+
+/// A keychain in a map: stores under the account, reads back through
+/// `Secrets` for `{ keychain = true }`, fails on demand.
+#[derive(Default)]
+pub struct MemorySecretStore {
+    pub entries: RefCell<HashMap<String, String>>,
+    pub failure: Option<SecretStoreError>,
+}
+
+impl SecretStore for MemorySecretStore {
+    fn store(&self, account: &str, key: &SecretKey) -> Result<(), SecretStoreError> {
+        if let Some(failure) = &self.failure {
+            return Err(failure.clone());
+        }
+        self.entries
+            .borrow_mut()
+            .insert(account.to_string(), key.expose().to_string());
+        Ok(())
+    }
+}
+
+impl Secrets for MemorySecretStore {
+    fn lookup(&self, source: &KeySource) -> Option<String> {
+        match source {
+            KeySource::Keychain(account) => self.entries.borrow().get(account).cloned(),
+            _ => None,
+        }
+    }
+}
+
+/// What every `SecretStore` that can also be read must do: a stored key
+/// is found under its account, a second store replaces it, accounts are
+/// independent.
+pub fn secret_store_contract<S: SecretStore + Secrets>(store: &S) {
+    let first = SecretKey::new("sk-first").unwrap();
+    let second = SecretKey::new("sk-second").unwrap();
+    assert_eq!(store.lookup(&KeySource::Keychain("a".into())), None);
+    store.store("a", &first).unwrap();
+    assert_eq!(
+        store.lookup(&KeySource::Keychain("a".into())).as_deref(),
+        Some("sk-first")
+    );
+    store.store("a", &second).unwrap();
+    assert_eq!(
+        store.lookup(&KeySource::Keychain("a".into())).as_deref(),
+        Some("sk-second"),
+        "the second store replaces the first"
+    );
+    assert_eq!(store.lookup(&KeySource::Keychain("b".into())), None);
+    store.store("b", &first).unwrap();
+    assert_eq!(
+        store.lookup(&KeySource::Keychain("a".into())).as_deref(),
+        Some("sk-second"),
+        "accounts are independent"
+    );
+    assert_eq!(
+        store.lookup(&KeySource::Env("a".into())),
+        None,
+        "the keychain answers for keychain sources only"
+    );
+}
+
+#[cfg(test)]
+mod secret_store_tests {
+    use super::*;
+
+    #[test]
+    fn the_in_memory_keychain_obeys_the_contract() {
+        secret_store_contract(&MemorySecretStore::default());
+    }
+}

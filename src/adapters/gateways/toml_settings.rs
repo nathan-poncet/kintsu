@@ -62,13 +62,7 @@ pub fn render_settings(settings: &Settings) -> String {
                 }
             }
         }
-        let tier = match m.tier {
-            Tier::Tiny => "tiny",
-            Tier::Small => "small",
-            Tier::Large => "large",
-            Tier::Agent => "agent",
-        };
-        out.push_str(&format!("tier     = \"{tier}\"\n\n"));
+        out.push_str(&format!("tier     = \"{}\"\n\n", m.tier.name()));
     }
     out.push_str("[routing]\n");
     for (task, names) in [
@@ -134,6 +128,40 @@ pub enum SettingsError {
 }
 
 /// Reads the file; a missing file means the defaults.
+/// The configuration text with `[models.<model>]` reading its key from the
+/// keychain, every other line as it was; `None` when the table is not
+/// there. A text edit, not a re-render: the user's comments survive.
+pub fn with_keychain_key(text: &str, model: &str) -> Option<String> {
+    let header = format!("[models.{model}]");
+    let mut lines: Vec<String> = text.lines().map(String::from).collect();
+    let start = lines.iter().position(|l| l.trim() == header)?;
+    let end = lines
+        .iter()
+        .skip(start + 1)
+        .position(|l| l.trim_start().starts_with('['))
+        .map_or(lines.len(), |i| start + 1 + i);
+    let key_line = "key      = { keychain = true }".to_string();
+    let is_key = |line: &String| {
+        let trimmed = line.trim_start();
+        trimmed == "key" || trimmed.starts_with("key ") || trimmed.starts_with("key=")
+    };
+    match lines[start + 1..end].iter().position(is_key) {
+        Some(i) => lines[start + 1 + i] = key_line,
+        None => {
+            let blank = lines[start + 1..end]
+                .iter()
+                .position(|l| l.trim().is_empty())
+                .map_or(end, |i| start + 1 + i);
+            lines.insert(blank, key_line);
+        }
+    }
+    let mut out = lines.join("\n");
+    if text.ends_with('\n') {
+        out.push('\n');
+    }
+    Some(out)
+}
+
 pub fn load_settings(path: &Path, home: Option<&str>) -> Result<Settings, SettingsError> {
     match std::fs::read_to_string(path) {
         Ok(text) => parse_settings(&text, home),
@@ -795,5 +823,50 @@ eager_fix = true
         );
         let s = parse_settings("[daemon]\nsync_budget = \"40ms\"\n[ui]\nhotkey = \"ctrl-k\"\n[models.x]\nprovider = \"ollama\"\nmodel = \"m\"\nopen_in = \"pane\"", None).unwrap();
         assert_eq!(s.models.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod key_edit_tests {
+    use super::with_keychain_key;
+
+    const FILE: &str = "# my config\n\n[models.haiku]\nprovider = \"anthropic\"   # cloud\nmodel    = \"claude-haiku-4-5\"\nkey      = { env = \"ANTHROPIC_API_KEY\" }\ntier     = \"large\"\n\n[models.local]\nprovider = \"ollama\"\nmodel    = \"m\"\n\n[routing]\nexplain = [\"haiku\"]\n";
+
+    #[test]
+    fn the_key_line_of_the_named_table_is_replaced_and_nothing_else_moves() {
+        let edited = with_keychain_key(FILE, "haiku").unwrap();
+        assert_eq!(
+            edited,
+            FILE.replace(
+                "key      = { env = \"ANTHROPIC_API_KEY\" }",
+                "key      = { keychain = true }"
+            )
+        );
+    }
+
+    #[test]
+    fn a_table_without_a_key_line_gets_one_before_its_blank_line() {
+        let edited = with_keychain_key(FILE, "local").unwrap();
+        assert!(
+            edited.contains(
+                "[models.local]\nprovider = \"ollama\"\nmodel    = \"m\"\nkey      = { keychain = true }\n\n[routing]"
+            ),
+            "{edited}"
+        );
+        assert!(
+            edited.contains("{ env = \"ANTHROPIC_API_KEY\" }"),
+            "haiku is untouched"
+        );
+        let last = with_keychain_key("[models.solo]\nprovider = \"anthropic\"", "solo").unwrap();
+        assert_eq!(
+            last,
+            "[models.solo]\nprovider = \"anthropic\"\nkey      = { keychain = true }"
+        );
+    }
+
+    #[test]
+    fn an_unknown_table_leaves_the_text_alone() {
+        assert_eq!(with_keychain_key(FILE, "nope"), None);
+        assert_eq!(with_keychain_key("", "haiku"), None);
     }
 }
