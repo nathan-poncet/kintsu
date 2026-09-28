@@ -214,10 +214,9 @@ clippy, tests, release build, a scripted smoke run of every command, hook
 syntax, docs shell, installer, coverage, cargo-deny), `release.yml` on a
 `v*` tag (verifies the tag matches `Cargo.toml`, drafts the release from
 `CHANGELOG.md`, builds four targets, uploads `SHA256SUMS` in the format
-`install.sh` expects), `deps.yml` weekly (advisories fail, outdated crates
-are listed). Dependabot opens the update PRs. `deny.toml` allows MIT,
-Apache-2.0, BSD-3, ISC, Unicode-3.0, Zlib, CDLA-Permissive-2.0 and bans
-`openssl-sys`.
+`install.sh` expects), `deps.yml` weekly (advisories fail). Dependabot
+opens the update PRs. `deny.toml` allows MIT, Apache-2.0, BSD-3, ISC,
+Unicode-3.0, Zlib, CDLA-Permissive-2.0 and bans `openssl-sys`.
 
 The release workflow has not run yet: it needs a `## [X.Y.Z]` section in
 `CHANGELOG.md` matching the tag (the `[Unreleased]` notes move under it),
