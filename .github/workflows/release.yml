@@ -83,3 +83,53 @@ jobs:
           sha256sum kintsu-*.tar.gz > SHA256SUMS
           cat SHA256SUMS
           gh release upload "${GITHUB_REF_NAME}" SHA256SUMS --clobber
+
+  homebrew:
+    name: update the Homebrew tap
+    needs: checksums
+    runs-on: ubuntu-latest
+    env:
+      # A fine-grained token with contents write on nathan-poncet/homebrew-kintsu.
+      # Secrets are not readable in `if:`; the env var is.
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Render the formula from the published checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download "${GITHUB_REF_NAME}" --pattern SHA256SUMS
+          python3 scripts/homebrew-formula.py --version "${GITHUB_REF_NAME}" --sums SHA256SUMS > kintsu.rb
+          cat kintsu.rb
+      - name: Push it to the tap
+        if: env.TAP_TOKEN != ''
+        run: |
+          auth=$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 -w0)
+          git -c "http.extraheader=AUTHORIZATION: basic ${auth}" clone --depth 1 \
+            https://github.com/nathan-poncet/homebrew-kintsu.git tap
+          mkdir -p tap/Formula
+          cp kintsu.rb tap/Formula/kintsu.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/kintsu.rb
+          if git diff --cached --quiet; then
+            echo "The tap already has ${GITHUB_REF_NAME}." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m "🔖 kintsu ${GITHUB_REF_NAME#v}"
+          git -c "http.extraheader=AUTHORIZATION: basic ${auth}" push
+          echo "Formula/kintsu.rb pushed to nathan-poncet/homebrew-kintsu for ${GITHUB_REF_NAME}." >> "$GITHUB_STEP_SUMMARY"
+      - name: Say why the tap was not updated
+        if: env.TAP_TOKEN == ''
+        run: |
+          {
+            echo '## Homebrew tap not updated'
+            echo
+            echo 'The `HOMEBREW_TAP_TOKEN` secret is not set, so the formula below was rendered but not pushed to `nathan-poncet/homebrew-kintsu`. See packaging/homebrew/README.md.'
+            echo
+            echo '```ruby'
+            cat kintsu.rb
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
