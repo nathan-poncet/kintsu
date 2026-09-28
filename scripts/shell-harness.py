@@ -27,12 +27,27 @@ import pyte
 
 ROOT = os.environ.get("ROOT", "/tmp/kintsu-harness")
 BIN = os.path.abspath(os.environ.get("BIN", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "target", "debug")))
+STREAMED = ["Node 20 is too old for this build.\n", "The bundler needs node:sqlite, ", "which arrived in Node 22.5.\n",
+            "nvm has 22.12 installed.\n", "Switch to it, then build again.\n", "Nothing in your code is wrong.\n",
+            "The lockfile is fine too.\n", "That is all.\n"]
 class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"   # chunked answers need it; every answer still closes the connection
     def do_POST(self):
-        n = int(self.headers.get("content-length", 0)); self.rfile.read(n)
+        n = int(self.headers.get("content-length", 0)); asked = self.rfile.read(n)
         time.sleep(float(os.environ.get("DELAY", "0")))
+        self.close_connection = True
+        if b'"stream":true' in asked.replace(b" ", b""):
+            # The panel asks for the answer as it comes: eight pieces, a
+            # fifth of a second apart, so the screen shows it growing.
+            self.send_response(200); self.send_header("content-type", "application/x-ndjson"); self.send_header("transfer-encoding", "chunked"); self.send_header("connection", "close"); self.end_headers()
+            for piece in STREAMED + [None]:
+                line = json.dumps({"message": {"role": "assistant", "content": piece or ""}, "done": piece is None}).encode() + b"\n"
+                self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n"); self.wfile.flush()
+                if piece is not None: time.sleep(0.2)
+            self.wfile.write(b"0\r\n\r\n"); self.wfile.flush()
+            return
         body = json.dumps({"message": {"role": "assistant", "content": "nvm use 22 && npm run build"}, "done": True}).encode()
-        self.send_response(200); self.send_header("content-type", "application/json"); self.send_header("content-length", str(len(body))); self.end_headers(); self.wfile.write(body)
+        self.send_response(200); self.send_header("content-type", "application/json"); self.send_header("content-length", str(len(body))); self.send_header("connection", "close"); self.end_headers(); self.wfile.write(body)
     def log_message(self, *a): pass
 srv = socketserver.TCPServer(("127.0.0.1", 0), H); port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -239,9 +254,9 @@ def panel_steps(send, screen, shell):
     send("\x15", 0.4)
     send("false\n", 1.5)
     send("\x0b", 1.5)
-    snap("^K after a plain failure")
-    send("w", 2.5)
-    snap("w: why, from the model")
+    snap("^K after a plain failure: Why asks at once, the explanation streams in, the panel grows")
+    send("w", 1.6)
+    snap("w: why, from the model, whole")
     send("\x1b", 1.0)
     snap("Esc: closed")
     send("\x0b", 1.5)

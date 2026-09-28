@@ -73,6 +73,10 @@ pub fn run(
             top = moved_top;
             height = wanted;
             terminal = open_viewport(&tty, top, columns, height)?;
+            // A fresh terminal writes only the cells that differ from
+            // blank: the rows must be blank first, or the old footer stays
+            // under the new text.
+            clear_rows(&mut tty, top, height)?;
         }
         terminal.draw(|frame| panel.render(frame, style))?;
         while let Ok(arrival) = arrivals.try_recv() {
@@ -135,6 +139,14 @@ fn open_viewport(
     )?;
     terminal.hide_cursor()?;
     Ok(terminal)
+}
+
+/// Blanks `height` rows from `top`, zero-based.
+fn clear_rows(tty: &mut File, top: u16, height: u16) -> io::Result<()> {
+    for row in top..top.saturating_add(height) {
+        write!(tty, "\x1b[{};1H\x1b[2K", row + 1)?;
+    }
+    tty.flush()
 }
 
 /// Where a panel that now wants `height` rows stands, and how many rows
