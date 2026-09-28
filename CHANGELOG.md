@@ -8,6 +8,10 @@ All notable changes to kintsu are recorded here. The format follows
 
 ### Added
 
+- `[ui] hotkey`: the key that opens the panel is configurable (`^O`,
+  `ctrl-o`, `C-o`); the three hooks bind it and the bubble names it. Keys
+  the terminal or the line editor own (Tab, Enter, Backspace, `^C`, `^D`,
+  `^Z`, `^S`, `^Q`) are refused with a message that says which.
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
   `git-log` and `gitpush`, `mandiff`, `gradle` for `./gradlew`, `app.py`

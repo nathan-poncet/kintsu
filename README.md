@@ -43,8 +43,8 @@ A small bubble, one gold seam on the left, one sentence, a line of
 actions; on a terminal that renders hyperlinks, each word is clickable
 once `kintsu service install` has registered the `kintsu://` scheme.
 A confident, harmless fix is already on your next prompt, dim:
-Tab takes it, you press Enter. `^K` expands the bubble into a panel under
-your prompt: Why, Fix, Agent, Ignore, Privacy, one letter each; ⏎ puts the
+Tab takes it, you press Enter. `^K` (or the key `ui.hotkey` names)
+expands the bubble into a panel under your prompt: Why, Fix, Agent, Ignore, Privacy, one letter each; ⏎ puts the
 fix in your line and closes it, you press Enter to run. Nothing ever
 steals a keystroke from your prompt, and nothing runs on its own. When no
 rule knows and a local model is routed for quick fixes (or `eager_fix =
