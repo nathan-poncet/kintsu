@@ -597,6 +597,24 @@ programs. The daemon's own PATH is only the fallback for a frame without
 one. The same environment gap holds for API keys read from `{ env = … }`
 under launchd; that one is still open.
 
+## 25. More instant rules, after thefuck (2026-09-28)
+
+The maintainer asked to take from thefuck's rules what spares a model
+call. Most of thefuck's 170 rules read the command's output; the instant
+rules run on the quiet path, before anything is read from the terminal,
+so the first batch is what the line, the status, the PATH and the
+working directory tell (section 24 made the PATH the shell's). The rules
+that read the shape of the line come before the typo guess, so
+`git-log` becomes `git log` and not `git-lfs`; the typo guess stays
+before `./` (a `gti` here is still `git`). `rm dir` proposes `rm -r dir`
+and carries the red line every recursive removal gets, so it is never
+pre-typed. `git commit -amend` is a guess about intent, confidence 0.75,
+not pre-typed either. Uneven quotes were on the list and are not built:
+a line with an unbalanced quote never runs, the shell waits for more.
+The subcommand tables moved to `entities/subcommands.rs`; they serve
+typos, `gitpush` and `git-push` alike. Rules are re-implemented from the
+idea, in Rust, under our own tests; thefuck is MIT.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; `ui.hotkey`; streaming the

@@ -6,7 +6,24 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
+  with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
+  `git-log` and `gitpush`, `mandiff`, `gradle` for `./gradlew`, `app.py`
+  without its interpreter, `git git push`, `git commit -amend`, `python
+  app` for `app.py`, `./x` without its execute bit, `cat` and `rm` on a
+  directory, `mkdir a/b/c` without `-p`. Subcommand typos are known for
+  npm, pnpm, yarn, docker, podman, brew, go, pip, kubectl, gh, apt, dnf,
+  yum, hg, terraform, conda, gem, composer and systemctl, not only git
+  and cargo.
+
+### Fixed
+
+- The rules look at the shell's PATH, not the daemon's: under launchd the
+  daemon's is the bare system one, and `clade` was corrected to `clang`
+  instead of `claude`. The hook's frame now carries the shell's PATH and
+  the daemon remembers it per session for a later click on fix.
 
 ## [0.2.0] - 2026-09-25
 

@@ -21,6 +21,7 @@ pub mod rules;
 pub mod session;
 pub mod settings;
 pub mod shell;
+pub mod subcommands;
 pub mod time;
 pub mod triage;
 

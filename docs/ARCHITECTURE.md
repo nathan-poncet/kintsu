@@ -50,7 +50,8 @@ kintsu/
     │   ├── fix.rs                    Fix · Confidence · FixSource
     │   ├── danger.rs                 Danger · classify_danger
     │   ├── distance.rs               edit distance, closest candidate with tie rules
-    │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the five instant rules)
+    │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the instant rules: what the line, the status, the PATH and the directory tell)
+    │   ├── subcommands.rs            the subcommands of git, cargo, npm, docker, brew… for typos, `gitpush` and `git-push`
     │   ├── redaction.rs              redact · Redacted · SecretKind
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
