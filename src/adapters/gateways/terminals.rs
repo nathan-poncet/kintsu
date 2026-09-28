@@ -1,6 +1,7 @@
 //! The pane's recent text, from whichever program draws it: Herdr, tmux,
-//! WezTerm, Kitty or iTerm2, each through its own command-line interface.
-//! Tried in the configured order; the first that answers wins.
+//! WezTerm, Kitty or iTerm2, each through its own command-line interface,
+//! or the copy of stderr the shell's hook made when the tee is on. Tried
+//! in the configured order; the first that answers wins.
 
 use std::io::Read;
 use std::path::PathBuf;
@@ -199,9 +200,23 @@ impl OutputSource for TerminalOutput {
     fn recent(&self, terminal: &TerminalIdentity, lines: usize) -> Option<String> {
         self.sources
             .iter()
-            .filter_map(|source| command_for(source, terminal, lines))
-            .find_map(|invocation| self.run(&invocation))
+            .find_map(|source| match source.as_str() {
+                "stderr" => stderr_copy(terminal),
+                _ => command_for(source, terminal, lines)
+                    .and_then(|invocation| self.run(&invocation)),
+            })
     }
+}
+
+/// The shell's copy of the command's stderr, read once: the file holds
+/// one command and is removed, so a later read never takes an old error
+/// for a new one.
+fn stderr_copy(terminal: &TerminalIdentity) -> Option<String> {
+    let path = terminal.stderr_copy.as_deref()?;
+    let bytes = std::fs::read(path).ok()?;
+    let _ = std::fs::remove_file(path);
+    let text = String::from_utf8_lossy(&bytes);
+    (!text.trim().is_empty()).then(|| text.into_owned())
 }
 
 #[cfg(test)]
@@ -221,6 +236,7 @@ mod tests {
             kitty_window: Some("12".into()),
             kitty_listen_on: Some("unix:/tmp/kitty".into()),
             iterm_session: Some("w0t0p0:ABCD-1234".into()),
+            stderr_copy: None,
         }
     }
 
@@ -336,6 +352,43 @@ mod tests {
             output.recent(&TerminalIdentity::default(), 10),
             None,
             "no pane, nothing asked"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_shells_copy_of_stderr_is_read_first_and_once() {
+        let dir = std::env::temp_dir().join(format!("kintsu-stderr-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let tmux = dir.join("tmux");
+        std::fs::write(&tmux, "#!/bin/sh\nprintf '$ make\\nscreen\\n'\n").unwrap();
+        std::fs::set_permissions(&tmux, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let copy = dir.join("42.stderr");
+        std::fs::write(&copy, "touch: /etc/x: Permission denied\n").unwrap();
+        let output =
+            TerminalOutput::new(vec!["stderr".into(), "tmux".into()]).with_bin_dir(dir.clone());
+        let t = TerminalIdentity {
+            tmux_pane: Some("%1".into()),
+            stderr_copy: Some(copy.display().to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            output.recent(&t, 10).as_deref(),
+            Some("touch: /etc/x: Permission denied\n"),
+            "the copy comes before the pane"
+        );
+        assert!(!copy.exists(), "read once");
+        assert_eq!(
+            output.recent(&t, 10).as_deref(),
+            Some("$ make\nscreen\n"),
+            "gone, the pane answers"
+        );
+        std::fs::write(&copy, "  \n").unwrap();
+        assert_eq!(
+            output.recent(&t, 10).as_deref(),
+            Some("$ make\nscreen\n"),
+            "an empty copy is no output"
         );
         std::fs::remove_dir_all(dir).unwrap();
     }

@@ -131,14 +131,20 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         }
         Command::Init(shell) => {
             // The shell must get its hook even when the configuration is
-            // broken: the default key, then.
-            let hotkey = load_settings(&rt.config_path, rt.home.as_deref())
-                .map(|settings| settings.ui.hotkey)
-                .unwrap_or_default();
+            // broken: the default key and no tee, then; the first `kintsu
+            // triage` reports the mistake.
+            let settings = load_settings(&rt.config_path, rt.home.as_deref()).ok();
+            let hotkey = settings.as_ref().map(|s| s.ui.hotkey).unwrap_or_default();
+            let stderr_tee = settings.as_ref().is_some_and(|s| s.capture.stderr_tee);
             let _ = write!(
                 out,
                 "{}",
-                shell_hook(shell, &rt.state_dir.display().to_string(), hotkey)
+                shell_hook(
+                    shell,
+                    &rt.state_dir.display().to_string(),
+                    hotkey,
+                    stderr_tee
+                )
             );
             return ExitCode::SUCCESS;
         }
@@ -411,6 +417,9 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 environment: &environment,
                 models: &HttpModels,
                 service_installed: service_installed(rt),
+                shell: session
+                    .and_then(|s| state.load(s).ok().flatten())
+                    .and_then(|s| s.shell()),
             }
             .run(session);
             let places = Places {

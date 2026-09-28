@@ -21,6 +21,9 @@ pub struct TerminalIdentity {
     pub kitty_listen_on: Option<String>,
     /// `ITERM_SESSION_ID`.
     pub iterm_session: Option<String>,
+    /// The file where the shell's hook copied the command's stderr, for
+    /// terminals no program can read a pane of.
+    pub stderr_copy: Option<String>,
 }
 
 impl TerminalIdentity {
@@ -31,6 +34,7 @@ impl TerminalIdentity {
             || self.wezterm_pane.is_some()
             || self.kitty_window.is_some()
             || self.iterm_session.is_some()
+            || self.stderr_copy.is_some()
     }
 }
 
@@ -167,6 +171,14 @@ error TS2307: Cannot find module 'left-pad'
                 ..Default::default()
             }
             .is_known()
+        );
+        assert!(
+            TerminalIdentity {
+                stderr_copy: Some("/s/sessions/42.stderr".into()),
+                ..Default::default()
+            }
+            .is_known(),
+            "a copy of stderr is a source too"
         );
     }
 }

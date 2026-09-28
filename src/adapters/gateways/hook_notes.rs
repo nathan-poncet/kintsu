@@ -6,7 +6,9 @@
 //! pre-typed on the next prompt; `<state>/sessions/<id>.bubble` holds what
 //! kintsu printed above the prompt, as printed, so the panel can take its
 //! place and put it back. The hooks remove the bubble when another command
-//! runs.
+//! runs. `<state>/sessions/<id>.stderr` is the other way round: the hook
+//! writes it, a copy of the last command's stderr when the tee is on, and
+//! the capture reads it.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -46,6 +48,16 @@ impl HookNotes {
 
     pub fn bubble_path(&self, session: &SessionId) -> PathBuf {
         self.dir.join(format!("{}.bubble", session.as_str()))
+    }
+
+    pub fn stderr_path(&self, session: &SessionId) -> PathBuf {
+        self.dir.join(format!("{}.stderr", session.as_str()))
+    }
+
+    /// Where the hook copied the last command's stderr, when it did.
+    pub fn stderr_copy(&self, session: &SessionId) -> Option<String> {
+        let path = self.stderr_path(session);
+        path.is_file().then(|| path.display().to_string())
     }
 
     /// What was just printed above the prompt for the current failure.
@@ -107,6 +119,12 @@ mod tests {
         assert_eq!(
             notes.bubble(&id).unwrap().as_deref(),
             Some("| make exited 2.\n| kintsu fix\n| Try make -j4?")
+        );
+        assert_eq!(notes.stderr_copy(&id), None, "the hook made no copy");
+        std::fs::write(notes.stderr_path(&id), "boom\n").unwrap();
+        assert_eq!(
+            notes.stderr_copy(&id).as_deref(),
+            Some(dir.join("sessions").join("42.stderr").to_str().unwrap())
         );
         std::fs::remove_dir_all(dir).unwrap();
     }

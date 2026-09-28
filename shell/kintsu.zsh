@@ -7,7 +7,10 @@
 # expands the last bubble into
 # the panel, in the bubble's place; nothing runs until you press Enter. Messages
 # that arrive later (a model's answer) are printed above the prompt by a
-# subscriber the hook keeps alive. KINTSU_DISABLE=1 switches the hook off.
+# subscriber the hook keeps alive. With `capture.stderr_tee` on, each
+# command's stderr also goes through tee into a file kintsu reads after
+# the bubble, for terminals no program can read a pane of.
+# KINTSU_DISABLE=1 switches the hook off.
 
 if [[ -o interactive ]]; then
   autoload -Uz add-zsh-hook
@@ -23,6 +26,8 @@ if [[ -o interactive ]]; then
   if [[ -z "${KINTSU_DISABLE:-}" ]]; then
     command kintsu session new --shell zsh --pid $$ >/dev/null 2>&1
   fi
+  typeset -g __kintsu_stderr_tee="__KINTSU_STDERR_TEE__"
+  typeset -g __kintsu_stderr_file="__KINTSU_STATE_DIR__/sessions/$$.stderr" __kintsu_stderr_saved=""
 
   # An "asking…" line still waiting when another command starts: once that
   # command has printed, its row can no longer be found, so it is blanked
@@ -34,6 +39,9 @@ if [[ -o interactive ]]; then
     # Whatever this command prints is what sits above the next prompt;
     # `kintsu why` and `kintsu fix` leave a marker of their own.
     command rm -f -- "$__kintsu_bubble_file"
+    if [[ -n "$__kintsu_stderr_tee" && -z "${KINTSU_DISABLE:-}" && "$1" != kintsu* ]]; then
+      __kintsu_tee_start
+    fi
     if (( __kintsu_pending_seq == __kintsu_seq )); then
       local rendered="${(%%)PROMPT}"
       local -a prompt_rows=("${(@f)rendered}") typed_rows=("${(@f)1}")
@@ -50,6 +58,7 @@ if [[ -o interactive ]]; then
     local __kintsu_status=$? __kintsu_pipe="${pipestatus[*]}"
     local cmdline="$__kintsu_command" started="$__kintsu_started" duration=""
     local -a timing
+    __kintsu_tee_stop
     (( __kintsu_seq++ ))
     command rm -f -- "$__kintsu_ghost_file" 2>/dev/null   # a fix is for the failure just before
     __kintsu_command=""
@@ -74,6 +83,24 @@ if [[ -o interactive ]]; then
       --command "$cmdline" --cwd "$PWD" --session "$KINTSU_SESSION" --shell zsh "${timing[@]}"
     __kintsu_take_marker
     return $__kintsu_status
+  }
+
+  # A copy of the command's stderr: fd 2 goes through tee into the
+  # session's file and back to the terminal, one file per command. The
+  # command sees a pipe on stderr, not a tty, and a tee runs for its
+  # duration; that is why the option is off by default. zsh gives no pid
+  # for a process substitution, so the tee is not waited for: kintsu reads
+  # the file after the bubble, and a background job that kept the pipe
+  # keeps its stderr flowing into the file until it exits.
+  __kintsu_tee_start() {
+    command mkdir -p -- "${__kintsu_stderr_file:h}" 2>/dev/null
+    exec {__kintsu_stderr_saved}>&2
+    exec 2> >(command tee -- "$__kintsu_stderr_file" >&$__kintsu_stderr_saved 2>/dev/null)
+  }
+  __kintsu_tee_stop() {
+    [[ -n "$__kintsu_stderr_saved" ]] || return 0
+    exec 2>&$__kintsu_stderr_saved {__kintsu_stderr_saved}>&-
+    __kintsu_stderr_saved=""
   }
 
   # kintsu leaves a marker when it printed an "asking…" line: the answer may

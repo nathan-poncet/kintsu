@@ -4,9 +4,10 @@ use crate::entities::{Hotkey, Shell};
 
 /// The script to `eval` or `source`, from `shell/` at the root of the
 /// repository, with the state directory filled in so the hook can read
-/// the markers the binary leaves, and the hotkey in the shell's own
-/// notation for the bind line that opens the panel.
-pub fn shell_hook(shell: Shell, state_dir: &str, hotkey: Hotkey) -> String {
+/// the markers the binary leaves, the hotkey in the shell's own notation
+/// for the bind line that opens the panel, and whether it copies each
+/// command's stderr for the capture (`capture.stderr_tee`; zsh and bash only).
+pub fn shell_hook(shell: Shell, state_dir: &str, hotkey: Hotkey, stderr_tee: bool) -> String {
     let (template, key) = match shell {
         Shell::Zsh => (include_str!("../../../shell/kintsu.zsh"), hotkey.zsh()),
         Shell::Bash => (include_str!("../../../shell/kintsu.bash"), hotkey.bash()),
@@ -15,6 +16,7 @@ pub fn shell_hook(shell: Shell, state_dir: &str, hotkey: Hotkey) -> String {
     template
         .replace("__KINTSU_STATE_DIR__", state_dir)
         .replace("__KINTSU_HOTKEY__", &key)
+        .replace("__KINTSU_STDERR_TEE__", if stderr_tee { "1" } else { "" })
 }
 
 #[cfg(test)]
@@ -22,7 +24,7 @@ mod tests {
     use super::*;
 
     fn hook(shell: Shell, state_dir: &str) -> String {
-        shell_hook(shell, state_dir, Hotkey::DEFAULT)
+        shell_hook(shell, state_dir, Hotkey::DEFAULT, false)
     }
 
     #[test]
@@ -50,16 +52,34 @@ mod tests {
         assert!(hook(Shell::Bash, "/s").contains(r#"bind -x '"\C-k": __kintsu_panel'"#));
         let ctrl_o = Hotkey::parse("^O").unwrap();
         assert!(
-            shell_hook(Shell::Zsh, "/s", ctrl_o).contains("bindkey '^O' __kintsu_panel_widget")
+            shell_hook(Shell::Zsh, "/s", ctrl_o, false)
+                .contains("bindkey '^O' __kintsu_panel_widget")
         );
-        let fish = shell_hook(Shell::Fish, "/s", ctrl_o);
+        let fish = shell_hook(Shell::Fish, "/s", ctrl_o, false);
         assert!(fish.contains("bind \\co __kintsu_panel"));
         assert!(
             fish.contains("bind -M insert \\co __kintsu_panel"),
             "vi mode too"
         );
         assert!(
-            shell_hook(Shell::Bash, "/s", ctrl_o).contains(r#"bind -x '"\C-o": __kintsu_panel'"#)
+            shell_hook(Shell::Bash, "/s", ctrl_o, false)
+                .contains(r#"bind -x '"\C-o": __kintsu_panel'"#)
+        );
+    }
+
+    #[test]
+    fn the_stderr_tee_is_switched_on_in_the_hook_only_when_asked() {
+        for shell in [Shell::Zsh, Shell::Bash] {
+            let on = shell_hook(shell, "/s", Hotkey::DEFAULT, true);
+            assert!(on.contains("__kintsu_stderr_tee=\"1\""), "{shell}");
+            assert!(on.contains("tee"), "{shell}");
+            assert!(on.contains("/s/sessions/"), "{shell}");
+            let off = shell_hook(shell, "/s", Hotkey::DEFAULT, false);
+            assert!(off.contains("__kintsu_stderr_tee=\"\""), "{shell}");
+        }
+        assert!(
+            !shell_hook(Shell::Fish, "/s", Hotkey::DEFAULT, true).contains("__kintsu_stderr_tee"),
+            "fish cannot redirect its own stderr"
         );
     }
 }

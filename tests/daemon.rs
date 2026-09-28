@@ -683,3 +683,55 @@ fn without_a_subscriber_the_message_waits_and_comes_with_the_next_decision_on_th
             .contains("Try cargo build --release?")
     );
 }
+
+#[test]
+fn the_shells_copy_of_stderr_feeds_the_capture_and_the_rules_that_read_it() {
+    let mut f = Fixture::new(
+        "stderr",
+        "[capture]\nstderr_tee = true\n[ui]\neager_fix = false\n",
+    );
+    f.start_daemon();
+    let (code, hook, _) = f.run(&["init", "zsh"], None);
+    assert_eq!(code, 0);
+    assert!(
+        hook.contains("__kintsu_stderr_tee=\"1\""),
+        "the hook copies stderr only when the option is on"
+    );
+    // The hook wrote the copy; the frame names it; no pane reader exists.
+    let copy = f.dir.join("state").join("sessions").join("s6.stderr");
+    std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
+    std::fs::write(&copy, "touch: /etc/hosts.new: Permission denied\n").unwrap();
+    f.exchange(&format!(
+        r#"{{"v":1,"type":"command_finished","session":"s6","command":"touch /etc/hosts.new","status":1,"cwd":"/","shell":"zsh","terminal":{{"stderr_copy":"{}"}}}}"#,
+        copy.display()
+    ));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut bubbles: Vec<serde_json::Value> = Vec::new();
+    while Instant::now() < deadline && bubbles.is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+        bubbles = f
+            .exchange(r#"{"v":1,"type":"pending","session":"s6"}"#)
+            .into_iter()
+            .filter(|frame| frame["type"] == "bubble")
+            .collect();
+    }
+    assert!(
+        bubbles.iter().any(|b| b["text"]
+            .as_str()
+            .unwrap_or("")
+            .contains("sudo touch /etc/hosts.new")),
+        "{bubbles:?}"
+    );
+    assert!(!copy.exists(), "the copy is read once");
+    let (code, privacy, _) = f.run(&["privacy"], Some("s6"));
+    assert_eq!(code, 0);
+    assert!(
+        privacy.contains("touch: /etc/hosts.new: Permission denied"),
+        "{privacy}"
+    );
+    let (_, doctor, _) = f.run(&["doctor"], Some("s6"));
+    assert!(
+        doctor.contains("zsh copies each command's stderr"),
+        "{doctor}"
+    );
+}

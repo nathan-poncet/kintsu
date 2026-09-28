@@ -53,6 +53,7 @@ fn main() -> ExitCode {
         kitty_window: var("KITTY_WINDOW_ID"),
         kitty_listen_on: var("KITTY_LISTEN_ON"),
         iterm_session: var("ITERM_SESSION_ID"),
+        stderr_copy: None,
     };
     let runtime = app::Runtime {
         args: std::env::args().skip(1).collect(),

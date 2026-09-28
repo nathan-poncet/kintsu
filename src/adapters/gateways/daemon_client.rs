@@ -358,6 +358,7 @@ fn terminal_json(terminal: &TerminalIdentity) -> Value {
         "kitty_window": terminal.kitty_window,
         "kitty_listen_on": terminal.kitty_listen_on,
         "iterm_session": terminal.iterm_session,
+        "stderr_copy": terminal.stderr_copy,
     })
 }
 
