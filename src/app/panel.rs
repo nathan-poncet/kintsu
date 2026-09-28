@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use crate::adapters::gateways::tty_panel;
 use crate::adapters::gateways::{
-    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState, JsonlLedger, SystemClock,
+    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonlLedger, SqliteState, SystemClock,
 };
 use crate::adapters::presenters::panel::{Arrival, Ask, Effect, Panel};
 use crate::adapters::presenters::{Style, ignored, privacy_report};
@@ -152,7 +152,7 @@ impl Asker {
         let path_var = self.path_var.clone();
         let session = self.session.clone();
         std::thread::spawn(move || {
-            let state = JsonState::new(&state_dir);
+            let state = SqliteState::new(&state_dir);
             let ledger = JsonlLedger::new(&state_dir);
             match ask {
                 Ask::Explain => {

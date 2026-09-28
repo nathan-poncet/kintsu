@@ -1,6 +1,8 @@
 //! Sessions, last cases and the ignore list as small JSON files under the
-//! state directory. Written atomically; unreadable files count as absent
-//! only when they are missing, never when they are corrupt.
+//! state directory: how v0.1 and v0.2 kept state. Written atomically;
+//! unreadable files count as absent only when they are missing, never when
+//! they are corrupt. Since SQLite took over, this is what the migration
+//! reads, and the documents SQLite keeps use the same shapes.
 
 use std::path::{Path, PathBuf};
 
@@ -64,6 +66,74 @@ impl JsonState {
     }
 }
 
+impl JsonState {
+    /// Whether any JSON state is there to migrate.
+    pub fn has_files(&self) -> bool {
+        !self.files().is_empty()
+    }
+
+    /// Every session on file, in no particular order; a file that cannot
+    /// be read is left out, a migration must not fail on one.
+    pub fn sessions(&self) -> Vec<Session> {
+        let mut sessions = Vec::new();
+        for path in json_files(&self.dir.join("sessions")) {
+            let dto: Option<SessionDto> = self.read(&path).ok().flatten();
+            if let Some(d) = dto {
+                sessions.push(Session::with_recent(
+                    SessionId::new(d.id),
+                    d.shell.as_deref().and_then(Shell::from_name),
+                    d.recent
+                        .into_iter()
+                        .filter_map(OutcomeDto::into_outcome)
+                        .collect(),
+                ));
+            }
+        }
+        sessions
+    }
+
+    /// Every case on file, oldest first, the last one overall last.
+    pub fn cases(&self) -> Vec<FailureCase> {
+        let mut cases = Vec::new();
+        for path in json_files(&self.dir.join("cases")) {
+            if path == self.last_case_file() {
+                continue;
+            }
+            let dto: Option<CaseDto> = self.read(&path).ok().flatten();
+            cases.extend(dto.and_then(CaseDto::into_case));
+        }
+        cases.sort_by_key(|c| c.at().as_millis());
+        let last: Option<CaseDto> = self.read(&self.last_case_file()).ok().flatten();
+        cases.extend(last.and_then(CaseDto::into_case));
+        cases
+    }
+
+    /// The files the state is made of, for moving them aside once read.
+    pub fn files(&self) -> Vec<PathBuf> {
+        let mut files = json_files(&self.dir.join("sessions"));
+        files.extend(json_files(&self.dir.join("cases")));
+        if self.ignore_file().is_file() {
+            files.push(self.ignore_file());
+        }
+        files
+    }
+}
+
+/// The `.json` files of a directory; the hooks' marker files and anything
+/// already moved aside are not among them.
+fn json_files(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut files: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .collect();
+    files.sort();
+    files
+}
+
 /// Only what a file name can hold: the rest becomes its hex.
 fn safe_name(id: &str) -> String {
     if !id.is_empty()
@@ -78,7 +148,7 @@ fn safe_name(id: &str) -> String {
 }
 
 #[derive(Serialize, Deserialize)]
-struct OutcomeDto {
+pub(super) struct OutcomeDto {
     command: String,
     status: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,7 +158,7 @@ struct OutcomeDto {
 }
 
 impl OutcomeDto {
-    fn from(o: &CommandOutcome) -> Self {
+    pub(super) fn from(o: &CommandOutcome) -> Self {
         Self {
             command: o.command().as_str().to_string(),
             status: o.status().code(),
@@ -97,7 +167,7 @@ impl OutcomeDto {
         }
     }
 
-    fn into_outcome(self) -> Option<CommandOutcome> {
+    pub(super) fn into_outcome(self) -> Option<CommandOutcome> {
         let mut outcome = CommandOutcome::new(
             CommandLine::new(self.command).ok()?,
             ExitStatus::new(self.status),
@@ -110,7 +180,7 @@ impl OutcomeDto {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SessionDto {
+pub(super) struct SessionDto {
     id: String,
     shell: Option<String>,
     recent: Vec<OutcomeDto>,
@@ -146,7 +216,7 @@ impl SessionRegistry for JsonState {
 }
 
 #[derive(Serialize, Deserialize)]
-struct FixDto {
+pub(super) struct FixDto {
     command: String,
     confidence: f32,
     source_kind: String,
@@ -184,13 +254,13 @@ impl FixDto {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ExplanationDto {
+pub(super) struct ExplanationDto {
     model: String,
     text: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct CaseDto {
+pub(super) struct CaseDto {
     id: String,
     at_ms: u64,
     outcome: OutcomeDto,
@@ -205,7 +275,7 @@ struct CaseDto {
 }
 
 impl CaseDto {
-    fn from(c: &FailureCase) -> Self {
+    pub(super) fn from(c: &FailureCase) -> Self {
         Self {
             id: c.id().as_str().to_string(),
             at_ms: c.at().as_millis(),
@@ -222,7 +292,7 @@ impl CaseDto {
         }
     }
 
-    fn into_case(self) -> Option<FailureCase> {
+    pub(super) fn into_case(self) -> Option<FailureCase> {
         let mut case = FailureCase::new(
             CaseId::new(self.id),
             Timestamp::from_millis(self.at_ms),
@@ -270,7 +340,7 @@ impl CaseStore for JsonState {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-enum TargetDto {
+pub(super) enum TargetDto {
     Program(String),
     Command(String),
     Everything,
@@ -278,7 +348,7 @@ enum TargetDto {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
-enum ScopeDto {
+pub(super) enum ScopeDto {
     Everywhere,
     Directory(String),
     Session(String),
@@ -286,13 +356,13 @@ enum ScopeDto {
 }
 
 #[derive(Serialize, Deserialize)]
-struct IgnoreDto {
-    target: TargetDto,
-    scope: ScopeDto,
+pub(super) struct IgnoreDto {
+    pub(super) target: TargetDto,
+    pub(super) scope: ScopeDto,
 }
 
 impl IgnoreDto {
-    fn from(e: &IgnoreEntry) -> Self {
+    pub(super) fn from(e: &IgnoreEntry) -> Self {
         Self {
             target: match e.target() {
                 IgnoreTarget::Program(p) => TargetDto::Program(p.clone()),
@@ -308,7 +378,7 @@ impl IgnoreDto {
         }
     }
 
-    fn into_entry(self) -> IgnoreEntry {
+    pub(super) fn into_entry(self) -> IgnoreEntry {
         IgnoreEntry::new(
             match self.target {
                 TargetDto::Program(p) => IgnoreTarget::Program(p),
@@ -347,6 +417,7 @@ impl IgnoreStore for JsonState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::use_cases::testing::storage_contract;
 
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("kintsu-state-{}-{name}", std::process::id()));
@@ -354,105 +425,58 @@ mod tests {
         dir
     }
 
-    fn outcome(text: &str, code: i32) -> CommandOutcome {
-        CommandOutcome::new(CommandLine::new(text).unwrap(), ExitStatus::new(code))
-    }
-
     #[test]
-    fn sessions_round_trip_with_their_shell_and_history() {
-        let dir = scratch("sessions");
-        let state = JsonState::new(&dir);
-        let id = SessionId::new("42");
-        assert_eq!(state.load(&id).unwrap(), None);
-        let mut session = Session::new(id.clone(), Some(Shell::Fish));
-        session.remember(outcome("ls", 0));
-        session.remember(outcome("make", 2).lasting(Duration::from_secs(3)));
-        SessionRegistry::save(&state, &session).unwrap();
-        assert_eq!(state.load(&id).unwrap(), Some(session));
+    fn the_json_files_honour_the_storage_contract() {
+        let dir = scratch("contract");
+        storage_contract::everything(&JsonState::new(&dir));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
-    fn a_pipelines_statuses_round_trip_with_the_outcome() {
-        let dir = scratch("pipeline");
+    fn a_corrupt_file_is_an_error_not_an_absence() {
+        let dir = scratch("corrupt");
         let state = JsonState::new(&dir);
-        let pipeline = outcome("gti status | head", 0)
-            .in_pipeline(vec![ExitStatus::new(127), ExitStatus::new(0)]);
-        let session = Session::with_recent(SessionId::new("p"), None, vec![pipeline.clone()]);
-        SessionRegistry::save(&state, &session).unwrap();
-        let back = SessionRegistry::load(&state, &SessionId::new("p"))
-            .unwrap()
-            .unwrap();
-        assert_eq!(back.recent(), &[pipeline]);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn the_last_case_is_kept_per_session_and_overall() {
-        let dir = scratch("cases");
-        let state = JsonState::new(&dir);
-        let a = FailureCase::new(
-            CaseId::new("a"),
-            Timestamp::from_millis(1),
-            outcome("make", 2),
-            Some("/w".into()),
-        )
-        .with_session(Some(SessionId::new("s1")))
-        .with_recent(vec![CommandLine::new("ls").unwrap()])
-        .with_output("boom".into())
-        .with_proposal(Some(Fix::new(
-            CommandLine::new("make -j4").unwrap(),
-            Confidence::new(0.6),
-            FixSource::Model("local".into()),
-            "suggested by local",
-        )))
-        .with_explanation(Explanation::new("local", "the target is missing"));
-        let b = FailureCase::new(
-            CaseId::new("b"),
-            Timestamp::from_millis(2),
-            outcome("cargo", 101),
-            None,
-        )
-        .with_session(Some(SessionId::new("s2/odd id")));
-        CaseStore::save(&state, &a).unwrap();
-        CaseStore::save(&state, &b).unwrap();
-        assert_eq!(state.last(Some(&SessionId::new("s1"))).unwrap(), Some(a));
-        assert_eq!(
-            state.last(Some(&SessionId::new("s2/odd id"))).unwrap(),
-            Some(b.clone())
-        );
-        assert_eq!(state.last(None).unwrap(), Some(b));
-        assert_eq!(state.last(Some(&SessionId::new("s3"))).unwrap(), None);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn the_ignore_list_round_trips_and_a_corrupt_file_is_an_error() {
-        let dir = scratch("ignore");
-        let state = JsonState::new(&dir);
-        assert!(state.entries().unwrap().is_empty());
-        let entries = vec![
-            IgnoreEntry::new(
-                IgnoreTarget::Program("make".into()),
-                IgnoreScope::Directory("/w".into()),
-            ),
-            IgnoreEntry::new(
-                IgnoreTarget::Command("npm test".into()),
-                IgnoreScope::Everywhere,
-            ),
-            IgnoreEntry::new(
-                IgnoreTarget::Program("x".into()),
-                IgnoreScope::Session(SessionId::new("7")),
-            ),
-            IgnoreEntry::mute_until(Timestamp::from_millis(99)),
-        ];
-        state.replace(&entries).unwrap();
-        assert_eq!(state.entries().unwrap(), entries);
+        std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(state.ignore_file(), b"{not json").unwrap();
         assert!(matches!(
             state.entries(),
             Err(IgnoreStoreError::Unavailable(_))
         ));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_whole_state_can_be_read_back_for_a_migration() {
+        let dir = scratch("readback");
+        let state = JsonState::new(&dir);
+        assert!(!state.has_files());
+        storage_contract::everything(&state);
+        std::fs::write(
+            dir.join("sessions").join("42.ghost"),
+            b"a marker, not a session",
+        )
+        .unwrap();
+        let sessions = state.sessions();
+        assert_eq!(
+            sessions.len(),
+            2,
+            "42 and p; the marker file is not a session"
+        );
+        std::fs::write(dir.join("cases").join("session-broken.json"), b"{not json").unwrap();
+        let cases = state.cases();
+        assert_eq!(cases.len(), 3, "one per session, then the last overall");
+        assert_eq!(cases.last().unwrap().id().as_str(), "a");
+        assert!(
+            state
+                .files()
+                .iter()
+                .all(|f| f.extension().unwrap() == "json")
+        );
+        assert_eq!(
+            state.files().len(),
+            7,
+            "two sessions, two per-session cases, the broken one, last.json, the ignore list"
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 

@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
-    FsEnvironment, HttpModels, JsonState, JsonlLedger, RandomIds, SessionSecrets, Sessions,
+    FsEnvironment, HttpModels, JsonlLedger, RandomIds, SessionSecrets, Sessions, SqliteState,
     SystemClock, TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::ignored;
@@ -166,8 +166,8 @@ impl Daemon {
         SessionSecrets::new(session.map(|s| self.sessions.env_of(s)).unwrap_or_default())
     }
 
-    fn state(&self) -> JsonState {
-        JsonState::new(&self.cfg.state_dir)
+    fn state(&self) -> SqliteState {
+        SqliteState::new(&self.cfg.state_dir)
     }
 
     fn style(&self, settings: &Settings, color: bool) -> Style {
@@ -490,7 +490,7 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
 fn messages<'a>(
     daemon: &'a Daemon,
     settings: &'a Settings,
-    state: &'a JsonState,
+    state: &'a SqliteState,
     secrets: &'a dyn Secrets,
 ) -> Messages<'a> {
     Messages {
