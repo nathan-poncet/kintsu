@@ -6,7 +6,9 @@ use thiserror::Error;
 use crate::entities::{Explanation, FailureCase, ModelSpec, SessionId, Settings, case_document};
 use crate::use_cases::ports::{CaseStore, CaseStoreError, ModelError, ModelGateway, Secrets};
 use crate::use_cases::prompts::explain_prompt;
-use crate::use_cases::routing::{ask_first, excluded_for_sensitivity, model_candidates};
+use crate::use_cases::routing::{
+    ask_first, ask_first_streaming, excluded_for_sensitivity, model_candidates,
+};
 
 /// An explanation and where it came from.
 #[derive(Debug, Clone, PartialEq)]
@@ -71,14 +73,41 @@ impl Explain<'_> {
     /// shell's last, so the panel shows it again instead of asking again.
     pub fn run(&self, session: Option<&SessionId>) -> Result<Explained, ExplainError> {
         let (case, candidates) = self.prepare(session)?;
-        let redactions = case_document(&case).redactions;
-        let (model, text) = ask_first(
+        let answered = ask_first(
             self.models,
             self.secrets,
             &candidates,
             &explain_prompt(&case),
-        )
-        .map_err(ExplainError::AllFailed)?;
+        );
+        self.keep(case, answered)
+    }
+
+    /// `run`, with the prose handed over as the model produces it: what the
+    /// panel shows while it waits. `on_chunk` gets the model's name and
+    /// the piece; a caller starts afresh when the name changes.
+    pub fn run_streaming(
+        &self,
+        session: Option<&SessionId>,
+        on_chunk: &mut dyn FnMut(&str, &str),
+    ) -> Result<Explained, ExplainError> {
+        let (case, candidates) = self.prepare(session)?;
+        let answered = ask_first_streaming(
+            self.models,
+            self.secrets,
+            &candidates,
+            &explain_prompt(&case),
+            on_chunk,
+        );
+        self.keep(case, answered)
+    }
+
+    fn keep(
+        &self,
+        case: FailureCase,
+        answered: Result<(String, String), Vec<(String, ModelError)>>,
+    ) -> Result<Explained, ExplainError> {
+        let redactions = case_document(&case).redactions;
+        let (model, text) = answered.map_err(ExplainError::AllFailed)?;
         let text = text.trim().to_string();
         if self.cases.still_current(&case)? {
             self.cases.save(
@@ -181,6 +210,36 @@ mod tests {
             models: &models,
         };
         uc.run(Some(&SessionId::new("42"))).unwrap();
+        let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
+        assert_eq!(
+            kept.explanation(),
+            Some(&Explanation::new("local", "The target is missing."))
+        );
+    }
+
+    #[test]
+    fn a_streamed_explanation_arrives_in_pieces_and_is_kept_whole() {
+        let cases = MemoryCases::default();
+        cases.save(&case("make", 2, Some("42"))).unwrap();
+        let models = ScriptedModels::answering(&[
+            ("cloud", Err(ModelError::Refused("HTTP 429".into()))),
+            ("local", Ok("The target is missing.\n")),
+        ]);
+        let uc = Explain {
+            settings: &settings(&["cloud", "local"]),
+            cases: &cases,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+        };
+        let mut pieces = Vec::new();
+        let e = uc
+            .run_streaming(Some(&SessionId::new("42")), &mut |model, chunk| {
+                pieces.push((model.to_string(), chunk.to_string()))
+            })
+            .unwrap();
+        assert_eq!(e.text, "The target is missing.");
+        assert_eq!(pieces.len(), 4);
+        assert!(pieces.iter().all(|(m, _)| m == "local"));
         let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
         assert_eq!(
             kept.explanation(),
