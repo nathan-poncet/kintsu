@@ -72,6 +72,13 @@ impl SqliteState {
         self.dir.join("kintsu.db")
     }
 
+    /// Opens the file now, creating the schema and importing the JSON state
+    /// when that has not been done: for a process that would rather pay
+    /// for it at start than inside a budget.
+    pub fn prepare(&self) -> Result<(), String> {
+        self.with(|_| Ok(()))
+    }
+
     /// Counts and the migration note, for the doctor's report.
     pub fn summary(&self) -> Result<StoreSummary, String> {
         self.with(|c| {
@@ -113,13 +120,13 @@ impl SqliteState {
         connection
             .pragma_update(None, "synchronous", "NORMAL")
             .map_err(describe)?;
-        self.prepare(&mut connection).map_err(describe)?;
+        self.install_schema(&mut connection).map_err(describe)?;
         Ok(connection)
     }
 
     /// The schema, once; the JSON import with it, so a second process that
     /// opens the file at the same moment waits and finds both done.
-    fn prepare(&self, connection: &mut Connection) -> rusqlite::Result<()> {
+    fn install_schema(&self, connection: &mut Connection) -> rusqlite::Result<()> {
         let version: i64 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
         if version != 0 {
             return Ok(());

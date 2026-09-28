@@ -838,7 +838,10 @@ when JSON state is there, imports the sessions, the cases (`last.json`
 last, so it stays the last overall) and the ignore list, then moves the
 files aside as `*.json.migrated`; a file that cannot be read is left out
 rather than failing the migration. A second process opening the file at
-the same moment waits on the lock and finds both done. `kintsu doctor`
+the same moment waits on the lock and finds both done. The daemon opens
+the store when it starts and keeps one connection, so the first frame does
+not pay for the schema inside the sync budget: under an instrumented CI
+build it did, and the decision came late. `kintsu doctor`
 prints a `state` line: the file, the counts, and what the migration
 imported when it did. `JsonState` stays as the reader of that state and
 the owner of the document shapes; it is no longer a store the roots use.
