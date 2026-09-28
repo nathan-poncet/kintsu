@@ -78,8 +78,13 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         frames::ping(),
     );
     let ledger = JsonlLedger::new(&cfg.state_dir);
+    let state = SqliteState::new(&cfg.state_dir);
+    if let Err(e) = state.prepare() {
+        log(&format!("state: {e}"));
+    }
     let daemon = Arc::new(Daemon {
         cfg,
+        state,
         sessions,
         ascii,
         links,
@@ -116,6 +121,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
 
 struct Daemon {
     cfg: DaemonConfig,
+    state: SqliteState,
     sessions: Sessions,
     ascii: Arc<AtomicBool>,
     links: Arc<AtomicBool>,
@@ -166,8 +172,8 @@ impl Daemon {
         SessionSecrets::new(session.map(|s| self.sessions.env_of(s)).unwrap_or_default())
     }
 
-    fn state(&self) -> SqliteState {
-        SqliteState::new(&self.cfg.state_dir)
+    fn state(&self) -> &SqliteState {
+        &self.state
     }
 
     fn style(&self, settings: &Settings, color: bool) -> Style {
@@ -304,9 +310,9 @@ fn on_command_finished(
         settings: &settings,
         clock: &SystemClock,
         ids: &RandomIds,
-        sessions: &state,
-        cases: &state,
-        ignores: &state,
+        sessions: state,
+        cases: state,
+        ignores: state,
         environment: &environment,
     };
     let decision = match triage.run(input) {
@@ -321,7 +327,7 @@ fn on_command_finished(
     }
     let pending = match &decision {
         TriageDecision::Offer { case, fix: None } => {
-            messages(daemon, &settings, &state, &secrets).fix_candidate(case)
+            messages(daemon, &settings, state, &secrets).fix_candidate(case)
         }
         _ => None,
     };
@@ -333,8 +339,8 @@ fn on_command_finished(
     // bash hears what waited only now: a message about a failure the shell
     // no longer looks at names its command.
     let watched = Focus {
-        sessions: &state,
-        cases: &state,
+        sessions: state,
+        cases: state,
     };
     let bubbles: Vec<String> = session
         .as_ref()
@@ -359,7 +365,7 @@ fn on_command_finished(
             let capture = CaptureOutput {
                 settings: &settings,
                 output: &TerminalOutput::new(settings.capture.sources.clone()),
-                cases: &state,
+                cases: state,
             };
             let case = match capture.run(*case, &terminal) {
                 Ok(case) => case,
@@ -371,7 +377,7 @@ fn on_command_finished(
             if fix.is_some() {
                 return;
             }
-            let messages = messages(&daemon, &settings, &state, &secrets);
+            let messages = messages(&daemon, &settings, state, &secrets);
             match messages.fix_from_output(&case, &FsEnvironment::new(path)) {
                 Some(Ok(_)) => return,
                 Some(Err(e)) => log(&format!("fix for {}: {e}", case.outcome().command())),
@@ -391,7 +397,7 @@ fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId)
     let settings = daemon.settings();
     let state = daemon.state();
     let secrets = daemon.secrets_for(Some(&session));
-    let candidate = messages(daemon, &settings, &state, &secrets).explain_candidate(&session);
+    let candidate = messages(daemon, &settings, state, &secrets).explain_candidate(&session);
     match candidate {
         Err(e) => {
             let _ = send_line(stream, &frames::error(&e.to_string()));
@@ -401,7 +407,7 @@ fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId)
             let daemon = Arc::clone(daemon);
             std::thread::spawn(move || {
                 let state = daemon.state();
-                if let Err(e) = messages(&daemon, &settings, &state, &secrets).explain(&session) {
+                if let Err(e) = messages(&daemon, &settings, state, &secrets).explain(&session) {
                     log(&format!("explain for {}: {e}", session.as_str()));
                 }
             });
@@ -427,7 +433,7 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
         let settings = daemon.settings();
         let state = daemon.state();
         let secrets = daemon.secrets_for(Some(&session));
-        let messages = messages(&daemon, &settings, &state, &secrets);
+        let messages = messages(&daemon, &settings, state, &secrets);
         let result = match action {
             Action::Why => messages.explain(&session).map(|_| ()),
             Action::Fix => {
@@ -441,8 +447,8 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
             Action::Ignore => {
                 let ignore = Ignore {
                     clock: &SystemClock,
-                    cases: &state,
-                    ignores: &state,
+                    cases: state,
+                    ignores: state,
                 };
                 let request = IgnoreRequest::Last {
                     program: None,
