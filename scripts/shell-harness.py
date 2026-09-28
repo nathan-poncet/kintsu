@@ -13,6 +13,7 @@ binary (cargo build). Not part of CI: run it after touching shell/*.
     python3 scripts/shell-harness.py late       # the answer lands after another command
     python3 scripts/shell-harness.py ghost      # a typo, the pre-typed fix, Tab, Enter
     python3 scripts/shell-harness.py panel      # ^K, the panel, Enter, w, Esc (fish, zsh, bash)
+    python3 scripts/shell-harness.py tee        # capture.stderr_tee: a refused touch, the sudo fix, kintsu privacy (zsh, bash)
     DELAY=1.5 …                                 # slow the fake model down
 
 Environment: BIN (directory of the kintsu binary, default target/debug),
@@ -36,7 +37,9 @@ class H(http.server.BaseHTTPRequestHandler):
 srv = socketserver.TCPServer(("127.0.0.1", 0), H); port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 os.makedirs(ROOT, exist_ok=True)
-open(f"{ROOT}/config.toml", "w").write(f'[models.local]\nprovider = "ollama"\nmodel = "m"\nbase_url = "http://127.0.0.1:{port}"\n[routing]\nquick_fix = ["local"]\nexplain = ["local"]\n[ui]\neager_fix = true\n')
+TEE = sys.argv[1:] == ["tee"]
+capture = '[capture]\nstderr_tee = true\n' if TEE else ''
+open(f"{ROOT}/config.toml", "w").write(f'[models.local]\nprovider = "ollama"\nmodel = "m"\nbase_url = "http://127.0.0.1:{port}"\n[routing]\nquick_fix = ["local"]\nexplain = ["local"]\n{capture}[ui]\neager_fix = true\n')
 # A small, known PATH: the binary under test, a fake `git` so `gti` has one
 # unambiguous neighbour, and the system directories.
 os.makedirs(f"{ROOT}/bin", exist_ok=True)
@@ -150,7 +153,7 @@ end''',
     commandline -f repaint
 end''',
 }
-def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False):
+def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False, tee=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -179,6 +182,15 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, pan
     send('eval "$(kintsu init zsh)"\n', 0.8)
     send("true\n", 1.5)
     send("clear\n", 0.5)
+    if tee:
+        send("touch /etc/kintsu-harness-denied\n", 1.5)   # stderr copied by the hook; the rule that reads it answers
+        drain(2.5)
+        send("kintsu privacy\n", 1.2)
+        send("kintsu daemon stop\n", 0.6)
+        send("exit\n", 0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen
     if ghost:
         send("gti status\n", 1.0)
         snapshot = [l.rstrip() for l in screen.display if l.strip()]
@@ -240,7 +252,7 @@ def panel_steps(send, screen, shell):
     send("\x0b", 1.5)
     snap("^K after a success: nothing opens")
 
-def run_bash():
+def run_bash(tee=False):
     import shutil, subprocess
     subprocess.run(["pkill", "-f", "kintsu daemon run"], capture_output=True); time.sleep(0.3)
     shutil.rmtree(f"{ROOT}/state", ignore_errors=True)
@@ -269,6 +281,16 @@ def run_bash():
     send('eval "$(kintsu init bash)"\n', 0.8)
     send("true\n", 1.5)
     send("clear\n", 0.5)
+    if tee:
+        send("touch /etc/kintsu-harness-denied\n", 1.5)   # the DEBUG trap started the tee before touch
+        drain(2.0)
+        send("true\n", 1.5)                                 # bash hears the message with its next decision
+        send("kintsu privacy\n", 1.2)
+        send("kintsu daemon stop\n", 0.6)
+        send("exit\n", 0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen
     panel_steps(send, screen, f"bash ({bash})")
     send("kintsu daemon stop\n", 0.6)
     send("exit\n", 0.4)
@@ -277,6 +299,10 @@ def run_bash():
     return screen
 
 which = sys.argv[1:] or list(variants)
+if which == ["tee"]:
+    show("zsh, stderr copied by the hook", run_zsh(tee=True))
+    show("bash, stderr copied by the hook", run_bash(tee=True))
+    srv.shutdown(); sys.exit(0)
 if which == ["panel"]:
     run(None, panel=True)
     run_zsh(panel=True)

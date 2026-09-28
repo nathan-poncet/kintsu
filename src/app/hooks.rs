@@ -35,6 +35,9 @@ pub(super) fn triage(
     input.terminal = rt.terminal.clone();
     input.path = Some(rt.path_var.clone());
     input.env = keys_the_models_read(settings);
+    if let Some(session) = &input.session {
+        input.terminal.stderr_copy = HookNotes::new(&rt.state_dir).stderr_copy(session);
+    }
     if rt.daemon
         && let Some(view) = rt
             .client()

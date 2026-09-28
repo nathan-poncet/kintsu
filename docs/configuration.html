@@ -288,7 +288,7 @@ log_level   = <span class="s">"warn"</span>
 
 <span class="k">[capture]</span>
 sources    = [<span class="s">"tmux"</span>, <span class="s">"herdr"</span>, <span class="s">"wezterm"</span>, <span class="s">"kitty"</span>, <span class="s">"iterm2"</span>]   <span class="c"># tried in order; only what is present</span>
-stderr_tee = false        <span class="c"># zsh only: capture stderr when no source above is available. Opt in.</span>
+stderr_tee = false        <span class="c"># zsh and bash: copy each command's stderr through tee, for terminals no source above can read. Opt in: a tee per command, and stderr is no longer a tty for the command. Re-run kintsu init after changing.</span>
 max_lines  = 400</code></pre>
     </div>
   </section>

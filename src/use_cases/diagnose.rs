@@ -1,7 +1,7 @@
 //! `kintsu doctor`: is the hook active, are the models reachable in
 //! principle, are the keys where the configuration says.
 
-use crate::entities::{KeySource, Provider, SessionId, Settings};
+use crate::entities::{KeySource, Provider, SessionId, Settings, Shell};
 use crate::use_cases::ports::{Environment, ModelGateway, Secrets};
 
 /// How a check went.
@@ -29,6 +29,8 @@ pub struct Diagnose<'a> {
     /// Whether the daemon is installed as a launchd agent or a systemd
     /// unit, so it runs without the shell's environment.
     pub service_installed: bool,
+    /// The shell of the session the report is for, when it is known.
+    pub shell: Option<Shell>,
 }
 
 impl Diagnose<'_> {
@@ -140,6 +142,21 @@ impl Diagnose<'_> {
                 ),
             ));
         }
+        if self.settings.capture.stderr_tee {
+            match self.shell {
+                Some(shell) if shell.supports_stderr_tee() => checks.push(check(
+                    "capture.stderr_tee",
+                    Health::Ok,
+                    format!("{shell} copies each command's stderr for the capture"),
+                )),
+                Some(shell) => checks.push(check(
+                    "capture.stderr_tee",
+                    Health::Warning,
+                    format!("on, but {shell} cannot copy its own stderr: zsh and bash only"),
+                )),
+                None => {}
+            }
+        }
         let routing = &self.settings.routing;
         for (task, names) in [
             ("explain", &routing.explain),
@@ -205,6 +222,7 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&["claude"]),
             models: &ScriptedModels::default(),
             service_installed: false,
+            shell: Some(Shell::Zsh),
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let health = |subject: &str| {
@@ -253,6 +271,7 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&[]),
             models: &ScriptedModels::default(),
             service_installed: true,
+            shell: None,
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let daemon = report.iter().find(|c| c.subject == "daemon").unwrap();
@@ -281,10 +300,48 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&[]),
             models: &ScriptedModels::default(),
             service_installed: false,
+            shell: None,
         };
         let report = uc.run(None);
         assert_eq!(report[0].health, Health::Problem);
         assert_eq!(report[1].subject, "models");
         assert_eq!(report[1].health, Health::Warning);
+    }
+
+    #[test]
+    fn the_stderr_tee_is_for_zsh_and_bash_and_fish_is_told_so() {
+        let mut settings = Settings::default();
+        settings.capture.stderr_tee = true;
+        let report_for = |settings: &Settings, shell: Option<Shell>| {
+            Diagnose {
+                settings,
+                secrets: &MapSecrets::with(&[]),
+                environment: &FakeEnvironment::with_executables(&[]),
+                models: &ScriptedModels::default(),
+                shell,
+                service_installed: false,
+            }
+            .run(Some(&SessionId::new("42")))
+            .into_iter()
+            .find(|c| c.subject == "capture.stderr_tee")
+        };
+        assert_eq!(
+            report_for(&settings, Some(Shell::Zsh)).unwrap().health,
+            Health::Ok
+        );
+        assert_eq!(
+            report_for(&settings, Some(Shell::Bash)).unwrap().health,
+            Health::Ok
+        );
+        let fish = report_for(&settings, Some(Shell::Fish)).unwrap();
+        assert_eq!(fish.health, Health::Warning);
+        assert!(fish.detail.contains("zsh and bash only"), "{}", fish.detail);
+        assert_eq!(report_for(&settings, None), None, "no shell to speak of");
+        settings.capture.stderr_tee = false;
+        assert_eq!(
+            report_for(&settings, Some(Shell::Fish)),
+            None,
+            "off: nothing to say"
+        );
     }
 }

@@ -12,6 +12,15 @@ All notable changes to kintsu are recorded here. The format follows
   `ctrl-o`, `C-o`); the three hooks bind it and the bubble names it. Keys
   the terminal or the line editor own (Tab, Enter, Backspace, `^C`, `^D`,
   `^Z`, `^S`, `^Q`) are refused with a message that says which.
+- `[capture] stderr_tee = true`: the zsh and bash hooks copy each
+  command's stderr through `tee` into the session's file, and the capture
+  reads it first, for terminals no program can read a pane of
+  (Terminal.app, Ghostty…). The rules that read the output and the
+  model's explanation then see the error there too. Off by default: a tee
+  per command, and stderr is no longer a tty for the command. fish cannot
+  redirect its own stderr; `kintsu doctor` says so. Re-run `kintsu init`
+  after switching it on.
+
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
   `git-log` and `gitpush`, `mandiff`, `gradle` for `./gradlew`, `app.py`

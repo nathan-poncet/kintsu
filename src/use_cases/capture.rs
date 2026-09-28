@@ -85,6 +85,29 @@ mod tests {
     }
 
     #[test]
+    fn the_shells_copy_of_stderr_is_the_output_as_it_is() {
+        let cases = MemoryCases::default();
+        let copy = FakeOutput::showing("touch: /etc/hosts.new: Permission denied\n");
+        let settings = Settings::default();
+        let uc = CaptureOutput {
+            settings: &settings,
+            output: &copy,
+            cases: &cases,
+        };
+        let identity = TerminalIdentity {
+            stderr_copy: Some("/s/sessions/42.stderr".into()),
+            ..Default::default()
+        };
+        let case = uc
+            .run(case("touch /etc/hosts.new", 1, Some("42")), &identity)
+            .unwrap();
+        assert_eq!(
+            case.output(),
+            Some("touch: /etc/hosts.new: Permission denied")
+        );
+    }
+
+    #[test]
     fn a_slow_read_does_not_bring_back_a_failure_the_shell_moved_past() {
         use crate::entities::{CaseId, Timestamp};
         let cases = MemoryCases::default();

@@ -20,6 +20,12 @@ impl Shell {
         matches!(self, Shell::Zsh | Shell::Fish)
     }
 
+    /// Whether the hook can copy a command's stderr through `tee`: zsh and
+    /// bash can redirect their own descriptors, fish cannot.
+    pub fn supports_stderr_tee(self) -> bool {
+        matches!(self, Shell::Zsh | Shell::Bash)
+    }
+
     /// Whether a message can reach the shell while it waits at the prompt:
     /// zsh watches a descriptor, fish takes a signal, bash hears nothing
     /// before its next prompt.

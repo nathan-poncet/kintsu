@@ -149,6 +149,7 @@ struct FileDto {
 struct CaptureDto {
     sources: Option<Vec<String>>,
     max_lines: Option<usize>,
+    stderr_tee: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -313,19 +314,30 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
         },
     };
     let defaults = CaptureSettings::default();
-    let capture = CaptureSettings {
-        sources: match file.capture.sources {
-            None => defaults.sources,
-            Some(list) => {
-                if let Some(bad) = list.iter().find(|s| !defaults.sources.contains(s)) {
-                    return Err(SettingsError::Invalid(format!(
-                        "capture.sources: `{bad}` (herdr, tmux, wezterm, kitty, iterm2)"
-                    )));
-                }
-                list
+    let stderr_tee = file.capture.stderr_tee.unwrap_or(defaults.stderr_tee);
+    let mut sources = match file.capture.sources {
+        None => defaults.sources,
+        Some(list) => {
+            if let Some(bad) = list
+                .iter()
+                .find(|s| *s != "stderr" && !defaults.sources.contains(s))
+            {
+                return Err(SettingsError::Invalid(format!(
+                    "capture.sources: `{bad}` (stderr, herdr, tmux, wezterm, kitty, iterm2)"
+                )));
             }
-        },
+            list
+        }
+    };
+    // The shell's own copy is exact where a pane read is a screen dump:
+    // when it is made, it is read first.
+    if stderr_tee && !sources.iter().any(|s| s == "stderr") {
+        sources.insert(0, "stderr".to_string());
+    }
+    let capture = CaptureSettings {
+        sources,
         max_lines: file.capture.max_lines.unwrap_or(defaults.max_lines),
+        stderr_tee,
     };
     Ok(Settings {
         models,
@@ -709,7 +721,20 @@ eager_fix = true
         )
         .unwrap()
         .capture;
-        assert_eq!((c.sources, c.max_lines), (vec!["tmux".to_string()], 80));
+        assert_eq!(
+            (c.sources, c.max_lines, c.stderr_tee),
+            (vec!["stderr".to_string(), "tmux".to_string()], 80, true),
+            "the shell's copy comes first when it is made"
+        );
+        let c = parse_settings("[capture]\nsources = [\"tmux\", \"stderr\"]", None)
+            .unwrap()
+            .capture;
+        assert!(!c.stderr_tee, "off by default");
+        assert_eq!(
+            c.sources,
+            vec!["tmux".to_string(), "stderr".to_string()],
+            "an explicit order is kept"
+        );
         assert!(err("[ui]\neager_fix = \"sometimes\"").contains("ui.eager_fix"));
         assert_eq!(
             parse_settings("[ui]\neager_fix = \"auto\"", None)

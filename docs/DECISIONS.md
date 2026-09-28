@@ -359,8 +359,8 @@ Sources, tried in the configured order, each through its own CLI:
 `osascript` (the visible screen only). Herdr and tmux were exercised on
 this machine; the other three follow their documentation and are covered
 by the same invocation tests. Ghostty has no way to read a pane, so a
-Ghostty user gets capture only inside Herdr or tmux. The opt-in stderr
-tee for shells without any source is not built.
+Ghostty user gets capture only inside Herdr or tmux, or through the
+opt-in stderr tee of section 27, in zsh and bash.
 
 Two corrections after the first day of use. The echo of the command is
 the last line that *ends* with it, never a line kintsu wrote itself (the
@@ -483,7 +483,7 @@ evening, six of them after a fuller explanation. One is still *pending*.
 | 3. `ui.hotkey` | read it; `^K` stays the default |
 | 4. the panel's height | grows as answers arrive |
 | 5. the site | shows the current tag; "Play with it" stays as it is |
-| 6. the stderr tee for terminals without a readable pane | *pending*: the maintainer asked why capture depends on the terminal when the shell is hooked; the answer is that the shell never sees the output, only the terminal holds it |
+| 6. the stderr tee for terminals without a readable pane | the maintainer asked why capture depends on the terminal when the shell is hooked; the answer is that the shell never sees the output, only the terminal holds it. Decided on 2026-09-29: build it, opt-in; section 27 |
 | 7. project awareness: `Cargo.toml`, `.kintsu.toml`, `CLAUDE.md` in the brief | v0.3 |
 | 8. `$pipestatus` | build it; built, section 23 |
 | 9. email and IP redaction, custom patterns | v0.3 |
@@ -634,8 +634,7 @@ words, so a compiler's hint about a variable is left alone. Ties among
 several suggestions are refused, as in the typo rules. The local path
 (`KINTSU_NO_DAEMON`) captures but does not deliver: `kintsu fix` finds
 the rule's answer there. Without a readable pane (Ghostty) nothing of
-this fires; the stderr tee (pending, section "open questions") would
-give it the output.
+this fires unless the stderr tee of section 27 is on, in zsh or bash.
 
 ## 27. The daemon reads the keys the shell sees (2026-09-29)
 
@@ -701,12 +700,41 @@ style; the daemon refreshes it with the settings for the subscriber
 renderer, next to `ascii` and `links`. The configuration page wrote
 `hotkey = "ctrl-k"`; that spelling is accepted, `^K` is the one printed.
 
+## 30. The stderr tee: opt-in, zsh and bash (2026-09-29)
+
+Open question 6, decided: built. `[capture] stderr_tee = true`, the name
+the configuration page already had, makes the zsh and bash hooks send
+each command's stderr through `tee` into `<state>/sessions/<id>.stderr`,
+one command per file. `kintsu init` emits that code only when the option
+is on, so switching it needs the hook re-sourced; `kintsu doctor` says
+what the shell does with it. The client names the file in the frame's
+terminal identity (`stderr_copy`) when it exists; the daemon reads it
+first among the sources, once, and removes it. A copy has no prompt echo,
+so `output_after` keeps its tail as it is.
+
+zsh saves fd 2 and redirects it in `preexec`, restores it in `precmd`
+before `kintsu triage` prints, so the bubble never lands in the copy; a
+`kintsu` command line is not copied. bash has no preexec: a `DEBUG` trap
+starts the tee before the first simple command of a line, armed at the
+end of the `PROMPT_COMMAND` chain so the prompt's own functions are not
+copied and disarmed once started; an existing `DEBUG` trap (bash-preexec)
+is left alone and the copy is not made. fish cannot redirect its own
+stderr; the doctor says so when the option is on there.
+
+The costs, and why it is off by default: a `tee` process per command,
+and the command sees a pipe on stderr, not a tty, so cargo, git and pip
+colour and animate less. The tee is not waited for: zsh gives no pid for
+a process substitution, and a background job that inherited the pipe
+would hold `wait` until it exits. kintsu reads the file after the bubble,
+from the daemon's background thread, well after tee's last write; a job
+left in the background keeps its stderr flowing into the file until it
+exits, and the next command's tee truncates it.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; streaming the answers into the
    panel.
-2. The stderr tee, if the maintainer wants it (pending above).
-3. SQLite behind the three storage ports; the pty harness in CI.
-4. `kintsu models` and `kintsu login` (pending); learning rules from
+2. SQLite behind the three storage ports; the pty harness in CI.
+3. `kintsu models` and `kintsu login` (pending); learning rules from
    accepted fixes; the cost ledger; budgets.
-5. A Homebrew tap and an apt repository.
+4. A Homebrew tap and an apt repository.

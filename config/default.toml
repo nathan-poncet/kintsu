@@ -57,8 +57,9 @@ same_failure   = "once"                  # once · always
 # After a failure worth a bubble, the command's output is read from the
 # terminal and kept with the case, so `why`, `fix` and the agent see it.
 [capture]
-sources   = ["herdr", "tmux", "wezterm", "kitty", "iterm2"]   # tried in order; only what is present
-max_lines = 400                                                # 0 disables capture
+sources    = ["herdr", "tmux", "wezterm", "kitty", "iterm2"]   # tried in order; only what is present
+max_lines  = 400                                                # 0 disables capture
+stderr_tee = false                                              # zsh and bash: copy each command's stderr for terminals no source can read; re-run `kintsu init` after changing
 
 # ── UI ──────────────────────────────────────────────────────────────────
 [ui]

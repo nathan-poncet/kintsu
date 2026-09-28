@@ -95,12 +95,12 @@ kintsu/
             │                         hook_notes.rs (the files the hooks read) · ndjson.rs · unix.rs (libc) ·
             │                         service.rs (launchd, systemd, the kintsu:// handler) ·
             │                         tty_panel.rs (raw mode, the viewport on /dev/tty, OSC 52) ·
-            │                         terminals.rs (OutputSource: herdr, tmux, wezterm, kitty, iterm2) ·
+            │                         terminals.rs (OutputSource: the shell's stderr copy, herdr, tmux, wezterm, kitty, iterm2) ·
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs
-            └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2,stderr_tee}.rs ·
+            └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2}.rs ·
                                       store/sqlite.rs · notify/{zle_fd,signal,next_prompt}.rs
 ```
 

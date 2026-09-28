@@ -10,9 +10,10 @@ capture from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and
 `command_finished` carries `pipestatus`, and a message that lands once
 the shell moved on to another command names its command and offers no
 keys. `session_new` is sent once at the shell's start and answers the id
-the daemon knows the shell by, its pid today. Not yet: `get_case`, the
-stderr tee, SQLite. The idle exit is not wanted. See
-[DECISIONS.md](DECISIONS.md), sections 2, 17, 20, 23 and 28.*
+the daemon knows the shell by, its pid today. The opt-in stderr tee (zsh,
+bash) names its copy in the frame's terminal identity (`stderr_copy`).
+Not yet: `get_case`, SQLite. The idle exit is not wanted. See
+[DECISIONS.md](DECISIONS.md), sections 2, 17, 20, 23, 28 and 30.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and

@@ -99,6 +99,7 @@ fn terminal_identity(v: Option<&Value>) -> TerminalIdentity {
         kitty_window: field("kitty_window"),
         kitty_listen_on: field("kitty_listen_on"),
         iterm_session: field("iterm_session"),
+        stderr_copy: field("stderr_copy"),
     }
 }
 
@@ -268,7 +269,7 @@ mod tests {
 
     #[test]
     fn a_finished_command_becomes_a_triage_input() {
-        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","env":{"ANTHROPIC_API_KEY":"sk-test","ODD":7},"color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
+        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","env":{"ANTHROPIC_API_KEY":"sk-test","ODD":7},"color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty","stderr_copy":"/s/sessions/42.stderr"}}"#;
         let Request::CommandFinished {
             input,
             color,
@@ -294,6 +295,10 @@ mod tests {
         assert_eq!(input.terminal.herdr_pane.as_deref(), Some("wS:p1"));
         assert_eq!(input.terminal.tmux_pane, None, "empty means absent");
         assert_eq!(input.terminal.program.as_deref(), Some("ghostty"));
+        assert_eq!(
+            input.terminal.stderr_copy.as_deref(),
+            Some("/s/sessions/42.stderr")
+        );
         let bare = parse_frame(
             r#"{"v":1,"type":"command_finished","command":"ls","status":0,"session":""}"#,
         )

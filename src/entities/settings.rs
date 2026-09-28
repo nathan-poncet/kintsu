@@ -299,10 +299,15 @@ impl Default for UiSettings {
 /// Reading the failed command's output from the terminal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaptureSettings {
-    /// The sources to try, in order: `herdr`, `tmux`, `wezterm`, `kitty`, `iterm2`.
+    /// The sources to try, in order: `stderr` (the shell's own copy),
+    /// `herdr`, `tmux`, `wezterm`, `kitty`, `iterm2`.
     pub sources: Vec<String>,
     /// How many lines of output a case keeps at most; 0 disables capture.
     pub max_lines: usize,
+    /// Whether the zsh and bash hooks copy each command's stderr through
+    /// `tee`, for terminals no source can read. Off by default: it costs a
+    /// process per command and stderr stops being a tty for the command.
+    pub stderr_tee: bool,
 }
 
 impl Default for CaptureSettings {
@@ -313,6 +318,7 @@ impl Default for CaptureSettings {
                 .map(String::from)
                 .collect(),
             max_lines: 400,
+            stderr_tee: false,
         }
     }
 }
