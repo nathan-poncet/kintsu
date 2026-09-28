@@ -246,6 +246,12 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     let session = rt.session.as_ref();
 
     match command {
+        Command::SessionNew {
+            session,
+            shell,
+            pid,
+            tty,
+        } => hooks::session_new(rt, &settings, session, shell, pid, tty),
         Command::Triage { input, signal_pid } => hooks::triage(
             rt,
             &Local {

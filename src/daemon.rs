@@ -87,6 +87,13 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         loop {
             std::thread::sleep(SUBSCRIBER_PING);
             pinger.sessions.ping();
+            let gone = pinger.sessions.forget_gone(unix::process_alive);
+            if gone > 0 {
+                log(&format!(
+                    "{gone} shell(s) gone, {} still known",
+                    pinger.sessions.count()
+                ));
+            }
         }
     });
     for stream in listener.incoming() {
@@ -194,6 +201,11 @@ fn handle(daemon: &Arc<Daemon>, mut stream: UnixStream) {
         Request::Hello { .. } => {
             let _ = send_line(&mut stream, &frames::welcome(VERSION));
         }
+        Request::SessionNew { session, details } => {
+            daemon.sessions.register(&session, *details);
+            log(&daemon.sessions.describe(&session));
+            let _ = send_line(&mut stream, &frames::session(&session));
+        }
         Request::CommandFinished {
             input,
             color,
@@ -238,17 +250,10 @@ fn on_command_finished(
     let settings = daemon.settings();
     let style = daemon.style(&settings, color);
     let session = input.session.clone();
-    let terminal = input.terminal.clone();
     let ghost_shell = input.shell.is_some_and(Shell::supports_ghost_text);
     if let (Some(session), Some(pid)) = (&session, signal_pid) {
         daemon.sessions.register_signal(session, pid);
     }
-    // Under launchd or systemd the daemon's own PATH is the bare system
-    // one; the shell's is what its programs are looked up in.
-    let path = input
-        .path
-        .clone()
-        .unwrap_or_else(|| daemon.cfg.path_var.clone());
     if let (Some(session), Some(reported)) = (&session, &input.path) {
         daemon.sessions.remember_path(session, reported.clone());
     }
@@ -257,6 +262,22 @@ fn on_command_finished(
     {
         daemon.sessions.remember_env(session, input.env.clone());
     }
+    // What the frame does not say, the shell's registration may have said.
+    // The daemon's own PATH, the bare system one under launchd or systemd,
+    // is the last resort.
+    let path = input
+        .path
+        .clone()
+        .or_else(|| session.as_ref().and_then(|s| daemon.sessions.path_of(s)))
+        .unwrap_or_else(|| daemon.cfg.path_var.clone());
+    let terminal = if input.terminal.is_known() {
+        input.terminal.clone()
+    } else {
+        session
+            .as_ref()
+            .and_then(|s| daemon.sessions.terminal_of(s))
+            .unwrap_or_else(|| input.terminal.clone())
+    };
     let secrets = daemon.secrets_for(session.as_ref());
     let state = daemon.state();
     let environment = FsEnvironment::new(path.clone());

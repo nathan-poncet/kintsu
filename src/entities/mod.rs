@@ -40,7 +40,7 @@ pub use outcome::CommandOutcome;
 pub use output_rules::suggest_fix_from_output;
 pub use redaction::redact;
 pub use rules::{DirEntry, Facts, Os, suggest_fix};
-pub use session::{Session, SessionId};
+pub use session::{Session, SessionDetails, SessionId};
 pub use settings::{
     CaptureSettings, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing, Settings,
     Tier, UiMode, UiSettings,

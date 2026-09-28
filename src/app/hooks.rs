@@ -1,15 +1,17 @@
-//! What the hooks call: `kintsu triage` after every command line, and
-//! `kintsu subscribe`, the zsh child that waits for messages.
+//! What the hooks call: `kintsu session new` once at the shell's start,
+//! `kintsu triage` after every command line, and `kintsu subscribe`, the
+//! zsh child that waits for messages.
 
 use std::collections::BTreeMap;
 use std::io::Write;
+use std::os::fd::AsRawFd;
 use std::process::ExitCode;
 
 use crate::adapters::gateways::{
-    DaemonClient, EnvSecrets, HookNotes, RandomIds, SystemClock, TerminalOutput,
+    DaemonClient, EnvSecrets, HookNotes, RandomIds, SystemClock, TerminalOutput, unix,
 };
 use crate::adapters::presenters::{error_line, toast};
-use crate::entities::{KeySource, SessionId, Settings, Shell, TriageDecision};
+use crate::entities::{KeySource, SessionDetails, SessionId, Settings, Shell, TriageDecision};
 use crate::use_cases::ports::Secrets;
 use crate::use_cases::{CaptureOutput, Triage, TriageInput};
 
@@ -124,6 +126,36 @@ fn keys_the_models_read(settings: &Settings) -> BTreeMap<String, String> {
             _ => None,
         })
         .collect()
+}
+
+/// `kintsu session new`: what the hook says once, at the shell's start, so
+/// the daemon knows the shell before its first failure. Nothing waits on
+/// it: a daemon that is not there is started for the next frame, and the
+/// shell's start never fails for it.
+pub(super) fn session_new(
+    rt: &Runtime,
+    settings: &Settings,
+    session: Option<SessionId>,
+    shell: Option<Shell>,
+    pid: Option<u32>,
+    tty: Option<String>,
+) -> ExitCode {
+    let Some(session) = session.or_else(|| rt.session.clone()) else {
+        return ExitCode::SUCCESS;
+    };
+    if !rt.daemon {
+        return ExitCode::SUCCESS;
+    }
+    let details = SessionDetails {
+        shell,
+        pid,
+        tty: tty.or_else(|| unix::tty_name(std::io::stdin().as_raw_fd())),
+        terminal: rt.terminal.clone(),
+        path: Some(rt.path_var.clone()),
+        env: keys_the_models_read(settings),
+    };
+    let _ = rt.client().session_new(&session, &details, SYNC_BUDGET);
+    ExitCode::SUCCESS
 }
 
 /// `kintsu subscribe`: prints every bubble the daemon sends for the session

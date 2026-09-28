@@ -50,6 +50,14 @@ pub enum Command {
         input: Box<TriageInput>,
         signal_pid: Option<u32>,
     },
+    /// `kintsu session new --shell <name> --pid <n> [--tty <path>] [--session <id>]`:
+    /// a shell that just started registers with the daemon.
+    SessionNew {
+        session: Option<SessionId>,
+        shell: Option<Shell>,
+        pid: Option<u32>,
+        tty: Option<String>,
+    },
     /// `kintsu subscribe [--session <id>]`: print bubbles as they come.
     Subscribe { session: Option<SessionId> },
     /// `kintsu pending [--session <id>]`: print the bubbles not yet seen.
@@ -143,6 +151,8 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
             .map(Command::Init)
             .ok_or_else(|| CliError::UnsupportedShell((*shell).to_string())),
         ["triage", flags @ ..] => parse_triage(flags),
+        ["session", "new", flags @ ..] => parse_session_new(flags),
+        ["session", ..] => Err(CliError::MissingValue("session new".into())),
         ["subscribe", flags @ ..] => {
             parse_session_flag(flags).map(|session| Command::Subscribe { session })
         }
@@ -240,6 +250,29 @@ fn statuses(flag: &str, value: &str) -> Result<Vec<ExitStatus>, CliError> {
         .split_whitespace()
         .map(|code| integer::<i32>(flag, code).map(ExitStatus::new))
         .collect()
+}
+
+fn parse_session_new(flags: &[&str]) -> Result<Command, CliError> {
+    let (mut session, mut shell, mut pid, mut tty) = (None, None, None, None);
+    let mut flags = flags.iter();
+    while let Some(flag) = flags.next() {
+        let value = *flags
+            .next()
+            .ok_or_else(|| CliError::MissingValue((*flag).to_string()))?;
+        match *flag {
+            "--session" => session = Some(SessionId::new(value)).filter(|s| !s.as_str().is_empty()),
+            "--shell" => shell = Shell::from_name(value),
+            "--pid" => pid = Some(integer::<u32>(flag, value)?),
+            "--tty" => tty = Some(value.to_string()).filter(|t| !t.is_empty()),
+            other => return Err(CliError::UnknownFlag(other.to_string())),
+        }
+    }
+    Ok(Command::SessionNew {
+        session,
+        shell,
+        pid,
+        tty,
+    })
 }
 
 fn parse_session_flag(flags: &[&str]) -> Result<Option<SessionId>, CliError> {
@@ -395,6 +428,54 @@ mod tests {
             Ok(Command::Service(ServiceAction::Uninstall))
         );
         assert_eq!(parse_args(["service"]), Err(CliError::UnknownServiceAction));
+    }
+
+    #[test]
+    fn a_shell_registers_with_what_it_knows_and_nothing_is_required() {
+        let Command::SessionNew {
+            session,
+            shell,
+            pid,
+            tty,
+        } = parse_args([
+            "session",
+            "new",
+            "--shell",
+            "fish",
+            "--pid",
+            "4242",
+            "--tty",
+            "/dev/ttys004",
+        ])
+        .unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (session, shell, pid, tty.as_deref()),
+            (None, Some(Shell::Fish), Some(4242), Some("/dev/ttys004"))
+        );
+        assert!(matches!(
+            parse_args(["session", "new"]).unwrap(),
+            Command::SessionNew {
+                session: None,
+                shell: None,
+                pid: None,
+                tty: None
+            }
+        ));
+        assert!(matches!(
+            parse_args(["session", "new", "--pid", "x"]),
+            Err(CliError::InvalidInteger { .. })
+        ));
+        assert!(matches!(
+            parse_args(["session", "new", "--pid"]),
+            Err(CliError::MissingValue(_))
+        ));
+        assert!(matches!(
+            parse_args(["session"]),
+            Err(CliError::MissingValue(_))
+        ));
     }
 
     #[test]

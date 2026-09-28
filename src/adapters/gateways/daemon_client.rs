@@ -11,7 +11,7 @@ use std::time::{Duration, Instant, SystemTime};
 use serde_json::{Value, json};
 
 use crate::adapters::gateways::ndjson::{read_line, send_line};
-use crate::entities::{Action, CaseId, SessionId};
+use crate::entities::{Action, CaseId, SessionDetails, SessionId, TerminalIdentity};
 use crate::use_cases::TriageInput;
 
 /// What the daemon decided, already rendered for this terminal.
@@ -78,18 +78,7 @@ impl DaemonClient {
             "env": (!input.env.is_empty()).then(|| json!(input.env)),
             "color": color,
             "signal_pid": signal_pid,
-            "terminal": {
-                "program": input.terminal.program,
-                "tmux_pane": input.terminal.tmux_pane,
-                "tmux_socket": input.terminal.tmux_socket,
-                "herdr_pane": input.terminal.herdr_pane,
-                "herdr_socket": input.terminal.herdr_socket,
-                "herdr_bin": input.terminal.herdr_bin,
-                "wezterm_pane": input.terminal.wezterm_pane,
-                "kitty_window": input.terminal.kitty_window,
-                "kitty_listen_on": input.terminal.kitty_listen_on,
-                "iterm_session": input.terminal.iterm_session,
-            },
+            "terminal": terminal_json(&input.terminal),
         });
         send_line(&mut stream, &frame.to_string()).ok()?;
         let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;
@@ -102,6 +91,45 @@ impl DaemonClient {
             pending: answer["pending"].as_str().map(String::from),
             ghost: answer["ghost"].as_str().map(String::from),
         })
+    }
+
+    /// A shell that just started says what it is. Never worth a wait at
+    /// the shell's start: when no daemon listens, one is started and
+    /// `Ok(None)` comes back, the next frame will find it; when one
+    /// listens, the answer must come within `budget`.
+    pub fn session_new(
+        &self,
+        session: &SessionId,
+        details: &SessionDetails,
+        budget: Duration,
+    ) -> io::Result<Option<SessionId>> {
+        let mut stream = match self.connect() {
+            Ok(stream) => stream,
+            Err(_) => {
+                if self.may_spawn() {
+                    self.spawn()?;
+                }
+                return Ok(None);
+            }
+        };
+        stream.set_read_timeout(Some(budget))?;
+        stream.set_write_timeout(Some(budget))?;
+        let frame = json!({
+            "v": 1,
+            "type": "session_new",
+            "version": self.version,
+            "session": session.as_str(),
+            "shell": details.shell.map(|s| s.name()),
+            "pid": details.pid,
+            "tty": details.tty,
+            "path": details.path,
+            "env": (!details.env.is_empty()).then(|| json!(details.env)),
+            "terminal": terminal_json(&details.terminal),
+        });
+        send_line(&mut stream, &frame.to_string())?;
+        let answer: Value =
+            serde_json::from_str(&read_line(&mut stream)?).map_err(io::Error::other)?;
+        Ok(answer["session"].as_str().map(SessionId::new))
     }
 
     /// Opens a subscription; the caller reads bubble frames from the stream.
@@ -317,6 +345,22 @@ impl DaemonClient {
     }
 }
 
+/// The pane identity as the frames carry it.
+fn terminal_json(terminal: &TerminalIdentity) -> Value {
+    json!({
+        "program": terminal.program,
+        "tmux_pane": terminal.tmux_pane,
+        "tmux_socket": terminal.tmux_socket,
+        "herdr_pane": terminal.herdr_pane,
+        "herdr_socket": terminal.herdr_socket,
+        "herdr_bin": terminal.herdr_bin,
+        "wezterm_pane": terminal.wezterm_pane,
+        "kitty_window": terminal.kitty_window,
+        "kitty_listen_on": terminal.kitty_listen_on,
+        "iterm_session": terminal.iterm_session,
+    })
+}
+
 /// The text of a bubble frame; nothing for pings and the rest.
 fn bubble_text(line: &str) -> Option<String> {
     let v: Value = serde_json::from_str(line).ok()?;
@@ -363,6 +407,38 @@ mod tests {
         );
         assert!(!client.shutdown().unwrap());
         assert!(client.hello().is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_registration_without_a_daemon_tries_to_start_one_and_does_not_wait() {
+        let dir = std::env::temp_dir().join(format!("kintsu-client-sn-{}", std::process::id()));
+        let client = DaemonClient::new(
+            dir.join("d.sock"),
+            "/definitely/not/kintsu",
+            dir.join("d.log"),
+        );
+        let started = Instant::now();
+        let first = client.session_new(
+            &SessionId::new("s"),
+            &SessionDetails::default(),
+            Duration::from_millis(40),
+        );
+        assert!(first.is_err(), "the binary to start does not exist");
+        let again = client.session_new(
+            &SessionId::new("s"),
+            &SessionDetails::default(),
+            Duration::from_millis(40),
+        );
+        assert_eq!(
+            again.unwrap(),
+            None,
+            "within the backoff: nothing to start, nothing to wait for"
+        );
+        assert!(
+            started.elapsed() < Duration::from_millis(400),
+            "never the spawn wait"
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 }

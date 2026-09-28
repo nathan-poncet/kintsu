@@ -160,6 +160,19 @@ pub fn open_pty() -> Option<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
     }
 }
 
+/// Whether a process with this id still exists. A process of another
+/// user answers "not permitted", which is still an answer: it is there.
+pub fn process_alive(pid: u32) -> bool {
+    let Ok(pid) = libc::pid_t::try_from(pid) else {
+        return false;
+    };
+    // SAFETY: kill with signal 0 checks the pid and has no other effect.
+    if unsafe { libc::kill(pid, 0) } == 0 {
+        return true;
+    }
+    std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
 /// True when the signal was sent; false when the process is gone.
 pub fn signal_usr1(pid: u32) -> bool {
     let Ok(pid) = libc::pid_t::try_from(pid) else {
@@ -172,6 +185,16 @@ pub fn signal_usr1(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn this_process_is_alive_and_an_impossible_pid_is_not() {
+        assert!(process_alive(std::process::id()));
+        assert!(!process_alive(u32::MAX), "not a pid_t");
+        let mut child = std::process::Command::new("true").spawn().unwrap();
+        let pid = child.id();
+        child.wait().unwrap();
+        assert!(!process_alive(pid), "reaped: gone");
+    }
 
     #[test]
     fn a_diverted_descriptor_writes_elsewhere_until_restored() {

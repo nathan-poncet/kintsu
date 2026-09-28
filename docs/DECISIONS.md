@@ -89,7 +89,8 @@ built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
   refused and why. Keychain and command sources are read per call.
 - Not built: the panel, ghost text, clickable `kintsu://` words,
   `kintsu service install`, SQLite (JSON files stay), `session_new`
-  (the session is still the shell's pid), `act`/`get_case` frames.
+  (built on 2026-09-29, section 28; the session is still the shell's
+  pid), `act`/`get_case` frames.
 
 Two things learned building it: a lock on stdout held in `main` for the
 whole run deadlocked every daemon thread that logged (fixed by passing
@@ -653,12 +654,41 @@ not a reason to break `{ env = … }`). `kintsu doctor` says, when the
 daemon is installed as a service and a model reads its key from the
 environment, that the shell forwards it.
 
+## 28. `session_new`: the shell registers itself when it starts (2026-09-29)
+
+Open question 10 of 2026-09-25, answered "build the frame". The hooks run
+`kintsu session new --shell <name> --pid <pid>` once at init; the client
+adds the tty of its stdin, the pane identity, the shell's PATH and the
+key variables the models read, and sends `session_new`. The daemon
+registers the session, logs one line about it and answers `session` with
+the id. The id stays the shell's pid (section 4): this frame is where a
+daemon-chosen token would come back from, and nothing else changes when
+that day comes.
+
+Nothing at the shell's start waits: when no daemon listens the client
+starts one and returns without a registration, the first
+`command_finished` carries everything anyway; when one listens the answer
+must come within the sync budget. So the very first shell after a boot is
+registered only by its first frame. The hooks keep sending PATH, keys and
+pane identity with every `command_finished`: a key exported after the
+shell started must reach the daemon, and a daemon restarted under a
+running shell must not be blind until the next shell. What the daemon
+gains is the fallback order, frame first, then the registration, then its
+own environment, and a registry that knows every live shell.
+
+Forgetting: every twenty seconds, with the subscriber ping, sessions with
+no subscriber whose pid (from the registration, the SIGUSR1 pid, or the
+id itself when it parses) is gone are dropped, with their pending
+messages, which nobody would read. A session that gave no pid is kept;
+tests use such ids. Reads of the registry (`path_of`, `env_of`,
+`terminal_of`) create nothing, so a forgotten session does not come back
+as an empty entry when a late click asks about it.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; `ui.hotkey`; streaming the
    answers into the panel.
-2. `session_new`; the stderr tee, if the maintainer wants it (pending
-   above).
+2. The stderr tee, if the maintainer wants it (pending above).
 3. SQLite behind the three storage ports; the pty harness in CI.
 4. `kintsu models` and `kintsu login` (pending); learning rules from
    accepted fixes; the cost ledger; budgets.

@@ -59,6 +59,11 @@ pub fn ping() -> String {
     json!({"v": V, "type": "ping"}).to_string()
 }
 
+/// The answer to `session_new`: the id the daemon knows the shell by.
+pub fn session(id: &crate::entities::SessionId) -> String {
+    json!({"v": V, "type": "session", "session": id.as_str()}).to_string()
+}
+
 pub fn done() -> String {
     json!({"v": V, "type": "done"}).to_string()
 }
@@ -167,6 +172,11 @@ mod tests {
         ] {
             assert_eq!(parse(&frame)["type"], kind);
         }
+        let s = parse(&session(&crate::entities::SessionId::new("4242")));
+        assert_eq!(
+            (s["type"].as_str(), s["session"].as_str()),
+            (Some("session"), Some("4242"))
+        );
         let b = parse(&bubble(&CaseId::new("c1"), "▎ t"));
         assert_eq!(
             (b["type"].as_str(), b["case"].as_str(), b["text"].as_str()),

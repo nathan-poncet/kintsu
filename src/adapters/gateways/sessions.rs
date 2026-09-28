@@ -1,7 +1,8 @@
-//! The shells the daemon has heard from: the subscriber connection that
-//! receives bubbles live, the pid to poke with SIGUSR1, and the messages
-//! not yet seen. This is the daemon's `Notifier`. How a message reads is
-//! not decided here: the composition root hands in the renderer.
+//! The shells the daemon has heard from: what each said about itself
+//! when it started, the subscriber connection that receives bubbles live,
+//! the pid to poke with SIGUSR1, and the messages not yet seen. This is
+//! the daemon's `Notifier`. How a message reads is not decided here: the
+//! composition root hands in the renderer.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::os::unix::net::UnixStream;
@@ -10,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::adapters::gateways::ndjson::send_line;
 use crate::adapters::gateways::unix;
-use crate::entities::{CaseId, Message, SessionId};
+use crate::entities::{CaseId, Message, SessionDetails, SessionId, Shell, TerminalIdentity};
 use crate::use_cases::ports::{Notifier, NotifyError};
 
 /// Renders a message into the frame line a subscriber receives; the bool
@@ -21,8 +22,29 @@ struct SessionState {
     pending: VecDeque<Message>,
     subscriber: Option<(UnixStream, bool)>,
     signal_pid: Option<u32>,
+    shell: Option<Shell>,
+    /// The shell's own pid, from its registration: gone means forgotten.
+    pid: Option<u32>,
+    tty: Option<String>,
+    terminal: Option<TerminalIdentity>,
     path: Option<String>,
     env: BTreeMap<String, String>,
+}
+
+impl SessionState {
+    fn new() -> Self {
+        Self {
+            pending: VecDeque::new(),
+            subscriber: None,
+            signal_pid: None,
+            shell: None,
+            pid: None,
+            tty: None,
+            terminal: None,
+            path: None,
+            env: BTreeMap::new(),
+        }
+    }
 }
 
 /// Clicks on older bubbles than this get "this case is gone".
@@ -77,14 +99,73 @@ impl Sessions {
         let mut map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let state = map
             .entry(id.as_str().to_string())
-            .or_insert_with(|| SessionState {
-                pending: VecDeque::new(),
-                subscriber: None,
-                signal_pid: None,
-                path: None,
-                env: BTreeMap::new(),
-            });
+            .or_insert_with(SessionState::new);
         f(state, self)
+    }
+
+    /// A read: nothing is created for a shell the daemon never heard from.
+    fn peek<R>(&self, id: &SessionId, f: impl FnOnce(&SessionState) -> R) -> Option<R> {
+        let map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        map.get(id.as_str()).map(f)
+    }
+
+    /// What the shell said about itself when it started. Only what it
+    /// said replaces what was known: a registration without a PATH keeps
+    /// the last one.
+    pub fn register(&self, id: &SessionId, details: SessionDetails) {
+        self.with(id, |state, _| {
+            state.shell = details.shell.or(state.shell);
+            state.pid = details.pid.or(state.pid);
+            state.tty = details.tty.or(state.tty.take());
+            if details.terminal.is_known() {
+                state.terminal = Some(details.terminal);
+            }
+            if details.path.is_some() {
+                state.path = details.path;
+            }
+            if !details.env.is_empty() {
+                state.env = details.env;
+            }
+        });
+    }
+
+    /// One line about a registered session, for the log.
+    pub fn describe(&self, id: &SessionId) -> String {
+        self.peek(id, |state| {
+            format!(
+                "session {} registered: {} pid {} on {}",
+                id.as_str(),
+                state.shell.map_or("a shell", Shell::name),
+                state.pid.map_or("?".to_string(), |p| p.to_string()),
+                state.tty.as_deref().unwrap_or("no tty"),
+            )
+        })
+        .unwrap_or_else(|| format!("session {} unknown", id.as_str()))
+    }
+
+    /// The pane the shell registered with, for the output capture when a
+    /// frame does not name one.
+    pub fn terminal_of(&self, id: &SessionId) -> Option<TerminalIdentity> {
+        self.peek(id, |state| state.terminal.clone()).flatten()
+    }
+
+    /// Drops the sessions whose shell is gone and that nobody listens for:
+    /// no subscriber, and a pid that `alive` denies. A session that gave
+    /// no pid and has none to parse from its id is kept, there is no way
+    /// to tell. Returns how many were forgotten.
+    pub fn forget_gone(&self, alive: impl Fn(u32) -> bool) -> usize {
+        let mut map = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let before = map.len();
+        map.retain(|id, state| {
+            let pid = state.pid.or(state.signal_pid).or_else(|| id.parse().ok());
+            state.subscriber.is_some() || pid.is_none_or(&alive)
+        });
+        before - map.len()
+    }
+
+    /// How many shells are known.
+    pub fn count(&self) -> usize {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// A new subscriber replaces the old one and receives what was waiting.
@@ -112,7 +193,7 @@ impl Sessions {
     }
 
     pub fn path_of(&self, id: &SessionId) -> Option<String> {
-        self.with(id, |state, _| state.path.clone())
+        self.peek(id, |state| state.path.clone()).flatten()
     }
 
     /// The key variables the shell forwarded last, for the models the
@@ -122,7 +203,7 @@ impl Sessions {
     }
 
     pub fn env_of(&self, id: &SessionId) -> BTreeMap<String, String> {
-        self.with(id, |state, _| state.env.clone())
+        self.peek(id, |state| state.env.clone()).unwrap_or_default()
     }
 
     /// The messages not yet seen, oldest first, and forgotten.
@@ -209,6 +290,96 @@ mod tests {
         s.remember_path(&id, "/b/bin:/usr/bin".into());
         assert_eq!(s.path_of(&id).as_deref(), Some("/b/bin:/usr/bin"));
         assert_eq!(s.path_of(&SessionId::new("43")), None);
+    }
+
+    #[test]
+    fn a_registration_is_kept_and_only_what_was_said_replaces_what_was_known() {
+        let s = sessions();
+        let id = SessionId::new("42");
+        s.register(
+            &id,
+            SessionDetails {
+                shell: Some(Shell::Zsh),
+                pid: Some(42),
+                tty: Some("/dev/ttys003".into()),
+                terminal: TerminalIdentity {
+                    tmux_pane: Some("%1".into()),
+                    ..TerminalIdentity::default()
+                },
+                path: Some("/a/bin".into()),
+                env: BTreeMap::from([("K".to_string(), "v".to_string())]),
+            },
+        );
+        assert_eq!(s.path_of(&id).as_deref(), Some("/a/bin"));
+        assert_eq!(s.env_of(&id).get("K").map(String::as_str), Some("v"));
+        assert_eq!(
+            s.terminal_of(&id).and_then(|t| t.tmux_pane),
+            Some("%1".to_string())
+        );
+        assert_eq!(
+            s.describe(&id),
+            "session 42 registered: zsh pid 42 on /dev/ttys003"
+        );
+        s.register(&id, SessionDetails::default());
+        assert_eq!(s.path_of(&id).as_deref(), Some("/a/bin"), "kept");
+        assert!(s.terminal_of(&id).is_some(), "kept");
+        assert_eq!(
+            s.describe(&id),
+            "session 42 registered: zsh pid 42 on /dev/ttys003",
+            "kept too"
+        );
+        assert_eq!(s.count(), 1);
+        assert_eq!(s.path_of(&SessionId::new("43")), None);
+        assert_eq!(s.count(), 1, "a read creates nothing");
+        assert_eq!(s.describe(&SessionId::new("43")), "session 43 unknown");
+    }
+
+    #[test]
+    fn a_session_whose_shell_is_gone_and_nobody_listens_for_is_forgotten() {
+        let s = sessions();
+        s.register(
+            &SessionId::new("a"),
+            SessionDetails {
+                pid: Some(1),
+                ..Default::default()
+            },
+        );
+        s.register(
+            &SessionId::new("b"),
+            SessionDetails {
+                pid: Some(2),
+                ..Default::default()
+            },
+        );
+        s.remember_path(&SessionId::new("77"), "/x".into());
+        s.remember_path(&SessionId::new("named"), "/y".into());
+        let (client, _server) = UnixStream::pair().unwrap();
+        s.register(
+            &SessionId::new("c"),
+            SessionDetails {
+                pid: Some(3),
+                ..Default::default()
+            },
+        );
+        s.attach(&SessionId::new("c"), client, false);
+        let alive = |pid: u32| pid == 1;
+        assert_eq!(
+            s.forget_gone(alive),
+            2,
+            "b (pid 2) and 77 (its id) are gone"
+        );
+        assert_eq!(s.count(), 3);
+        assert_eq!(s.path_of(&SessionId::new("77")), None);
+        assert_eq!(
+            s.path_of(&SessionId::new("named")).as_deref(),
+            Some("/y"),
+            "no pid to check"
+        );
+        assert_eq!(
+            s.count(),
+            3,
+            "c has a subscriber, a is alive, named is unknown"
+        );
     }
 
     #[test]

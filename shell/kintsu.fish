@@ -14,6 +14,11 @@ if status is-interactive
     set -g __kintsu_seq 0
     set -g __kintsu_pending_seq -1
     set -g __kintsu_prompt_shown 0
+    # Once, at start: what this shell is, so the daemon knows it before its
+    # first failure. Nothing waits on the answer.
+    if not set -q KINTSU_DISABLE
+        command kintsu session new --shell fish --pid $fish_pid >/dev/null 2>&1
+    end
 
     function __kintsu_count_prompt --on-event fish_prompt
         set -g __kintsu_seq (math $__kintsu_seq + 1)

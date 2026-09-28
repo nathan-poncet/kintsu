@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use crate::entities::TerminalIdentity;
 use crate::entities::{
-    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, SessionId, Shell,
+    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, SessionDetails, SessionId,
+    Shell,
 };
 use crate::use_cases::TriageInput;
 
@@ -41,6 +42,11 @@ pub struct Frame {
 pub enum Request {
     /// Version handshake.
     Hello { version: String },
+    /// A shell just started and says what it is; wants its session id back.
+    SessionNew {
+        session: SessionId,
+        details: Box<SessionDetails>,
+    },
     /// A hook reports a finished command line; wants a decision within the budget.
     CommandFinished {
         input: Box<TriageInput>,
@@ -134,6 +140,20 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
         "hello" => Ok(Request::Hello {
             version: required("version")?,
         }),
+        "session_new" => Ok(Request::SessionNew {
+            session: SessionId::new(required("session")?),
+            details: Box::new(SessionDetails {
+                shell: optional("shell").and_then(|s| Shell::from_name(&s)),
+                pid: v
+                    .get("pid")
+                    .and_then(Value::as_u64)
+                    .and_then(|p| u32::try_from(p).ok()),
+                tty: optional("tty"),
+                terminal: terminal_identity(v.get("terminal")),
+                path: optional("path"),
+                env: forwarded_env(v.get("env")),
+            }),
+        }),
         "command_finished" => {
             let status = v
                 .get("status")
@@ -220,6 +240,30 @@ mod tests {
                 .client_version,
             None
         );
+    }
+
+    #[test]
+    fn a_shell_that_starts_registers_what_it_is() {
+        let line = r#"{"v":1,"type":"session_new","version":"0.2.0","session":"4242","shell":"fish","pid":4242,"tty":"/dev/ttys004","path":"/w/bin","env":{"K":"v"},"terminal":{"program":"ghostty","kitty_window":"7"}}"#;
+        let Request::SessionNew { session, details } = parse_frame(line).unwrap() else {
+            panic!()
+        };
+        assert_eq!(session, SessionId::new("4242"));
+        assert_eq!(details.shell, Some(Shell::Fish));
+        assert_eq!(details.pid, Some(4242));
+        assert_eq!(details.tty.as_deref(), Some("/dev/ttys004"));
+        assert_eq!(details.path.as_deref(), Some("/w/bin"));
+        assert_eq!(details.env.get("K").map(String::as_str), Some("v"));
+        assert_eq!(details.terminal.kitty_window.as_deref(), Some("7"));
+        let bare = parse_frame(r#"{"v":1,"type":"session_new","session":"1"}"#).unwrap();
+        let Request::SessionNew { details, .. } = bare else {
+            panic!()
+        };
+        assert_eq!(*details, SessionDetails::default());
+        assert!(matches!(
+            parse_frame(r#"{"v":1,"type":"session_new"}"#),
+            Err(FrameError::Missing("session"))
+        ));
     }
 
     #[test]

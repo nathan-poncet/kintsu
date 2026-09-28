@@ -43,6 +43,11 @@ All notable changes to kintsu are recorded here. The format follows
   values of the variables the configured models name, nothing else, and
   the daemon keeps them in memory per session. `kintsu doctor` says so
   when the daemon runs as a service.
+- The shell registers itself when it starts: the hooks run `kintsu
+  session new` once, and the daemon knows the shell, its pane, its PATH
+  and its keys before its first failure. A frame that omits them gets
+  what the shell registered. Shells that are gone are forgotten, so the
+  daemon's registry never grows past the shells that exist.
 
 ## [0.2.0] - 2026-09-25
 
