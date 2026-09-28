@@ -167,8 +167,15 @@ impl Asker {
                             return;
                         }
                     }
+                    let pieces = tx.clone();
                     let answer = explain
-                        .run(session.as_ref())
+                        .run_streaming(session.as_ref(), &mut |model, piece| {
+                            let _ = pieces.send(Arrival::Chunk(
+                                Ask::Explain,
+                                model.to_string(),
+                                piece.to_string(),
+                            ));
+                        })
                         .map(|e| (e.model, e.text))
                         .map_err(|e| e.to_string());
                     let _ = tx.send(Arrival::Explanation(answer));

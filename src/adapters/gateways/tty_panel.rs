@@ -54,21 +54,26 @@ pub fn run(
     let (columns, rows) = crossterm::terminal::size()?;
     let climb = above.saturating_add(bubble.map_or(0, |text| screen_rows(text, columns)));
     climb_and_clear(&mut tty, climb)?;
-    let height = panel
-        .height(columns, style)
-        .min(rows.saturating_sub(1))
-        .max(1);
-    let top = place_viewport(&mut tty, height, rows)?;
-    let viewport = Rect::new(0, top, columns, height);
-    let mut terminal = Terminal::with_options(
-        CrosstermBackend::new(tty.try_clone()?),
-        TerminalOptions {
-            viewport: Viewport::Fixed(viewport),
-        },
-    )?;
-    terminal.hide_cursor()?;
+    let fitting = |wanted: u16| wanted.min(rows.saturating_sub(1)).max(1);
+    let mut height = fitting(panel.height(columns, style));
+    let mut top = place_viewport(&mut tty, height, rows)?;
+    let mut terminal = open_viewport(&tty, top, columns, height)?;
     send(&tty, EnableMouseCapture)?;
     let taken = loop {
+        // The panel grows with what it shows, an answer streaming in most
+        // of all: the screen is scrolled when the new rows would not fit,
+        // and the viewport opened again where the panel now stands.
+        let wanted = fitting(panel.height(columns, style));
+        if wanted > height {
+            let (moved_top, scrolled) = grown(top, wanted, rows);
+            if scrolled > 0 {
+                write!(tty, "\x1b[{rows};1H{}", "\n".repeat(scrolled as usize))?;
+                tty.flush()?;
+            }
+            top = moved_top;
+            height = wanted;
+            terminal = open_viewport(&tty, top, columns, height)?;
+        }
         terminal.draw(|frame| panel.render(frame, style))?;
         while let Ok(arrival) = arrivals.try_recv() {
             panel.receive(arrival);
@@ -113,6 +118,30 @@ fn climb_and_clear(tty: &mut File, rows: u16) -> io::Result<()> {
     }
     write!(tty, "\r\x1b[J")?;
     tty.flush()
+}
+
+/// A ratatui terminal pinned to `height` rows from `top`, cursor hidden.
+fn open_viewport(
+    tty: &File,
+    top: u16,
+    columns: u16,
+    height: u16,
+) -> io::Result<Terminal<CrosstermBackend<File>>> {
+    let mut terminal = Terminal::with_options(
+        CrosstermBackend::new(tty.try_clone()?),
+        TerminalOptions {
+            viewport: Viewport::Fixed(Rect::new(0, top, columns, height)),
+        },
+    )?;
+    terminal.hide_cursor()?;
+    Ok(terminal)
+}
+
+/// Where a panel that now wants `height` rows stands, and how many rows
+/// the screen must scroll first for them to fit below `top`.
+fn grown(top: u16, height: u16, rows: u16) -> (u16, u16) {
+    let overflow = (top + height).saturating_sub(rows);
+    (top.saturating_sub(overflow), overflow)
 }
 
 /// Where the viewport goes: the cursor's row, after scrolling the screen
@@ -314,6 +343,13 @@ mod tests {
         let bytes = read_available(&mut master);
         assert!(bytes.starts_with(b"\x1b[?100"), "{bytes:?}");
         assert!(unix::tty_name(slave.as_raw_fd()).is_some());
+    }
+
+    #[test]
+    fn a_panel_that_grows_keeps_its_place_until_the_bottom_then_scrolls() {
+        assert_eq!(grown(10, 9, 24), (10, 0), "room below: nothing moves");
+        assert_eq!(grown(18, 10, 24), (14, 4), "four rows short: scroll four");
+        assert_eq!(grown(0, 30, 24), (0, 6), "never above the first row");
     }
 
     #[test]
