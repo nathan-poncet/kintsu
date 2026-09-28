@@ -584,6 +584,19 @@ From the maintainer's first evening with the panel.
 - **The wrapped-prompt miscount** (decision 19) is accepted and tracked as
   issue #1.
 
+## 24. The rules look at the shell's PATH, not the daemon's (2026-09-28)
+
+Found in use: `clade` was corrected to `clang`, not `claude`. Since
+`kintsu service install` the daemon runs under launchd, whose environment
+carries the bare system PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), and the
+typo rule looked for neighbours there: `~/.local/bin`, Homebrew, cargo and
+mise were invisible. The `command_finished` frame now carries the shell's
+`path`; the daemon builds the rules' environment from it for that request
+and remembers it per session, so a click on `fix` later looks at the same
+programs. The daemon's own PATH is only the fallback for a frame without
+one. The same environment gap holds for API keys read from `{ env = … }`
+under launchd; that one is still open.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; `ui.hotkey`; streaming the

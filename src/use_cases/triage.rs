@@ -27,6 +27,9 @@ pub struct TriageInput {
     pub shell: Option<Shell>,
     /// Which pane, for the output capture that follows an offer.
     pub terminal: TerminalIdentity,
+    /// The shell's PATH: the programs the shell sees, which the daemon's
+    /// own environment does not necessarily list.
+    pub path: Option<String>,
 }
 
 /// Why triage could not finish.
@@ -199,6 +202,7 @@ mod tests {
                     session: Some(SessionId::new("42")),
                     shell: Some(Shell::Zsh),
                     terminal: TerminalIdentity::default(),
+                    path: None,
                 })
                 .unwrap()
         }
@@ -403,6 +407,7 @@ mod tests {
                 session: None,
                 shell: None,
                 terminal: TerminalIdentity::default(),
+                path: None,
             })
             .unwrap();
         let TriageDecision::Offer { case, .. } = decision else {

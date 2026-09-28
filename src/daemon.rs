@@ -236,8 +236,17 @@ fn on_command_finished(
     if let (Some(session), Some(pid)) = (&session, signal_pid) {
         daemon.sessions.register_signal(session, pid);
     }
+    // Under launchd or systemd the daemon's own PATH is the bare system
+    // one; the shell's is what its programs are looked up in.
+    let path = input
+        .path
+        .clone()
+        .unwrap_or_else(|| daemon.cfg.path_var.clone());
+    if let (Some(session), Some(reported)) = (&session, &input.path) {
+        daemon.sessions.remember_path(session, reported.clone());
+    }
     let state = daemon.state();
-    let environment = FsEnvironment::new(daemon.cfg.path_var.clone());
+    let environment = FsEnvironment::new(path);
     let triage = Triage {
         settings: &settings,
         clock: &SystemClock,
@@ -358,7 +367,11 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
         let result = match action {
             Action::Why => messages.explain(&session).map(|_| ()),
             Action::Fix => {
-                let environment = FsEnvironment::new(daemon.cfg.path_var.clone());
+                let path = daemon
+                    .sessions
+                    .path_of(&session)
+                    .unwrap_or_else(|| daemon.cfg.path_var.clone());
+                let environment = FsEnvironment::new(path);
                 messages.fix_now(&session, &environment).map(|_| ())
             }
             Action::Ignore => {

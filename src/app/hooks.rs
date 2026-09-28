@@ -27,6 +27,7 @@ pub(super) fn triage(
         style,
     } = *local;
     input.terminal = rt.terminal.clone();
+    input.path = Some(rt.path_var.clone());
     if rt.daemon
         && let Some(view) = rt
             .client()

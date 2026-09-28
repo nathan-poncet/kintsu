@@ -21,6 +21,7 @@ struct SessionState {
     pending: VecDeque<Message>,
     subscriber: Option<(UnixStream, bool)>,
     signal_pid: Option<u32>,
+    path: Option<String>,
 }
 
 /// Clicks on older bubbles than this get "this case is gone".
@@ -79,6 +80,7 @@ impl Sessions {
                 pending: VecDeque::new(),
                 subscriber: None,
                 signal_pid: None,
+                path: None,
             });
         f(state, self)
     }
@@ -99,6 +101,16 @@ impl Sessions {
     /// The shell wants SIGUSR1 when a message waits for it.
     pub fn register_signal(&self, id: &SessionId, pid: u32) {
         self.with(id, |state, _| state.signal_pid = Some(pid));
+    }
+
+    /// The PATH the shell reported last: what its rules should look at
+    /// when a click asks for a fix later.
+    pub fn remember_path(&self, id: &SessionId, path: String) {
+        self.with(id, |state, _| state.path = Some(path));
+    }
+
+    pub fn path_of(&self, id: &SessionId) -> Option<String> {
+        self.with(id, |state, _| state.path.clone())
     }
 
     /// The messages not yet seen, oldest first, and forgotten.
@@ -174,6 +186,17 @@ mod tests {
         assert_eq!(s.session_of(&CaseId::new("c")), None);
         s.remember_case(&CaseId::new("c"), &SessionId::new("42"));
         assert_eq!(s.session_of(&CaseId::new("c")), Some(SessionId::new("42")));
+    }
+
+    #[test]
+    fn a_session_remembers_the_path_its_shell_reported_last() {
+        let s = sessions();
+        let id = SessionId::new("42");
+        assert_eq!(s.path_of(&id), None);
+        s.remember_path(&id, "/a/bin:/usr/bin".into());
+        s.remember_path(&id, "/b/bin:/usr/bin".into());
+        assert_eq!(s.path_of(&id).as_deref(), Some("/b/bin:/usr/bin"));
+        assert_eq!(s.path_of(&SessionId::new("43")), None);
     }
 
     #[test]

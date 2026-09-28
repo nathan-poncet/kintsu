@@ -74,6 +74,7 @@ impl DaemonClient {
             "duration_ms": input.outcome.duration().map(|d| d.as_millis()),
             "cwd": input.cwd,
             "shell": input.shell.map(|s| s.name()),
+            "path": input.path,
             "color": color,
             "signal_pid": signal_pid,
             "terminal": {

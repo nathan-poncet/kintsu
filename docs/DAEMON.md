@@ -94,7 +94,7 @@ Client to daemon:
 | `hello` | `version`, `session` (optional) | `welcome` or `outdated` |
 | `session_new` | shell, pid, tty, terminal identity | `session` (id) |
 | `command_started` | `session`, `command`, `cwd` | none |
-| `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd` | `decision` within the sync budget, else `later` |
+| `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd`, `path` | `decision` within the sync budget, else `later` |
 | `subscribe` | `session` | a stream of `bubble` frames until the connection closes |
 | `pending` | `session` | the `bubble` frames not yet delivered (bash, or after a reconnect) |
 | `act` | `case`, `action` (`fix`, `why`, `agent`, `ignore`, `privacy`) | `ack`, then a `bubble` on the case's session; `error` when the case is gone |

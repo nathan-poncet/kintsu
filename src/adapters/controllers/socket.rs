@@ -145,6 +145,7 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 session: optional("session").map(SessionId::new),
                 shell: optional("shell").and_then(|s| Shell::from_name(&s)),
                 terminal: terminal_identity(v.get("terminal")),
+                path: optional("path"),
             };
             let signal_pid = v
                 .get("signal_pid")
@@ -206,7 +207,7 @@ mod tests {
 
     #[test]
     fn a_finished_command_becomes_a_triage_input() {
-        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
+        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
         let Request::CommandFinished {
             input,
             color,
@@ -221,6 +222,7 @@ mod tests {
         assert_eq!(input.cwd.as_deref(), Some("/w"));
         assert_eq!(input.session, Some(SessionId::new("42")));
         assert_eq!(input.shell, Some(Shell::Zsh));
+        assert_eq!(input.path.as_deref(), Some("/w/bin:/usr/bin"));
         assert!(color);
         assert_eq!(signal_pid, Some(4242));
         assert_eq!(input.terminal.herdr_pane.as_deref(), Some("wS:p1"));

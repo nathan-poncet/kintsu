@@ -225,6 +225,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
             session,
             shell,
             terminal: TerminalIdentity::default(),
+            path: None,
         }),
         signal_pid,
     })

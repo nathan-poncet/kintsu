@@ -205,6 +205,27 @@ fn the_daemon_speaks_the_protocol() {
         f.exchange(r#"{"v":1,"type":"command_finished","session":"s1","command":"ls","status":0}"#);
     assert_eq!(ok[0]["quiet"], "succeeded");
 
+    // The rules look at the PATH the frame carries, not the daemon's own:
+    // under launchd the daemon's is the bare system one. Another session,
+    // so s1's last failure stays the one `fix` reads below.
+    let shell_bin = f.dir.join("shell-bin");
+    std::fs::create_dir_all(&shell_bin).unwrap();
+    std::fs::write(shell_bin.join("frobnicate"), "").unwrap();
+    let theirs = f.exchange(&format!(
+        r#"{{"v":1,"type":"command_finished","session":"sp","command":"frobnicat","status":127,"cwd":"/","shell":"zsh","path":"{}"}}"#,
+        shell_bin.display()
+    ));
+    assert_eq!(theirs[0]["offer"]["fix"], "frobnicate");
+    let not_theirs = f.exchange(&format!(
+        r#"{{"v":1,"type":"command_finished","session":"sp","command":"gti log","status":127,"cwd":"/","shell":"zsh","path":"{}"}}"#,
+        shell_bin.display()
+    ));
+    assert_eq!(
+        not_theirs[0]["offer"]["fix"],
+        serde_json::Value::Null,
+        "git is on the daemon's PATH, not on this shell's"
+    );
+
     let pending = f.exchange(r#"{"v":1,"type":"pending","session":"s1"}"#);
     assert_eq!(pending.last().unwrap()["type"], "done");
     assert_eq!(pending.len(), 1, "nothing was waiting");
