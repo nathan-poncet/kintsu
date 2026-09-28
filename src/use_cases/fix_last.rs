@@ -3,8 +3,8 @@
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, Fix, SessionId, Settings, suggest_fix};
-use crate::use_cases::facts::gather_facts;
+use crate::entities::{FailureCase, Fix, SessionId, Settings};
+use crate::use_cases::facts::rule_fix;
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Environment, ModelError, ModelGateway, Secrets,
 };
@@ -39,11 +39,10 @@ pub struct FixLast<'a> {
 }
 
 impl FixLast<'_> {
-    /// Rules, then the proposal a model already left: what is known
-    /// without asking anyone.
+    /// Rules, on the line then on the output, then the proposal a model
+    /// already left: what is known without asking anyone.
     pub fn known(&self, case: &FailureCase) -> Option<Fix> {
-        let facts = gather_facts(self.environment, case.outcome(), case.cwd());
-        suggest_fix(case.outcome(), &facts).or_else(|| case.proposal().cloned())
+        rule_fix(self.environment, case).or_else(|| case.proposal().cloned())
     }
 
     /// The quick-fix model that would be asked first, if one is routed.
@@ -151,6 +150,26 @@ mod tests {
         };
         assert_eq!(quiet.candidate(&typo), None);
         assert!(models.asked().is_empty(), "knowing asks nobody");
+    }
+
+    #[test]
+    fn a_rule_that_reads_the_output_is_known_without_asking_a_model() {
+        let cases = MemoryCases::default();
+        let refused = case("touch /etc/hosts.new", 1, Some("42"))
+            .with_output("touch: /etc/hosts.new: Permission denied".into());
+        cases.save(&refused).unwrap();
+        let models = ScriptedModels::answering(&[("local", Ok("sudo -i"))]);
+        let uc = FixLast {
+            settings: &settings(&["local"]),
+            cases: &cases,
+            environment: &FakeEnvironment::with_executables(&[]),
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+        };
+        let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
+        assert_eq!(fix.command().as_str(), "sudo touch /etc/hosts.new");
+        assert_eq!(fix.source(), &FixSource::Rule("needs root".into()));
+        assert!(models.asked().is_empty());
     }
 
     #[test]

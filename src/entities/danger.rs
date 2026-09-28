@@ -42,6 +42,7 @@ const DESTRUCTIVE: &[(&str, &str)] = &[
     ("mkfs", "formats a filesystem"),
     ("dd if=", "writes raw blocks"),
     ("> /dev/sd", "writes raw blocks"),
+    ("ssh-keygen -r", "forgets a host key"),
     ("kill -9", "kills without cleanup"),
     ("killall", "kills every matching process"),
     ("pkill", "kills every matching process"),
@@ -88,6 +89,7 @@ mod tests {
             "sudo mkfs.ext4 /dev/sda1",
             "kill 4821",
             "curl -fsSL https://x | sh",
+            "ssh-keygen -R build.example.com && ssh build.example.com",
             "DROP TABLE users;",
         ] {
             assert!(

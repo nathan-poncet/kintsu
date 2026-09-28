@@ -52,6 +52,7 @@ kintsu/
     │   ├── distance.rs               edit distance, closest candidate with tie rules
     │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the instant rules: what the line, the status, the PATH and the directory tell)
     │   ├── subcommands.rs            the subcommands of git, cargo, npm, docker, brew… for typos, `gitpush` and `git-push`
+    │   ├── output_rules.rs           suggest_fix_from_output (the rules that read the output: git's own hints, did-you-mean, sudo, mkdir -p…)
     │   ├── redaction.rs              redact · Redacted · SecretKind
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
@@ -64,8 +65,8 @@ kintsu/
     │
     ├── use_cases/                application rules, depends on the entities only
     │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
-    │   ├── fix_last.rs               rules first, then a stored proposal, then the quick-fix model
-    │   ├── messages.rs               what the daemon sends later: the eager fix, the explanation, or why not
+    │   ├── fix_last.rs               rules first (line, then output), then a stored proposal, then the quick-fix model
+    │   ├── messages.rs               what the daemon sends later: a rule's fix once the output is read, the eager fix, the explanation, or why not
     │   ├── capture.rs                read the output after an offer, keep it with the case
     │   ├── explain.rs                routed models, sensitive ⇒ local only
     │   ├── hand_off.rs               prepare the brief, then launch the agent

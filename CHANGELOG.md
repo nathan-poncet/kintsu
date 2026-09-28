@@ -17,6 +17,19 @@ All notable changes to kintsu are recorded here. The format follows
   npm, pnpm, yarn, docker, podman, brew, go, pip, kubectl, gh, apt, dnf,
   yum, hg, terraform, conda, gem, composer and systemctl, not only git
   and cargo.
+- Twenty-six rules that read the command's output, once the terminal gave
+  it and before any model is asked: git's own hints (`push
+  --set-upstream`, a pull to set tracking, a rejected push, "stash them",
+  a branch that exists, `main` for `master`, an untracked pathspec, a new
+  branch, nothing staged, unrelated histories, a rebase to skip, `git rm`
+  on a directory or a changed file), any tool's "did you mean" in the
+  forms git, cargo, npm, gh, kubectl, pip, yarn, gem, terraform and hg
+  print, `pip --user`, a missing Python module and its PyPI name, `mkdir
+  -p`, a destination directory to create for `cp`, `mv` and `touch`,
+  `rm`, `grep` and `cp` on a directory, a changed ssh host key,
+  `--help`, and `sudo`, or its removal. A rule's fix arrives as a bubble
+  like a model's would, with no model configured at all. `ssh-keygen -R`
+  gets a red line.
 
 ### Fixed
 

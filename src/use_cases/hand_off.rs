@@ -4,10 +4,8 @@
 
 use thiserror::Error;
 
-use crate::entities::{
-    CaseId, ModelSpec, Provider, SessionId, Settings, hand_off_brief, suggest_fix,
-};
-use crate::use_cases::facts::gather_facts;
+use crate::entities::{CaseId, ModelSpec, Provider, SessionId, Settings, hand_off_brief};
+use crate::use_cases::facts::rule_fix;
 use crate::use_cases::ports::{AgentError, AgentLauncher, CaseStore, CaseStoreError, Environment};
 
 /// What is about to be sent, and to whom.
@@ -54,8 +52,7 @@ impl HandOff<'_> {
     ) -> Result<HandOffPlan, HandOffError> {
         let case = self.cases.last(session)?.ok_or(HandOffError::NoCase)?;
         let agent = self.pick(agent)?;
-        let facts = gather_facts(self.environment, case.outcome(), case.cwd());
-        let fix = suggest_fix(case.outcome(), &facts);
+        let fix = rule_fix(self.environment, &case);
         let brief = hand_off_brief(&case, fix.as_ref(), words);
         let redactions = crate::entities::case_document(&case).redactions;
         Ok(HandOffPlan {

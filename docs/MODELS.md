@@ -21,7 +21,7 @@ when a brain is missing.
 | task | input | output | tier | latency budget | when |
 |---|---|---|---|---|---|
 | `Classify` | command, status, first lines of output | category, worth-a-bubble, confidence | Tiny | 300 ms | after every offer, async, to enrich or retract the toast |
-| `QuickFix` | the case | one corrected command, confidence, danger | Small | 3 s | when no rule knew, on `Fix` or eagerly if configured |
+| `QuickFix` | the case | one corrected command, confidence, danger | Small | 3 s | when no rule knew, the line's nor the output's, on `Fix` or eagerly if configured |
 | `Explain` | the case | streamed prose | Small or Large | first token 1 s | on `Why` |
 | `Investigate` | the hand-off brief | whatever the agent does | Agent, else Large with tools | none | on `Agent` |
 | `Summarize` | long captured output | a short paragraph | Tiny or Small | 2 s | before sending 400 lines to anyone |

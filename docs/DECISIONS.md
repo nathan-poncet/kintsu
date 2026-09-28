@@ -615,6 +615,26 @@ The subcommand tables moved to `entities/subcommands.rs`; they serve
 typos, `gitpush` and `git-push` alike. Rules are re-implemented from the
 idea, in Rust, under our own tests; thefuck is MIT.
 
+## 26. Rules that read the output, before the model (2026-09-28)
+
+The second batch from thefuck: the rules that need the command's output.
+They run where the model call was, in the daemon's background thread,
+once the capture kept the output with the case, and in `kintsu fix`, the
+panel and the agent's brief through the same `rule_fix`. A rule's fix
+takes the same road as a model's (saved as the proposal when the case is
+still the shell's last, delivered as a bubble, late and named when the
+shell moved on), and needs no model at all: with none configured the
+bubble still comes. Late rule fixes are not pre-typed, like every
+message. The output is data: a word taken from it goes back into a
+command only when it is a plain path, branch, host or package name, and
+a tool's "did you mean" is taken only next to its own "unknown command"
+words, so a compiler's hint about a variable is left alone. Ties among
+several suggestions are refused, as in the typo rules. The local path
+(`KINTSU_NO_DAEMON`) captures but does not deliver: `kintsu fix` finds
+the rule's answer there. Without a readable pane (Ghostty) nothing of
+this fires; the stderr tee (pending, section "open questions") would
+give it the output.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; `ui.hotkey`; streaming the

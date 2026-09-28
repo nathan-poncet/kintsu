@@ -246,7 +246,7 @@ fn on_command_finished(
         daemon.sessions.remember_path(session, reported.clone());
     }
     let state = daemon.state();
-    let environment = FsEnvironment::new(path);
+    let environment = FsEnvironment::new(path.clone());
     let triage = Triage {
         settings: &settings,
         clock: &SystemClock,
@@ -298,8 +298,8 @@ fn on_command_finished(
         &frames::decision(&decision, text.as_deref(), &bubbles, pending.as_deref()),
     );
     if let TriageDecision::Offer { case, fix } = decision {
-        // Off the sync path: read the output, keep it with the case, then
-        // ask the model when no rule knew and the policy allows.
+        // Off the sync path: read the output, keep it with the case, try the
+        // rules that read it, then ask the model when the policy allows.
         let daemon = Arc::clone(daemon);
         std::thread::spawn(move || {
             let state = daemon.state();
@@ -315,9 +315,17 @@ fn on_command_finished(
                     return;
                 }
             };
-            if fix.is_none()
-                && pending.is_some()
-                && let Err(e) = messages(&daemon, &settings, &state).fix(&case)
+            if fix.is_some() {
+                return;
+            }
+            let messages = messages(&daemon, &settings, &state);
+            match messages.fix_from_output(&case, &FsEnvironment::new(path)) {
+                Some(Ok(_)) => return,
+                Some(Err(e)) => log(&format!("fix for {}: {e}", case.outcome().command())),
+                None => {}
+            }
+            if pending.is_some()
+                && let Err(e) = messages.fix(&case)
             {
                 log(&format!("fix for {}: {e}", case.outcome().command()));
             }

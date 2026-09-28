@@ -265,6 +265,34 @@ fn the_daemon_speaks_the_protocol() {
         "{privacy}"
     );
 
+    // A rule that reads the output answers before any model, and here no
+    // model is configured at all: the fix still arrives as a bubble.
+    std::fs::write(
+        f.dir.join("bin").join("tmux"),
+        "#!/bin/sh\nprintf '$ touch /etc/hosts.new\\ntouch: /etc/hosts.new: Permission denied\\n'\n",
+    )
+    .unwrap();
+    f.exchange(r#"{"v":1,"type":"command_finished","session":"s1","command":"touch /etc/hosts.new","status":1,"cwd":"/","terminal":{"tmux_pane":"%1"}}"#);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut bubbles: Vec<serde_json::Value> = Vec::new();
+    while Instant::now() < deadline && bubbles.is_empty() {
+        std::thread::sleep(Duration::from_millis(50));
+        bubbles = f
+            .exchange(r#"{"v":1,"type":"pending","session":"s1"}"#)
+            .into_iter()
+            .filter(|frame| frame["type"] == "bubble")
+            .collect();
+    }
+    assert!(
+        bubbles.iter().any(|b| b["text"]
+            .as_str()
+            .unwrap_or("")
+            .contains("sudo touch /etc/hosts.new")),
+        "{bubbles:?}"
+    );
+    let (code, out, _) = f.run(&["fix", "--raw"], Some("s1"));
+    assert_eq!((code, out.as_str()), (0, "sudo touch /etc/hosts.new\n"));
+
     let bye = f.exchange(r#"{"v":1,"type":"shutdown"}"#);
     assert_eq!(bye[0]["type"], "bye");
     f.wait_for_socket(false);

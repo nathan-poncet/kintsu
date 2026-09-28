@@ -6,8 +6,9 @@
 
 use thiserror::Error;
 
-use crate::entities::{CaseId, FailureCase, Message, MessageBody, SessionId, Settings};
+use crate::entities::{CaseId, FailureCase, Fix, Message, MessageBody, SessionId, Settings};
 use crate::use_cases::explain::{Explain, ExplainError};
+use crate::use_cases::facts::rule_fix;
 use crate::use_cases::fix_last::{FixError, FixLast};
 use crate::use_cases::focus::{Focus, FocusError};
 use crate::use_cases::ports::{
@@ -110,6 +111,37 @@ impl Messages<'_> {
             )?;
             return Err(MessagesError::NoFix);
         };
+        self.deliver_fix(case, fix, in_focus)
+    }
+
+    /// Runs once the output was read, before any model: a rule that reads
+    /// it may know the fix. `None` when there is no output or no rule.
+    pub fn fix_from_output(
+        &self,
+        case: &FailureCase,
+        environment: &dyn Environment,
+    ) -> Option<Result<Message, MessagesError>> {
+        case.output()?;
+        let fix = rule_fix(environment, case)?;
+        Some(
+            self.focus()
+                .holds(case)
+                .map_err(MessagesError::from)
+                .and_then(|in_focus| self.deliver_fix(case, fix, in_focus)),
+        )
+    }
+
+    /// Keeps the fix with the case, when the case is still the shell's last,
+    /// and sends it.
+    fn deliver_fix(
+        &self,
+        case: &FailureCase,
+        fix: Fix,
+        in_focus: bool,
+    ) -> Result<Message, MessagesError> {
+        let session = case
+            .session()
+            .ok_or_else(|| NotifyError::UnknownSession("none".into()))?;
         if self.cases.still_current(case)? {
             self.cases
                 .save(&case.clone().with_proposal(Some(fix.clone())))?;
@@ -265,6 +297,49 @@ mod tests {
         assert_eq!(delivered.len(), 1);
         assert_eq!(delivered[0].0.as_str(), "42");
         assert_eq!(delivered[0].1, message);
+    }
+
+    #[test]
+    fn a_rule_that_reads_the_output_answers_before_any_model() {
+        let sessions = MemoryRegistry::default();
+        let models = ScriptedModels::default();
+        let notifier = MemoryNotifier::default();
+        let cases = MemoryCases::default();
+        let uc = Messages {
+            settings: &settings(EagerFix::Off, &[]),
+            clock: &FakeClock::at(5),
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            notifier: &notifier,
+            cases: &cases,
+            sessions: &sessions,
+        };
+        let environment = FakeEnvironment::with_executables(&[]);
+        let silent = case("make test", 2, Some("42"));
+        assert!(
+            uc.fix_from_output(&silent, &environment).is_none(),
+            "no output yet"
+        );
+        let refused = case("touch /etc/hosts.new", 1, Some("42"))
+            .with_output("touch: /etc/hosts.new: Permission denied".into());
+        let message = uc.fix_from_output(&refused, &environment).unwrap().unwrap();
+        assert!(
+            matches!(message.body(), MessageBody::Fix(f) if f.command().as_str() == "sudo touch /etc/hosts.new")
+        );
+        assert_eq!(notifier.delivered.borrow().len(), 1);
+        assert!(
+            models.asked().is_empty(),
+            "no model configured, none needed"
+        );
+        assert!(
+            cases
+                .last(Some(&SessionId::new("42")))
+                .unwrap()
+                .unwrap()
+                .proposal()
+                .is_some(),
+            "kintsu fix reuses it"
+        );
     }
 
     #[test]
