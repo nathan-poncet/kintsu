@@ -38,10 +38,37 @@ pub fn ask_first(
     candidates: &[&ModelSpec],
     prompt: &Prompt,
 ) -> Result<(String, String), Vec<(String, ModelError)>> {
+    ask_in_order(secrets, candidates, |spec, key| {
+        models.complete(spec, key, prompt)
+    })
+}
+
+/// `ask_first`, with the answer handed over as it comes: `on_chunk` gets
+/// the model's name and the piece, so a caller can start afresh when a
+/// model that had begun fails and the next one answers.
+#[allow(clippy::type_complexity)]
+pub fn ask_first_streaming(
+    models: &dyn ModelGateway,
+    secrets: &dyn Secrets,
+    candidates: &[&ModelSpec],
+    prompt: &Prompt,
+    on_chunk: &mut dyn FnMut(&str, &str),
+) -> Result<(String, String), Vec<(String, ModelError)>> {
+    ask_in_order(secrets, candidates, |spec, key| {
+        models.stream(spec, key, prompt, &mut |chunk| on_chunk(&spec.name, chunk))
+    })
+}
+
+#[allow(clippy::type_complexity)]
+fn ask_in_order(
+    secrets: &dyn Secrets,
+    candidates: &[&ModelSpec],
+    mut ask: impl FnMut(&ModelSpec, Option<&str>) -> Result<String, ModelError>,
+) -> Result<(String, String), Vec<(String, ModelError)>> {
     let mut failures = Vec::new();
     for spec in candidates {
         let key = secrets.lookup(&spec.key);
-        match models.complete(spec, key.as_deref(), prompt) {
+        match ask(spec, key.as_deref()) {
             Ok(answer) if !answer.trim().is_empty() => return Ok((spec.name.clone(), answer)),
             Ok(_) => failures.push((
                 spec.name.clone(),
@@ -121,6 +148,47 @@ mod tests {
         assert_eq!(models.asked(), vec!["cloud", "local"]);
         assert_eq!(models.calls.borrow()[0].1.as_deref(), Some("k-123"));
         assert_eq!(models.calls.borrow()[1].1, None);
+    }
+
+    #[test]
+    fn streaming_asks_in_the_same_order_and_names_the_model_on_every_piece() {
+        let s = settings();
+        let models = ScriptedModels::answering(&[
+            ("cloud", Err(ModelError::Unreachable("timeout".into()))),
+            ("local", Ok("Node is too old. Use 22.")),
+        ]);
+        let candidates: Vec<&ModelSpec> =
+            vec![s.model("cloud").unwrap(), s.model("local").unwrap()];
+        let prompt = Prompt {
+            system: "s".into(),
+            user: "u".into(),
+            max_tokens: 10,
+        };
+        let mut pieces = Vec::new();
+        let (name, answer) = ask_first_streaming(
+            &models,
+            &MapSecrets::with(&[]),
+            &candidates,
+            &prompt,
+            &mut |model, chunk| pieces.push(format!("{model}:{chunk}")),
+        )
+        .unwrap();
+        assert_eq!(
+            (name.as_str(), answer.as_str()),
+            ("local", "Node is too old. Use 22.")
+        );
+        assert_eq!(
+            pieces,
+            vec![
+                "local:Node ",
+                "local:is ",
+                "local:too ",
+                "local:old. ",
+                "local:Use ",
+                "local:22."
+            ]
+        );
+        assert_eq!(models.asked(), vec!["cloud", "local"]);
     }
 
     #[test]

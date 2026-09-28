@@ -45,6 +45,20 @@ pub trait ModelGateway {
         prompt: &Prompt,
     ) -> Result<String, ModelError>;
 
+    /// Asks and hands the answer over as it comes, then returns it whole.
+    /// A gateway that cannot stream hands it over in one piece.
+    fn stream(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+        on_chunk: &mut dyn FnMut(&str),
+    ) -> Result<String, ModelError> {
+        let answer = self.complete(spec, key, prompt)?;
+        on_chunk(&answer);
+        Ok(answer)
+    }
+
     /// Whether the model can be reached right now, without asking it
     /// anything: a local server that is not running is not. Remote
     /// endpoints are assumed reachable; only a request tells.

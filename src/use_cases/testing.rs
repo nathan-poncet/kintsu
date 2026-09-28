@@ -190,6 +190,26 @@ impl ModelGateway for ScriptedModels {
             .cloned()
             .unwrap_or_else(|| Err(ModelError::Unreachable("not scripted".into())))
     }
+
+    /// The scripted answer, one word at a time, spaces attached.
+    fn stream(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+        on_chunk: &mut dyn FnMut(&str),
+    ) -> Result<String, ModelError> {
+        let answer = self.complete(spec, key, prompt)?;
+        let mut rest = answer.as_str();
+        while !rest.is_empty() {
+            let end = rest
+                .find(' ')
+                .map_or(rest.len(), |i| (i + 1).min(rest.len()));
+            on_chunk(&rest[..end]);
+            rest = &rest[end..];
+        }
+        Ok(answer)
+    }
 }
 
 #[derive(Default)]
