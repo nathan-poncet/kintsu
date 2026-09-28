@@ -37,6 +37,12 @@ All notable changes to kintsu are recorded here. The format follows
   daemon's is the bare system one, and `clade` was corrected to `clang`
   instead of `claude`. The hook's frame now carries the shell's PATH and
   the daemon remembers it per session for a later click on fix.
+- The daemon reads the API keys the shell sees: under launchd or systemd
+  its environment has none, so `{ env = "…" }` keys never reached the
+  eager fix, `kintsu why` or the panel. The hook's frame carries the
+  values of the variables the configured models name, nothing else, and
+  the daemon keeps them in memory per session. `kintsu doctor` says so
+  when the daemon runs as a service.
 
 ## [0.2.0] - 2026-09-25
 

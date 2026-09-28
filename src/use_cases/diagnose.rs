@@ -26,6 +26,9 @@ pub struct Diagnose<'a> {
     pub secrets: &'a dyn Secrets,
     pub environment: &'a dyn Environment,
     pub models: &'a dyn ModelGateway,
+    /// Whether the daemon is installed as a launchd agent or a systemd
+    /// unit, so it runs without the shell's environment.
+    pub service_installed: bool,
 }
 
 impl Diagnose<'_> {
@@ -118,6 +121,25 @@ impl Diagnose<'_> {
                 },
             });
         }
+        let from_env: Vec<String> = self
+            .settings
+            .models
+            .iter()
+            .filter_map(|m| match &m.key {
+                KeySource::Env(var) => Some(format!("${var}")),
+                _ => None,
+            })
+            .collect();
+        if self.service_installed && !from_env.is_empty() {
+            checks.push(check(
+                "daemon",
+                Health::Ok,
+                format!(
+                    "runs as a service, without your shell's environment: {} are read in the shell and forwarded with each command",
+                    from_env.join(", ")
+                ),
+            ));
+        }
         let routing = &self.settings.routing;
         for (task, names) in [
             ("explain", &routing.explain),
@@ -182,6 +204,7 @@ mod tests {
             secrets: &MapSecrets::with(&[("ANTHROPIC_API_KEY", "k")]),
             environment: &FakeEnvironment::with_executables(&["claude"]),
             models: &ScriptedModels::default(),
+            service_installed: false,
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let health = |subject: &str| {
@@ -217,6 +240,39 @@ mod tests {
     }
 
     #[test]
+    fn a_service_daemon_says_the_shells_keys_are_forwarded() {
+        let mut cloud = spec("cloud", Provider::Anthropic, Tier::Small);
+        cloud.key = KeySource::Env("ANTHROPIC_API_KEY".into());
+        let settings = Settings {
+            models: vec![cloud, spec("local", Provider::Ollama, Tier::Small)],
+            ..Default::default()
+        };
+        let uc = Diagnose {
+            settings: &settings,
+            secrets: &MapSecrets::with(&[("ANTHROPIC_API_KEY", "k")]),
+            environment: &FakeEnvironment::with_executables(&[]),
+            models: &ScriptedModels::default(),
+            service_installed: true,
+        };
+        let report = uc.run(Some(&SessionId::new("42")));
+        let daemon = report.iter().find(|c| c.subject == "daemon").unwrap();
+        assert_eq!(daemon.health, Health::Ok);
+        assert!(
+            daemon.detail.contains("$ANTHROPIC_API_KEY") && daemon.detail.contains("forwarded"),
+            "{}",
+            daemon.detail
+        );
+        let on_demand = Diagnose {
+            service_installed: false,
+            ..uc
+        };
+        assert!(
+            on_demand.run(None).iter().all(|c| c.subject != "daemon"),
+            "a daemon the shell starts inherits its environment"
+        );
+    }
+
+    #[test]
     fn no_hook_and_no_model_are_said_plainly() {
         let settings = Settings::default();
         let uc = Diagnose {
@@ -224,6 +280,7 @@ mod tests {
             secrets: &MapSecrets::with(&[]),
             environment: &FakeEnvironment::with_executables(&[]),
             models: &ScriptedModels::default(),
+            service_installed: false,
         };
         let report = uc.run(None);
         assert_eq!(report[0].health, Health::Problem);

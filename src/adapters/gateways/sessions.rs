@@ -3,7 +3,7 @@
 //! not yet seen. This is the daemon's `Notifier`. How a message reads is
 //! not decided here: the composition root hands in the renderer.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::os::unix::net::UnixStream;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,6 +22,7 @@ struct SessionState {
     subscriber: Option<(UnixStream, bool)>,
     signal_pid: Option<u32>,
     path: Option<String>,
+    env: BTreeMap<String, String>,
 }
 
 /// Clicks on older bubbles than this get "this case is gone".
@@ -81,6 +82,7 @@ impl Sessions {
                 subscriber: None,
                 signal_pid: None,
                 path: None,
+                env: BTreeMap::new(),
             });
         f(state, self)
     }
@@ -111,6 +113,16 @@ impl Sessions {
 
     pub fn path_of(&self, id: &SessionId) -> Option<String> {
         self.with(id, |state, _| state.path.clone())
+    }
+
+    /// The key variables the shell forwarded last, for the models the
+    /// daemon asks on its behalf. Memory only, never written anywhere.
+    pub fn remember_env(&self, id: &SessionId, env: BTreeMap<String, String>) {
+        self.with(id, |state, _| state.env = env);
+    }
+
+    pub fn env_of(&self, id: &SessionId) -> BTreeMap<String, String> {
+        self.with(id, |state, _| state.env.clone())
     }
 
     /// The messages not yet seen, oldest first, and forgotten.
@@ -197,6 +209,17 @@ mod tests {
         s.remember_path(&id, "/b/bin:/usr/bin".into());
         assert_eq!(s.path_of(&id).as_deref(), Some("/b/bin:/usr/bin"));
         assert_eq!(s.path_of(&SessionId::new("43")), None);
+    }
+
+    #[test]
+    fn a_session_remembers_the_keys_its_shell_forwarded_last() {
+        let s = sessions();
+        let id = SessionId::new("42");
+        assert!(s.env_of(&id).is_empty());
+        s.remember_env(&id, BTreeMap::from([("K".to_string(), "old".to_string())]));
+        s.remember_env(&id, BTreeMap::from([("K".to_string(), "new".to_string())]));
+        assert_eq!(s.env_of(&id).get("K").map(String::as_str), Some("new"));
+        assert!(s.env_of(&SessionId::new("43")).is_empty());
     }
 
     #[test]

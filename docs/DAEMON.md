@@ -94,12 +94,20 @@ Client to daemon:
 | `hello` | `version`, `session` (optional) | `welcome` or `outdated` |
 | `session_new` | shell, pid, tty, terminal identity | `session` (id) |
 | `command_started` | `session`, `command`, `cwd` | none |
-| `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd`, `path` | `decision` within the sync budget, else `later` |
+| `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd`, `path`, `env` | `decision` within the sync budget, else `later` |
 | `subscribe` | `session` | a stream of `bubble` frames until the connection closes |
 | `pending` | `session` | the `bubble` frames not yet delivered (bash, or after a reconnect) |
 | `act` | `case`, `action` (`fix`, `why`, `agent`, `ignore`, `privacy`) | `ack`, then a `bubble` on the case's session; `error` when the case is gone |
 | `get_case` | `case` or `session` | the case, redacted view included |
 | `shutdown` | | `bye` |
+
+`path` is the shell's PATH and `env` the values of the variables named by
+`key = { env = … }` in the configuration, nothing else of the shell's
+environment: a daemon started by launchd or systemd has neither. The
+daemon keeps both in memory per session, the PATH for the rules and the
+keys for the models it asks on the shell's behalf; they are never written
+or logged. The socket is `0600` in the user's state directory: same user,
+same machine.
 
 Daemon to client:
 

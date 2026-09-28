@@ -17,12 +17,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
-    EnvSecrets, FsEnvironment, HttpModels, JsonState, RandomIds, Sessions, SystemClock,
+    FsEnvironment, HttpModels, JsonState, RandomIds, SessionSecrets, Sessions, SystemClock,
     TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
 use crate::entities::{Action, CaseId, SessionId, Settings, Shell, TriageDecision, UiMode};
+use crate::use_cases::ports::Secrets;
 use crate::use_cases::{
     CaptureOutput, Focus, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
 };
@@ -132,6 +133,12 @@ impl Daemon {
         self.sessions.set_silent(settings.ui.mode == UiMode::Silent);
         *cached = Some((settings.clone(), mtime));
         settings
+    }
+
+    /// The keys the session's shell forwarded, over the daemon's own
+    /// environment: under launchd or systemd the latter has none.
+    fn secrets_for(&self, session: Option<&SessionId>) -> SessionSecrets {
+        SessionSecrets::new(session.map(|s| self.sessions.env_of(s)).unwrap_or_default())
     }
 
     fn state(&self) -> JsonState {
@@ -245,6 +252,12 @@ fn on_command_finished(
     if let (Some(session), Some(reported)) = (&session, &input.path) {
         daemon.sessions.remember_path(session, reported.clone());
     }
+    if let Some(session) = &session
+        && !input.env.is_empty()
+    {
+        daemon.sessions.remember_env(session, input.env.clone());
+    }
+    let secrets = daemon.secrets_for(session.as_ref());
     let state = daemon.state();
     let environment = FsEnvironment::new(path.clone());
     let triage = Triage {
@@ -268,7 +281,7 @@ fn on_command_finished(
     }
     let pending = match &decision {
         TriageDecision::Offer { case, fix: None } => {
-            messages(daemon, &settings, &state).fix_candidate(case)
+            messages(daemon, &settings, &state, &secrets).fix_candidate(case)
         }
         _ => None,
     };
@@ -318,7 +331,7 @@ fn on_command_finished(
             if fix.is_some() {
                 return;
             }
-            let messages = messages(&daemon, &settings, &state);
+            let messages = messages(&daemon, &settings, &state, &secrets);
             match messages.fix_from_output(&case, &FsEnvironment::new(path)) {
                 Some(Ok(_)) => return,
                 Some(Err(e)) => log(&format!("fix for {}: {e}", case.outcome().command())),
@@ -337,7 +350,9 @@ fn on_command_finished(
 fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId) {
     let settings = daemon.settings();
     let state = daemon.state();
-    match messages(daemon, &settings, &state).explain_candidate(&session) {
+    let secrets = daemon.secrets_for(Some(&session));
+    let candidate = messages(daemon, &settings, &state, &secrets).explain_candidate(&session);
+    match candidate {
         Err(e) => {
             let _ = send_line(stream, &frames::error(&e.to_string()));
         }
@@ -346,7 +361,7 @@ fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId)
             let daemon = Arc::clone(daemon);
             std::thread::spawn(move || {
                 let state = daemon.state();
-                if let Err(e) = messages(&daemon, &settings, &state).explain(&session) {
+                if let Err(e) = messages(&daemon, &settings, &state, &secrets).explain(&session) {
                     log(&format!("explain for {}: {e}", session.as_str()));
                 }
             });
@@ -371,7 +386,8 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
     std::thread::spawn(move || {
         let settings = daemon.settings();
         let state = daemon.state();
-        let messages = messages(&daemon, &settings, &state);
+        let secrets = daemon.secrets_for(Some(&session));
+        let messages = messages(&daemon, &settings, &state, &secrets);
         let result = match action {
             Action::Why => messages.explain(&session).map(|_| ()),
             Action::Fix => {
@@ -430,11 +446,16 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
     });
 }
 
-fn messages<'a>(daemon: &'a Daemon, settings: &'a Settings, state: &'a JsonState) -> Messages<'a> {
+fn messages<'a>(
+    daemon: &'a Daemon,
+    settings: &'a Settings,
+    state: &'a JsonState,
+    secrets: &'a dyn Secrets,
+) -> Messages<'a> {
     Messages {
         settings,
         clock: &SystemClock,
-        secrets: &EnvSecrets,
+        secrets,
         models: &HttpModels,
         notifier: &daemon.sessions,
         cases: state,

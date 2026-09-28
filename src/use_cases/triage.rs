@@ -2,6 +2,8 @@
 //! anything. This is the quiet path; it reads the PATH only when it must
 //! and never touches the network.
 
+use std::collections::BTreeMap;
+
 use thiserror::Error;
 
 use crate::entities::{
@@ -30,6 +32,10 @@ pub struct TriageInput {
     /// The shell's PATH: the programs the shell sees, which the daemon's
     /// own environment does not necessarily list.
     pub path: Option<String>,
+    /// The values of the variables the configured models read their keys
+    /// from, as the shell sees them: a daemon started by launchd or
+    /// systemd has none of them.
+    pub env: BTreeMap<String, String>,
 }
 
 /// Why triage could not finish.
@@ -203,6 +209,7 @@ mod tests {
                     shell: Some(Shell::Zsh),
                     terminal: TerminalIdentity::default(),
                     path: None,
+                    env: BTreeMap::new(),
                 })
                 .unwrap()
         }
@@ -408,6 +415,7 @@ mod tests {
                 shell: None,
                 terminal: TerminalIdentity::default(),
                 path: None,
+                env: BTreeMap::new(),
             })
             .unwrap();
         let TriageDecision::Offer { case, .. } = decision else {

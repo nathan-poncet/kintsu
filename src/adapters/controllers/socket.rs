@@ -1,6 +1,8 @@
 //! The daemon protocol, client to daemon: one JSON object per line, `v: 1`
 //! on every frame. This is the only place that reads frames.
 
+use std::collections::BTreeMap;
+
 use serde_json::Value;
 use thiserror::Error;
 
@@ -12,6 +14,20 @@ use crate::use_cases::TriageInput;
 
 /// The protocol version every frame carries.
 pub const PROTOCOL_VERSION: u64 = 1;
+
+/// The `env` object of a hook's frame: variable names to values, strings
+/// only; anything else is left out.
+fn forwarded_env(value: Option<&Value>) -> BTreeMap<String, String> {
+    value
+        .and_then(Value::as_object)
+        .map(|object| {
+            object
+                .iter()
+                .filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
 /// One parsed line: the client's version when it said it, and the request.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,6 +162,7 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 shell: optional("shell").and_then(|s| Shell::from_name(&s)),
                 terminal: terminal_identity(v.get("terminal")),
                 path: optional("path"),
+                env: forwarded_env(v.get("env")),
             };
             let signal_pid = v
                 .get("signal_pid")
@@ -207,7 +224,7 @@ mod tests {
 
     #[test]
     fn a_finished_command_becomes_a_triage_input() {
-        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
+        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","env":{"ANTHROPIC_API_KEY":"sk-test","ODD":7},"color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty"}}"#;
         let Request::CommandFinished {
             input,
             color,
@@ -223,6 +240,11 @@ mod tests {
         assert_eq!(input.session, Some(SessionId::new("42")));
         assert_eq!(input.shell, Some(Shell::Zsh));
         assert_eq!(input.path.as_deref(), Some("/w/bin:/usr/bin"));
+        assert_eq!(
+            input.env.get("ANTHROPIC_API_KEY").map(String::as_str),
+            Some("sk-test")
+        );
+        assert!(!input.env.contains_key("ODD"), "strings only");
         assert!(color);
         assert_eq!(signal_pid, Some(4242));
         assert_eq!(input.terminal.herdr_pane.as_deref(), Some("wS:p1"));
@@ -244,6 +266,7 @@ mod tests {
             (input.session, input.cwd, input.shell, color, signal_pid),
             (None, None, None, false, None)
         );
+        assert!(input.env.is_empty());
     }
 
     #[test]
