@@ -1,12 +1,16 @@
 //! What the hooks call: `kintsu triage` after every command line, and
 //! `kintsu subscribe`, the zsh child that waits for messages.
 
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::process::ExitCode;
 
-use crate::adapters::gateways::{DaemonClient, HookNotes, RandomIds, SystemClock, TerminalOutput};
+use crate::adapters::gateways::{
+    DaemonClient, EnvSecrets, HookNotes, RandomIds, SystemClock, TerminalOutput,
+};
 use crate::adapters::presenters::{error_line, toast};
-use crate::entities::{SessionId, Shell, TriageDecision};
+use crate::entities::{KeySource, SessionId, Settings, Shell, TriageDecision};
+use crate::use_cases::ports::Secrets;
 use crate::use_cases::{CaptureOutput, Triage, TriageInput};
 
 use super::{Local, Runtime, SYNC_BUDGET};
@@ -28,6 +32,7 @@ pub(super) fn triage(
     } = *local;
     input.terminal = rt.terminal.clone();
     input.path = Some(rt.path_var.clone());
+    input.env = keys_the_models_read(settings);
     if rt.daemon
         && let Some(view) = rt
             .client()
@@ -103,6 +108,22 @@ pub(super) fn triage(
         Err(_) => {}
     }
     ExitCode::SUCCESS
+}
+
+/// The values of the variables the configured models read their keys
+/// from, as this shell sees them; nothing else of the environment. The
+/// daemon, under launchd or systemd, has none of them.
+fn keys_the_models_read(settings: &Settings) -> BTreeMap<String, String> {
+    settings
+        .models
+        .iter()
+        .filter_map(|model| match &model.key {
+            KeySource::Env(var) => EnvSecrets
+                .lookup(&model.key)
+                .map(|value| (var.clone(), value)),
+            _ => None,
+        })
+        .collect()
 }
 
 /// `kintsu subscribe`: prints every bubble the daemon sends for the session

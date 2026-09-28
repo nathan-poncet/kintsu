@@ -1,6 +1,8 @@
 //! The `kintsu` command line, turned into something a use case understands.
 //! Only argv is read here; the environment is the composition root's job.
 
+use std::collections::BTreeMap;
+
 use thiserror::Error;
 
 use crate::entities::TerminalIdentity;
@@ -226,6 +228,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
             shell,
             terminal: TerminalIdentity::default(),
             path: None,
+            env: BTreeMap::new(),
         }),
         signal_pid,
     })

@@ -95,6 +95,12 @@ impl ServicePaths {
     pub fn desktop_entry(&self) -> PathBuf {
         self.home.join(".local/share/applications/kintsu.desktop")
     }
+
+    /// Whether the daemon is installed as a service here, so it runs
+    /// without the shell's environment.
+    pub fn daemon_installed(&self) -> bool {
+        self.launch_agent().is_file() || self.systemd_unit().is_file()
+    }
 }
 
 /// Installs the daemon service and the scheme handler; returns what was

@@ -75,6 +75,7 @@ impl DaemonClient {
             "cwd": input.cwd,
             "shell": input.shell.map(|s| s.name()),
             "path": input.path,
+            "env": (!input.env.is_empty()).then(|| json!(input.env)),
             "color": color,
             "signal_pid": signal_pid,
             "terminal": {

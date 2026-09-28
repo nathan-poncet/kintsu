@@ -7,6 +7,7 @@ use std::net::TcpListener;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 fn kintsu() -> Command {
@@ -42,7 +43,8 @@ impl Fixture {
             .env("NO_COLOR", "1")
             .env_remove("KINTSU_SESSION")
             .env_remove("KINTSU_NO_DAEMON")
-            .env_remove("KINTSU_DISABLE");
+            .env_remove("KINTSU_DISABLE")
+            .env_remove("KINTSU_TEST_KEY");
     }
 
     fn start_daemon(&mut self) {
@@ -101,11 +103,25 @@ impl Fixture {
     }
 
     fn run(&self, args: &[&str], session: Option<&str>) -> (i32, String, String) {
+        self.run_env(args, session, &[])
+    }
+
+    /// Like `run`, with variables only this process gets: what a shell has
+    /// and the daemon does not.
+    fn run_env(
+        &self,
+        args: &[&str],
+        session: Option<&str>,
+        extra: &[(&str, &str)],
+    ) -> (i32, String, String) {
         let mut cmd = kintsu();
         cmd.args(args);
         self.env(&mut cmd);
         if let Some(s) = session {
             cmd.env("KINTSU_SESSION", s);
+        }
+        for (name, value) in extra {
+            cmd.env(name, value);
         }
         let out = cmd.output().unwrap();
         (
@@ -170,6 +186,74 @@ fn fake_ollama(content: &'static str) -> u16 {
         }
     });
     port
+}
+
+/// An Anthropic-shaped endpoint that records the `x-api-key` header of
+/// every request and answers with `content`. Anthropic, not an
+/// OpenAI-compatible one: a local endpoint of the latter needs no key.
+fn fake_anthropic(content: &'static str) -> (u16, Arc<Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = Arc::clone(&seen);
+    std::thread::spawn(move || {
+        for incoming in listener.incoming() {
+            let Ok(mut stream) = incoming else { continue };
+            let mut buf = vec![0u8; 65536];
+            let mut read = 0;
+            loop {
+                let n = stream.read(&mut buf[read..]).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                read += n;
+                let text = String::from_utf8_lossy(&buf[..read]).to_string();
+                if let Some(split) = text.find("\r\n\r\n") {
+                    let length: usize = text
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if read >= split + 4 + length {
+                        break;
+                    }
+                }
+            }
+            let text = String::from_utf8_lossy(&buf[..read]).to_string();
+            let key = text
+                .lines()
+                .find(|l| l.to_ascii_lowercase().starts_with("x-api-key:"))
+                .and_then(|l| l.split_once(':'))
+                .map(|(_, v)| v.trim().to_string())
+                .unwrap_or_default();
+            recorded.lock().unwrap().push(key);
+            let body = format!(r#"{{"content":[{{"type":"text","text":"{content}"}}]}}"#);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+        }
+    });
+    (port, seen)
+}
+
+/// The first bubble the daemon has for the session, within ten seconds.
+fn wait_for_bubble(f: &Fixture, session: &str) -> String {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        let frames = f.exchange(&format!(
+            r#"{{"v":1,"type":"pending","session":"{session}"}}"#
+        ));
+        if let Some(bubble) = frames.iter().find(|frame| frame["type"] == "bubble") {
+            return bubble["text"].as_str().unwrap_or("").to_string();
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    panic!("no bubble for {session} within ten seconds");
 }
 
 #[test]
@@ -469,6 +553,45 @@ fn a_subscriber_receives_the_models_fix_as_a_message_and_fix_reuses_it() {
         "{}",
         refused[0]
     );
+}
+
+#[test]
+fn a_key_the_shell_sees_reaches_the_model_through_a_daemon_that_has_none() {
+    let (port, seen) = fake_anthropic("cargo build --release");
+    let config = format!(
+        "[models.cloud]\nprovider = \"anthropic\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\nkey = {{ env = \"KINTSU_TEST_KEY\" }}\n[routing]\nquick_fix = [\"cloud\"]\n[ui]\neager_fix = true\n"
+    );
+    let mut f = Fixture::new("keys", &config);
+    f.start_daemon();
+
+    // The daemon was started without the variable: on its own it has no key.
+    f.exchange(r#"{"v":1,"type":"command_finished","session":"s6","command":"make test","status":2,"cwd":"/"}"#);
+    let refused = wait_for_bubble(&f, "s6");
+    assert!(refused.contains("needs a key"), "{refused}");
+    assert!(
+        seen.lock().unwrap().is_empty(),
+        "nothing was sent without a key"
+    );
+
+    // The hook's process has it, as a shell would: it travels with the frame.
+    let (code, _, err) = f.run_env(
+        &[
+            "triage",
+            "--status",
+            "2",
+            "--command",
+            "make test",
+            "--session",
+            "s7",
+        ],
+        None,
+        &[("KINTSU_TEST_KEY", "sk-from-shell")],
+    );
+    assert_eq!(code, 0, "{err}");
+    assert!(err.contains("asking cloud"), "{err}");
+    let fixed = wait_for_bubble(&f, "s7");
+    assert!(fixed.contains("cargo build --release"), "{fixed}");
+    assert_eq!(seen.lock().unwrap().as_slice(), ["sk-from-shell"]);
 }
 
 #[test]

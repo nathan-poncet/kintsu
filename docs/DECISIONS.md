@@ -635,6 +635,24 @@ the rule's answer there. Without a readable pane (Ghostty) nothing of
 this fires; the stderr tee (pending, section "open questions") would
 give it the output.
 
+## 27. The daemon reads the keys the shell sees (2026-09-29)
+
+The other half of section 24: under launchd the daemon's environment has
+no `ANTHROPIC_API_KEY` either, so every model whose key is `{ env = … }`
+was unreachable from the daemon, which is where the eager fix, `kintsu
+why` and the panel's Why and Fix run. The hook's process reads the
+variables the configured models name, and only those, and sends their
+values in the `command_finished` frame as `env`; the daemon remembers
+them per session next to the PATH and asks models through a `Secrets`
+gateway that looks there first and in its own environment after. Nothing
+is written or logged; the socket is the user's, `0600`. Considered and
+not done: writing the values into the launchd plist at `kintsu service
+install` (a secret in a `644` file, stale after a rotation) and asking
+the user to switch to `{ command = … }` or the keychain (right for them,
+not a reason to break `{ env = … }`). `kintsu doctor` says, when the
+daemon is installed as a service and a model reads its key from the
+environment, that the shell forwards it.
+
 ## What is not built, by priority
 
 1. The panel growing as answers arrive; `ui.hotkey`; streaming the

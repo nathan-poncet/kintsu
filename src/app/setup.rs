@@ -71,6 +71,7 @@ pub(super) fn run(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Wr
         secrets: &EnvSecrets,
         environment: &environment,
         models: &HttpModels,
+        service_installed: super::service_installed(rt),
     }
     .run(rt.session.as_ref());
     let places = Places {

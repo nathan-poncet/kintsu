@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
     DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
-    ShellAgents, SystemClock, load_settings,
+    ShellAgents, SystemClock, load_settings, service,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -28,6 +28,18 @@ mod desktop;
 mod hooks;
 mod panel;
 mod setup;
+
+/// Whether the daemon is installed as a launchd agent or a systemd unit.
+fn service_installed(rt: &Runtime) -> bool {
+    rt.home.as_deref().is_some_and(|home| {
+        service::ServicePaths {
+            home: PathBuf::from(home),
+            state_dir: rt.state_dir.clone(),
+            exe: rt.exe.clone(),
+        }
+        .daemon_installed()
+    })
+}
 #[cfg(test)]
 mod tests;
 
@@ -385,6 +397,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 secrets: &EnvSecrets,
                 environment: &environment,
                 models: &HttpModels,
+                service_installed: service_installed(rt),
             }
             .run(session);
             let places = Places {
