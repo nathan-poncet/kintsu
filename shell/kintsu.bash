@@ -3,7 +3,8 @@
 # bash has no preexec, so the prompt command reads the last history entry
 # and its exit status. The history number tells an empty Enter apart from a
 # new command, so nothing is reported twice. (With HISTCONTROL=ignoredups,
-# the exact same line twice in a row is reported once.) ^K expands the last
+# the exact same line twice in a row is reported once.) The hotkey (^K unless
+# configured) expands the last
 # bubble into the panel, in its place; nothing runs until you press Enter.
 # KINTSU_DISABLE=1 switches the hook off in this shell.
 
@@ -54,7 +55,7 @@ if [[ $- == *i* ]]; then
     return $__kintsu_status
   }
 
-  # ^K expands the last bubble into the panel, in the bubble's place: from a
+  # The hotkey expands the last bubble into the panel, in the bubble's place: from a
   # fresh line, kintsu climbs the rows we name plus the bubble's own, draws,
   # and on close puts the bubble back and leaves the cursor where the
   # prompt's first line goes. bash then redraws only the prompt's last line
@@ -89,5 +90,5 @@ if [[ $- == *i* ]]; then
 
   __kintsu_read_history && __kintsu_last_history_number="$__kintsu_history_number"
   PROMPT_COMMAND="__kintsu_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
-  bind -x '"\C-k": __kintsu_panel' 2>/dev/null
+  bind -x '"__KINTSU_HOTKEY__": __kintsu_panel' 2>/dev/null
 fi

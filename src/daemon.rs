@@ -10,7 +10,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -22,7 +22,7 @@ use crate::adapters::gateways::{
 };
 use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
-use crate::entities::{Action, CaseId, SessionId, Settings, Shell, TriageDecision, UiMode};
+use crate::entities::{Action, CaseId, Hotkey, SessionId, Settings, Shell, TriageDecision, UiMode};
 use crate::use_cases::ports::Secrets;
 use crate::use_cases::{
     CaptureOutput, Focus, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
@@ -60,8 +60,10 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
     ));
     let ascii = Arc::new(AtomicBool::new(false));
     let links = Arc::new(AtomicBool::new(true));
+    let hotkey = Arc::new(AtomicU8::new(Hotkey::DEFAULT.letter() as u8));
     let render_ascii = Arc::clone(&ascii);
     let render_links = Arc::clone(&links);
+    let render_hotkey = Arc::clone(&hotkey);
     let sessions = Sessions::new(
         Box::new(move |message, color| {
             let style = Style {
@@ -69,6 +71,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
                 ascii: render_ascii.load(Ordering::Relaxed),
                 mode: UiMode::Toast,
                 links: render_links.load(Ordering::Relaxed),
+                hotkey: hotkey_from(render_hotkey.load(Ordering::Relaxed)),
             };
             frames::bubble(message.case(), &message_toast(message, &style))
         }),
@@ -79,6 +82,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         sessions,
         ascii,
         links,
+        hotkey,
         settings: Mutex::new(None),
     });
     daemon.settings();
@@ -113,7 +117,16 @@ struct Daemon {
     sessions: Sessions,
     ascii: Arc<AtomicBool>,
     links: Arc<AtomicBool>,
+    /// The hotkey's letter, for the subscriber renderer that outlives a
+    /// settings reload.
+    hotkey: Arc<AtomicU8>,
     settings: Mutex<Option<(Settings, Option<SystemTime>)>>,
+}
+
+/// The letter kept in the atomic, back to a key; it came from a parsed
+/// hotkey, so anything else is the default.
+fn hotkey_from(letter: u8) -> Hotkey {
+    Hotkey::parse(&format!("^{}", letter as char)).unwrap_or_default()
 }
 
 impl Daemon {
@@ -137,6 +150,8 @@ impl Daemon {
         };
         self.ascii.store(settings.ui.ascii, Ordering::Relaxed);
         self.links.store(settings.ui.links, Ordering::Relaxed);
+        self.hotkey
+            .store(settings.ui.hotkey.letter() as u8, Ordering::Relaxed);
         self.sessions.set_silent(settings.ui.mode == UiMode::Silent);
         *cached = Some((settings.clone(), mtime));
         settings
@@ -158,6 +173,7 @@ impl Daemon {
             ascii: settings.ui.ascii,
             mode: settings.ui.mode,
             links: settings.ui.links,
+            hotkey: settings.ui.hotkey,
         }
     }
 
@@ -434,6 +450,7 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
                     ascii: true,
                     mode: UiMode::Toast,
                     links: false,
+                    hotkey: settings.ui.hotkey,
                 };
                 let note = match ignore.run(Some(&session), request) {
                     Ok(entry) => ignored(&entry, &bare)

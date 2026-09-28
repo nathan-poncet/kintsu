@@ -696,7 +696,7 @@ mod tests {
     use super::*;
     use crate::entities::{
         CaseId, CommandLine, CommandOutcome, Confidence, ExitStatus, Explanation, FixSource,
-        Timestamp, UiMode,
+        Hotkey, Timestamp, UiMode,
     };
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
@@ -741,6 +741,7 @@ mod tests {
         ascii: false,
         mode: UiMode::Toast,
         links: false,
+        hotkey: Hotkey::DEFAULT,
     };
 
     #[test]

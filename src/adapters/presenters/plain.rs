@@ -42,9 +42,10 @@ pub fn fix_report(proposal: &FixProposal, style: &Style) -> String {
             ))));
         }
     }
-    out.push(
-        style.line(&style.dim("^K inserts it in your prompt; nothing runs until you press Enter.")),
-    );
+    out.push(style.line(&style.dim(&format!(
+        "{} inserts it in your prompt; nothing runs until you press Enter.",
+        style.hotkey
+    ))));
     out.join("\n")
 }
 

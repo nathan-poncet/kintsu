@@ -2,7 +2,8 @@
 #
 # fish_postexec fires after every command line with its text in $argv and
 # the exit status in $status; empty lines never fire it. $CMD_DURATION is
-# the last command's duration in milliseconds. ^K expands the last bubble
+# the last command's duration in milliseconds. The hotkey (^K unless
+# configured) expands the last bubble
 # into the panel, in the bubble's place; nothing runs until you press Enter.
 # Messages that arrive later reach the shell as SIGUSR1: the handler prints
 # them and repaints the prompt. KINTSU_DISABLE=1 switches the hook off.
@@ -103,7 +104,7 @@ if status is-interactive
         commandline -f repaint
     end
 
-    # ^K expands the last bubble into the panel, in the bubble's place: from
+    # The hotkey expands the last bubble into the panel, in the bubble's place: from
     # a fresh line, kintsu climbs the rows we name plus the bubble's own,
     # draws, and on close puts the bubble back and leaves the cursor where
     # the prompt's first line goes. The cursor is then put back where fish
@@ -143,8 +144,8 @@ if status is-interactive
         end
     end
 
-    bind \ck __kintsu_panel
-    bind -M insert \ck __kintsu_panel 2>/dev/null
+    bind __KINTSU_HOTKEY__ __kintsu_panel
+    bind -M insert __KINTSU_HOTKEY__ __kintsu_panel 2>/dev/null
     bind \t __kintsu_tab
     bind -M insert \t __kintsu_tab 2>/dev/null
 end

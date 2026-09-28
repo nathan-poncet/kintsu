@@ -46,11 +46,14 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
     let pretyped = ghost && fix.as_ref().is_some_and(Fix::is_ghostable);
     let word = |action: Action| word_for(case.id(), action, style);
     let (why, agent, ignore) = (word(Action::Why), word(Action::Agent), word(Action::Ignore));
+    let hotkey = style.hotkey;
     let actions = match fix {
-        Some(_) if pretyped => format!("Tab to fix{dot}{why}{dot}{agent}{dot}{ignore}{dot}^K more"),
-        Some(_) => format!("{why}{dot}{agent}{dot}{ignore}{dot}^K more"),
+        Some(_) if pretyped => {
+            format!("Tab to fix{dot}{why}{dot}{agent}{dot}{ignore}{dot}{hotkey} more")
+        }
+        Some(_) => format!("{why}{dot}{agent}{dot}{ignore}{dot}{hotkey} more"),
         None => format!(
-            "{}{dot}{why}{dot}{agent}{dot}{ignore}{dot}^K more",
+            "{}{dot}{why}{dot}{agent}{dot}{ignore}{dot}{hotkey} more",
             word(Action::Fix)
         ),
     };
@@ -58,7 +61,7 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
         UiMode::Hint => {
             let key = match fix {
                 Some(_) if pretyped => format!("{dot}Tab"),
-                Some(_) => format!("{dot}^K"),
+                Some(_) => format!("{dot}{hotkey}"),
                 None => String::new(),
             };
             style.line(&style.dim(&format!("{sentence}{key}")))
@@ -103,9 +106,10 @@ pub fn message_toast(message: &Message, style: &Style) -> String {
                 style.dim(&format!("({who})"))
             );
             let actions = format!(
-                "{}{dot}{}{dot}^K more",
+                "{}{dot}{}{dot}{} more",
                 word_for(message.case(), Action::Why, style),
-                word_for(message.case(), Action::Agent, style)
+                word_for(message.case(), Action::Agent, style),
+                style.hotkey
             );
             format!(
                 "{}\n{}",
@@ -150,7 +154,7 @@ mod tests {
     use super::*;
     use crate::entities::{
         CaseId, CommandLine, CommandOutcome, Confidence, Duration, ExitStatus, FailureCase,
-        FixSource, QuietReason, Timestamp,
+        FixSource, Hotkey, QuietReason, Timestamp,
     };
 
     fn offer(text: &str, code: i32, duration_ms: Option<u64>, fix: Option<&str>) -> TriageDecision {
@@ -290,6 +294,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: false,
+            hotkey: Hotkey::DEFAULT,
         };
         let text = toast(
             &offer("rm -rf buidl", 1, None, Some("rm -rf build")),
@@ -360,6 +365,28 @@ mod tests {
     }
 
     #[test]
+    fn the_bubble_names_the_configured_hotkey() {
+        let ctrl_o = Style {
+            hotkey: Hotkey::parse("^O").unwrap(),
+            ..Style::PLAIN
+        };
+        let text = toast(&offer("make", 2, None, None), &ctrl_o, false).unwrap();
+        assert!(text.ends_with("kintsu ignore - ^O more"), "{text}");
+        assert!(!text.contains("^K"), "{text}");
+        let hint = Style {
+            mode: UiMode::Hint,
+            ..ctrl_o
+        };
+        let text = toast(
+            &offer("gti status", 127, None, Some("git status")),
+            &hint,
+            false,
+        )
+        .unwrap();
+        assert!(text.ends_with(" - ^O"), "{text}");
+    }
+
+    #[test]
     fn a_late_message_names_its_command_and_offers_no_keys() {
         let about = CommandLine::new("git status").unwrap();
         let note = Message::new(
@@ -409,6 +436,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: true,
+            hotkey: Hotkey::DEFAULT,
         };
         let text = toast(&offer("make", 2, None, None), &linked, false).unwrap();
         assert!(

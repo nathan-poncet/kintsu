@@ -7,7 +7,7 @@ use crate::adapters::controllers::Prompter;
 use crate::adapters::gateways::{EnvSecrets, FsEnvironment, HttpModels, render_settings};
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{Style, doctor_report};
-use crate::entities::UiMode;
+use crate::entities::{Hotkey, UiMode};
 use crate::use_cases::{Detect, Diagnose, compose};
 
 use super::{Runtime, failure};
@@ -19,6 +19,7 @@ pub(super) fn run(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Wr
         ascii: false,
         mode: UiMode::Toast,
         links: false,
+        hotkey: Hotkey::DEFAULT,
     };
     let environment = FsEnvironment::new(rt.path_var.clone());
     let detected = Detect {

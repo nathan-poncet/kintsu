@@ -18,7 +18,7 @@ use crate::adapters::presenters::{
     pending_line, privacy_report, raw_fix, shell_hook,
 };
 use crate::daemon::{self, DaemonConfig};
-use crate::entities::{SessionId, Settings, Shell, TerminalIdentity, UiMode};
+use crate::entities::{Hotkey, SessionId, Settings, Shell, TerminalIdentity, UiMode};
 use crate::use_cases::ports::SessionRegistry;
 use crate::use_cases::{
     Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
@@ -118,6 +118,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         ascii: false,
         mode: UiMode::Toast,
         links: false,
+        hotkey: Hotkey::DEFAULT,
     };
     match command {
         Command::Help => {
@@ -129,10 +130,15 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             return ExitCode::SUCCESS;
         }
         Command::Init(shell) => {
+            // The shell must get its hook even when the configuration is
+            // broken: the default key, then.
+            let hotkey = load_settings(&rt.config_path, rt.home.as_deref())
+                .map(|settings| settings.ui.hotkey)
+                .unwrap_or_default();
             let _ = write!(
                 out,
                 "{}",
-                shell_hook(shell, &rt.state_dir.display().to_string())
+                shell_hook(shell, &rt.state_dir.display().to_string(), hotkey)
             );
             return ExitCode::SUCCESS;
         }
@@ -240,6 +246,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         ascii: settings.ui.ascii,
         mode: settings.ui.mode,
         links: settings.ui.links,
+        hotkey: settings.ui.hotkey,
     };
     let state = JsonState::new(&rt.state_dir);
     let environment = FsEnvironment::new(rt.path_var.clone());
