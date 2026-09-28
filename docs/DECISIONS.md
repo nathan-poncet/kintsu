@@ -889,7 +889,29 @@ fix`, the panel, the agent's brief, the daemon's messages. `kintsu
 learned` lists the entries, plain or `--json`; `kintsu learned forget
 <program>` or `--all` unlearns.
 
+## 36. A Homebrew formula, rendered from the checksums (2026-09-29)
+
+Priority 5 below, brought forward with the rest on the maintainer's
+request. The formula is `packaging/homebrew/kintsu.rb`, the output of
+`scripts/homebrew-formula.py` over a release's `SHA256SUMS`: one
+`url`/`sha256` pair per target under `on_macos`/`on_linux` and
+`on_arm`/`on_intel`, `bin.install` of the single binary the archives
+hold (the hooks live in the binary, `kintsu init <shell>` prints them),
+a `test` running `kintsu --version`, `livecheck` on the latest release.
+No explicit `version`: Homebrew reads it from the URL and `brew audit`
+flags a redundant one. `brew audit --strict --online`, `brew style` and
+`brew fetch` pass on it inside a tap. The release workflow renders it
+after the checksums are published and pushes `Formula/kintsu.rb` to
+`nathan-poncet/homebrew-kintsu` when the `HOMEBREW_TAP_TOKEN` secret is
+set (a fine-grained token, contents write on that repository, sent as an
+HTTP header rather than embedded in the remote URL); without it the job
+renders the formula into its summary and says it was not pushed.
+Creating the tap repository and the token stays the maintainer's: a
+public repository is a decision, not a build step. The site marks the
+Homebrew line "once the tap is published" until then.
+
 ## What is not built, by priority
 
 1. The pty harness in CI.
-2. A Homebrew tap and an apt repository.
+2. An apt repository; the Homebrew tap's repository and token (section
+   36).
