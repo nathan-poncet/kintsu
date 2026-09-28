@@ -89,6 +89,7 @@ pub(super) fn expand(
         ascii: settings.ui.ascii,
         mode: UiMode::Toast,
         links: false,
+        hotkey: settings.ui.hotkey,
     };
     let (tx, rx) = std::sync::mpsc::channel();
     let asker = Asker {

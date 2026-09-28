@@ -3,7 +3,8 @@
 # preexec remembers the command line and when it started; precmd reads the
 # exit status and lets `kintsu triage` decide whether to say anything. Every
 # command line is reported so the last failure has its context; an empty
-# Enter never re-reports the previous one. ^K expands the last bubble into
+# Enter never re-reports the previous one. The hotkey (^K unless configured)
+# expands the last bubble into
 # the panel, in the bubble's place; nothing runs until you press Enter. Messages
 # that arrive later (a model's answer) are printed above the prompt by a
 # subscriber the hook keeps alive. KINTSU_DISABLE=1 switches the hook off.
@@ -128,7 +129,7 @@ if [[ -o interactive ]]; then
     REPLY=$(( prompt_lines + buffer_lines - 1 ))
   }
 
-  # ^K expands the last bubble into the panel, in the bubble's place: kintsu
+  # The hotkey expands the last bubble into the panel, in the bubble's place: kintsu
   # climbs the rows we name plus the bubble's own, draws, and on close puts
   # the bubble back and leaves the cursor where the prompt's first line
   # goes, so zsh redraws the prompt there. What the user takes with ⏎ comes
@@ -192,5 +193,5 @@ if [[ -o interactive ]]; then
   add-zsh-hook preexec __kintsu_preexec
   add-zsh-hook precmd __kintsu_precmd
   zle -N __kintsu_panel_widget
-  bindkey '^K' __kintsu_panel_widget
+  bindkey '__KINTSU_HOTKEY__' __kintsu_panel_widget
 fi

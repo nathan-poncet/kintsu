@@ -1,5 +1,9 @@
 //! What the user decided, already typed and validated at the edge.
 
+use std::fmt;
+
+use thiserror::Error;
+
 use crate::entities::Duration;
 
 /// Which client speaks to a model.
@@ -182,6 +186,89 @@ impl EagerFix {
     }
 }
 
+/// The key that expands the last bubble into the panel: one control
+/// character, `^K` unless the configuration says otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Hotkey(char);
+
+/// Why a configuration value is not a hotkey.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum HotkeyError {
+    #[error("`{0}` is not a control key; write one as `^K` or `ctrl-k`")]
+    NotAControlKey(String),
+    #[error("`^{0}` is {1}, which the terminal or the line editor already uses")]
+    Taken(char, &'static str),
+}
+
+/// Control keys the terminal driver or the line editor own; binding them
+/// would break typing, so they are refused at the edge.
+const TAKEN_KEYS: &[(char, &str)] = &[
+    ('C', "the interrupt"),
+    ('D', "end of input"),
+    ('H', "Backspace"),
+    ('I', "Tab"),
+    ('J', "Enter"),
+    ('M', "Enter"),
+    ('Q', "flow control"),
+    ('S', "flow control"),
+    ('Z', "suspend"),
+];
+
+impl Hotkey {
+    pub const DEFAULT: Hotkey = Hotkey('K');
+
+    /// From the configuration: `^K`, `ctrl-k`, `ctrl+k` or `C-k`, any case.
+    pub fn parse(text: &str) -> Result<Self, HotkeyError> {
+        let text = text.trim();
+        let lower = text.to_ascii_lowercase();
+        let letter = ["^", "ctrl-", "ctrl+", "control-", "c-"]
+            .iter()
+            .find_map(|prefix| lower.strip_prefix(prefix))
+            .filter(|rest| rest.chars().count() == 1)
+            .and_then(|rest| rest.chars().next())
+            .filter(char::is_ascii_alphabetic)
+            .ok_or_else(|| HotkeyError::NotAControlKey(text.to_string()))?
+            .to_ascii_uppercase();
+        if let Some((_, what)) = TAKEN_KEYS.iter().find(|(taken, _)| *taken == letter) {
+            return Err(HotkeyError::Taken(letter, what));
+        }
+        Ok(Self(letter))
+    }
+
+    /// The letter, upper case: `K`.
+    pub fn letter(self) -> char {
+        self.0
+    }
+
+    /// As zsh's `bindkey` wants it: `^K`.
+    pub fn zsh(self) -> String {
+        format!("^{}", self.0)
+    }
+
+    /// As fish's `bind` wants it: `\ck`.
+    pub fn fish(self) -> String {
+        format!("\\c{}", self.0.to_ascii_lowercase())
+    }
+
+    /// As bash's `bind -x` wants it inside its quotes: `\C-k`.
+    pub fn bash(self) -> String {
+        format!("\\C-{}", self.0.to_ascii_lowercase())
+    }
+}
+
+impl Default for Hotkey {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// For people: `^K`.
+impl fmt::Display for Hotkey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "^{}", self.0)
+    }
+}
+
 /// Presentation choices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UiSettings {
@@ -193,6 +280,8 @@ pub struct UiSettings {
     pub eager_fix: EagerFix,
     /// The bubble's words are OSC 8 links to `kintsu://` actions.
     pub links: bool,
+    /// The key that opens the panel.
+    pub hotkey: Hotkey,
 }
 
 impl Default for UiSettings {
@@ -202,6 +291,7 @@ impl Default for UiSettings {
             ascii: false,
             eager_fix: EagerFix::default(),
             links: true,
+            hotkey: Hotkey::DEFAULT,
         }
     }
 }
@@ -272,6 +362,40 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hotkey_is_one_control_letter_in_any_of_the_usual_notations() {
+        for text in ["^O", "^o", "ctrl-o", "Ctrl+O", "C-o", " control-o "] {
+            assert_eq!(Hotkey::parse(text), Ok(Hotkey('O')), "{text}");
+        }
+        let key = Hotkey::parse("^o").unwrap();
+        assert_eq!(key.to_string(), "^O");
+        assert_eq!(key.zsh(), "^O");
+        assert_eq!(key.fish(), "\\co");
+        assert_eq!(key.bash(), "\\C-o");
+        assert_eq!(Hotkey::default(), Hotkey::parse("^K").unwrap());
+    }
+
+    #[test]
+    fn what_is_not_a_control_letter_or_already_taken_is_refused_by_name() {
+        for text in ["K", "^", "^KK", "^1", "^[", "alt-k", ""] {
+            assert!(
+                matches!(Hotkey::parse(text), Err(HotkeyError::NotAControlKey(_))),
+                "{text}"
+            );
+        }
+        assert_eq!(
+            Hotkey::parse("^C"),
+            Err(HotkeyError::Taken('C', "the interrupt"))
+        );
+        assert!(Hotkey::parse("^i").unwrap_err().to_string().contains("Tab"));
+        assert!(
+            Hotkey::parse("ctrl-m")
+                .unwrap_err()
+                .to_string()
+                .contains("Enter")
+        );
+    }
 
     fn spec(name: &str, provider: Provider, base_url: Option<&str>) -> ModelSpec {
         ModelSpec {

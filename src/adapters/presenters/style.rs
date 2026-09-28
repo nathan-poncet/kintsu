@@ -1,6 +1,6 @@
 //! The one decoration: a gold seam on the left of every line Kintsu writes.
 
-use crate::entities::UiMode;
+use crate::entities::{Hotkey, UiMode};
 
 /// How lines are drawn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,6 +13,8 @@ pub struct Style {
     pub mode: UiMode,
     /// Words become OSC 8 hyperlinks; needs a terminal, so `color` too.
     pub links: bool,
+    /// The key that opens the panel, for the texts that name it.
+    pub hotkey: Hotkey,
 }
 
 const GOLD: &str = "\x1b[38;5;179m";
@@ -28,6 +30,7 @@ impl Style {
         ascii: true,
         mode: UiMode::Toast,
         links: false,
+        hotkey: Hotkey::DEFAULT,
     };
     /// The same, named for the tests.
     #[cfg(test)]
@@ -177,6 +180,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: true,
+            hotkey: Hotkey::DEFAULT,
         };
         assert_eq!(screen_rows(&colour.lines("one\ntwo"), 80), 2);
     }
@@ -188,6 +192,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: false,
+            hotkey: Hotkey::DEFAULT,
         };
         assert_eq!(colour.line("hi"), "\x1b[38;5;179m▎\x1b[0m hi");
         assert_eq!(Style::PLAIN.line("hi"), "| hi");
@@ -203,6 +208,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: true,
+            hotkey: Hotkey::DEFAULT,
         };
         assert_eq!(
             linked.link("kintsu://act?case=c&do=why", "kintsu why"),
@@ -233,6 +239,7 @@ mod tests {
             ascii: false,
             mode: UiMode::Toast,
             links: false,
+            hotkey: Hotkey::DEFAULT,
         };
         assert_eq!(s.abbreviate("abcdefghij", 5), "abcd…");
     }

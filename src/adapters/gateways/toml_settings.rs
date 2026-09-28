@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    CaptureSettings, Duration, EagerFix, KeySource, ModelSpec, Provider, QuietSettings, Routing,
-    Settings, Tier, UiMode, UiSettings,
+    CaptureSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Provider, QuietSettings,
+    Routing, Settings, Tier, UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -97,6 +97,7 @@ pub fn render_settings(settings: &Settings) -> String {
             UiMode::Silent => "silent",
         }
     ));
+    out.push_str(&format!("hotkey    = \"{}\"\n", settings.ui.hotkey));
     out.push_str(&format!("ascii     = {}\n", settings.ui.ascii));
     out.push_str(&format!("links     = {}\n", settings.ui.links));
     out.push_str(&format!(
@@ -202,6 +203,7 @@ struct QuietDto {
 #[serde(default)]
 struct UiDto {
     mode: Option<String>,
+    hotkey: Option<String>,
     ascii: Option<bool>,
     eager_fix: Option<EagerDto>,
     links: Option<bool>,
@@ -293,6 +295,11 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
         },
         ascii: file.ui.ascii.unwrap_or(false),
         links: file.ui.links.unwrap_or(true),
+        hotkey: match file.ui.hotkey {
+            None => Hotkey::DEFAULT,
+            Some(text) => Hotkey::parse(&text)
+                .map_err(|e| SettingsError::Invalid(format!("ui.hotkey: {e}")))?,
+        },
         eager_fix: match file.ui.eager_fix {
             None => EagerFix::Auto,
             Some(EagerDto::Flag(true)) => EagerFix::On,
@@ -649,6 +656,7 @@ same_failure = "always"
 off_in = ["~/scratch/**", "/tmp/x/"]
 [ui]
 mode = "hint"
+hotkey = "ctrl-o"
 ascii = true
 eager_fix = true
 "#;
@@ -666,6 +674,7 @@ eager_fix = true
                 ascii: true,
                 eager_fix: EagerFix::On,
                 links: true,
+                hotkey: Hotkey::parse("^O").unwrap(),
             }
         );
     }
@@ -691,6 +700,8 @@ eager_fix = true
         assert!(err("[routing]\nexplain = [\"ghost\"]").contains("routing names `ghost`"));
         assert!(err("[quiet]\nsame_failure = \"never\"").contains("quiet.same_failure"));
         assert!(err("[ui]\nmode = \"loud\"").contains("ui.mode"));
+        assert!(err("[ui]\nhotkey = \"K\"").contains("ui.hotkey: `K` is not a control key"));
+        assert!(err("[ui]\nhotkey = \"^C\"").contains("interrupt"));
         assert!(err("[capture]\nsources = [\"screen\"]").contains("capture.sources"));
         let c = parse_settings(
             "[capture]\nsources = [\"tmux\"]\nmax_lines = 80\nstderr_tee = true",
