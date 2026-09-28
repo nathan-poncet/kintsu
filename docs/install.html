@@ -114,9 +114,13 @@
         <button type="button" role="tab" aria-selected="false" data-tab="remote">Servers, tmux, Herdr</button>
       </div>
       <div class="tab-panel on" data-tab="mac" role="tabpanel">
+        <div class="config"><div class="config-head"><span>Homebrew</span><span class="soon">once the tap is published</span></div><pre><code>brew install nathan-poncet/kintsu/kintsu</code></pre><p class="card-note">Apple silicon and Intel. The caveats print the hook line for your shell.</p></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
         <div class="config"><div class="config-head"><span>prebuilt binary</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-aarch64-apple-darwin.tar.gz\ntar xzf kintsu-aarch64-apple-darwin.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Intel Macs: <code>x86_64-apple-darwin</code>.</p></div>
       </div>
       <div class="tab-panel" data-tab="linux" role="tabpanel">
+        <div class="config"><div class="config-head"><span>Homebrew on Linux</span><span class="soon">once the tap is published</span></div><pre><code>brew install nathan-poncet/kintsu/kintsu</code></pre><p class="card-note">x86_64 and arm64, the static musl builds.</p></div>
+        <div class="or" aria-hidden="true"><span>or</span></div>
         <div class="config"><div class="config-head"><span>prebuilt binary</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz\ntar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static build, any distribution. <code>aarch64</code> too.</p></div>
       </div>
       <div class="tab-panel" data-tab="source" role="tabpanel">

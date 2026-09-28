@@ -53,6 +53,11 @@ All notable changes to kintsu are recorded here. The format follows
   what was learned (`--json` for programs), `kintsu learned forget
   <program>` or `--all` unlearns. Kept in `<state>/learned.json`, 500
   entries at most.
+- A Homebrew formula, `packaging/homebrew/kintsu.rb`, rendered by
+  `scripts/homebrew-formula.py` from a release's `SHA256SUMS`, and a
+  release job that pushes it to the tap `nathan-poncet/homebrew-kintsu`
+  on every tag when the `HOMEBREW_TAP_TOKEN` secret is set. Once the tap
+  is published: `brew install nathan-poncet/kintsu/kintsu`.
 
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
