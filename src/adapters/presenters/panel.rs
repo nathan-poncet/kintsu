@@ -59,11 +59,13 @@ pub enum Ask {
     Explain,
 }
 
-/// What comes back from outside: which model is being asked, its answer,
-/// a confirmation.
+/// What comes back from outside: which model is being asked, a piece of
+/// its answer as it is produced (which question, which model, the text),
+/// the whole answer, a confirmation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Arrival {
     Asking(Ask, String),
+    Chunk(Ask, String, String),
     Fix(Result<Option<Fix>, String>),
     Explanation(Result<(String, String), String>),
     Ignored(String),
@@ -74,6 +76,8 @@ pub enum Arrival {
 enum Loading<T> {
     Idle,
     Asking(String),
+    /// The model named, and what it has said so far.
+    Streaming(String, String),
     Ready(T),
     Failed(String),
 }
@@ -232,6 +236,20 @@ impl Panel {
         match arrival {
             Arrival::Asking(Ask::Fix, model) => self.fix = Loading::Asking(model),
             Arrival::Asking(Ask::Explain, model) => self.explanation = Loading::Asking(model),
+            // A fix is one line: it comes whole.
+            Arrival::Chunk(Ask::Fix, _, _) => {}
+            Arrival::Chunk(Ask::Explain, model, piece) => {
+                self.explanation = match std::mem::replace(&mut self.explanation, Loading::Idle) {
+                    Loading::Streaming(current, mut text) if current == model => {
+                        text.push_str(&piece);
+                        Loading::Streaming(current, text)
+                    }
+                    // The answer is already whole: a piece that lands after it
+                    // is late, and changes nothing.
+                    Loading::Ready(answer) => Loading::Ready(answer),
+                    _ => Loading::Streaming(model, piece),
+                }
+            }
             Arrival::Fix(Ok(fix)) => self.fix = Loading::Ready(fix),
             Arrival::Fix(Err(why)) => self.fix = Loading::Failed(why),
             Arrival::Explanation(Ok(answer)) => self.explanation = Loading::Ready(answer),
@@ -242,12 +260,16 @@ impl Panel {
     }
 
     /// Rows to draw, between six and fourteen: room for what is shown, or
-    /// for what is being asked.
+    /// for what is being asked; while an answer streams in, it follows the
+    /// text, so the caller asks again after every piece.
     pub fn height(&self, width: u16, style: &Style) -> u16 {
         let (lines, _) = self.content(style);
         let shown = wrapped_rows(&lines, width.saturating_sub(SEAM_WIDTH).max(1));
         let asking = match self.section {
-            Action::Why => matches!(self.explanation, Loading::Asking(_) | Loading::Idle),
+            Action::Why => matches!(
+                self.explanation,
+                Loading::Asking(_) | Loading::Idle | Loading::Streaming(..)
+            ),
             Action::Fix => {
                 matches!(self.fix, Loading::Asking(_))
                     || (matches!(self.fix, Loading::Idle) && self.can_ask_fix)
@@ -503,6 +525,12 @@ impl Panel {
             Action::Why => match &self.explanation {
                 Loading::Idle => (Vec::new(), None),
                 Loading::Asking(model) => (asking(model), None),
+                Loading::Streaming(_, text) => {
+                    let mut lines: Vec<Line<'static>> =
+                        text.lines().map(|l| Line::from(l.to_string())).collect();
+                    lines.push(Line::from(Span::styled(style.ellipsis().to_string(), dim)));
+                    (lines, None)
+                }
                 Loading::Ready((model, text)) => {
                     let mut lines: Vec<Line<'static>> =
                         text.lines().map(|l| Line::from(l.to_string())).collect();
@@ -513,7 +541,7 @@ impl Panel {
             },
             Action::Fix => match &self.fix {
                 Loading::Idle => (Vec::new(), None),
-                Loading::Asking(model) => (asking(model), None),
+                Loading::Asking(model) | Loading::Streaming(model, _) => (asking(model), None),
                 Loading::Ready(Some(fix)) => {
                     let mut first = vec![Span::styled(fix.command().as_str().to_string(), bold)];
                     match fix.danger() {
@@ -874,6 +902,83 @@ mod tests {
         assert_eq!(
             rows(&mut panel, &Style::PLAIN, 9)[2],
             "| No fix known for this one."
+        );
+    }
+
+    #[test]
+    fn an_explanation_streams_in_and_the_panel_asks_for_more_rows_as_it_grows() {
+        let mut panel = Panel::new(
+            &case("make test", None),
+            None,
+            true,
+            vec![],
+            None,
+            String::new(),
+        );
+        assert_eq!(panel.open(), Effect::Ask(Ask::Explain));
+        panel.receive(Arrival::Asking(Ask::Explain, "local".into()));
+        let room = panel.height(80, &Style::PLAIN);
+        assert_eq!(room, CHROME + ASKING_ROOM);
+        panel.receive(Arrival::Chunk(
+            Ask::Explain,
+            "local".into(),
+            "Node is ".into(),
+        ));
+        panel.receive(Arrival::Chunk(
+            Ask::Explain,
+            "local".into(),
+            "too old.\n".into(),
+        ));
+        let screen = rows(&mut panel, &Style::PLAIN, 9);
+        assert_eq!(screen[2], "| Node is too old.");
+        assert_eq!(screen[3], "| ...", "more is coming");
+        assert_eq!(
+            panel.height(80, &Style::PLAIN),
+            room,
+            "still room for the rest"
+        );
+        for i in 1..=8 {
+            panel.receive(Arrival::Chunk(
+                Ask::Explain,
+                "local".into(),
+                format!("Line {i}.\n"),
+            ));
+        }
+        assert_eq!(
+            panel.height(80, &Style::PLAIN),
+            CHROME + 9 + 1,
+            "the text's rows and the marker"
+        );
+        panel.receive(Arrival::Chunk(
+            Ask::Explain,
+            "cloud".into(),
+            "Other.".into(),
+        ));
+        assert_eq!(
+            rows(&mut panel, &Style::PLAIN, 9)[2],
+            "| Other.",
+            "another model starts afresh"
+        );
+        panel.receive(Arrival::Explanation(Ok((
+            "cloud".into(),
+            "Other take.".into(),
+        ))));
+        let screen = rows(&mut panel, &Style::PLAIN, 9);
+        assert_eq!(
+            (screen[2].as_str(), screen[3].as_str()),
+            ("| Other take.", "| — cloud")
+        );
+        panel.receive(Arrival::Chunk(Ask::Explain, "cloud".into(), "late".into()));
+        assert_eq!(
+            rows(&mut panel, &Style::PLAIN, 9)[2],
+            "| Other take.",
+            "a late piece changes nothing"
+        );
+        panel.receive(Arrival::Chunk(Ask::Fix, "local".into(), "git ".into()));
+        assert_eq!(
+            panel.press(Key::Section(Action::Fix)),
+            Effect::Ask(Ask::Fix),
+            "a fix comes whole; pieces about it are nothing"
         );
     }
 
