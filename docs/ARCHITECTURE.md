@@ -97,7 +97,7 @@ kintsu/
             │                         tty_panel.rs (raw mode, the viewport on /dev/tty, OSC 52) ·
             │                         terminals.rs (OutputSource: the shell's stderr copy, herdr, tmux, wezterm, kitty, iterm2) ·
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
-            │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic) ·
+            │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs
             └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2}.rs ·

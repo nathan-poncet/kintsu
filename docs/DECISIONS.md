@@ -730,11 +730,40 @@ from the daemon's background thread, well after tee's last write; a job
 left in the background keeps its stderr flowing into the file until it
 exits, and the next command's tee truncates it.
 
+## 31. The panel grows as the explanation streams in (2026-09-29)
+
+Open questions 4 and 14 of 2026-09-25, answered "grows" and "build it".
+The model gateway port has a streamed variant next to the whole answer:
+`stream` hands the text over piece by piece and returns it whole, and a
+gateway that cannot stream hands it over in one piece, so the fakes and
+the callers that want the whole answer are unchanged. The HTTP gateway
+reads Ollama's NDJSON and the server-sent events of the OpenAI-compatible
+and Anthropic endpoints line by line; a status outside 2xx is a refusal
+like before, and the output-limit rename (section 22) retries once here
+too. Only `Explain` streams: a quick fix is one line and comes whole.
+
+Two things differ from issue 5's sketch, for reasons found in the code.
+The daemon sends no `stream` frame: the panel asks its models from its
+own thread and receives through its own channel (section 21), so the
+pieces travel that channel as `Arrival::Chunk`, named after their model,
+and the daemon's protocol keeps the `stream` frame reserved and unused.
+And the hooks changed nothing: since section 23 the binary owns the rows
+it draws in and leaves the cursor where the hook redraws the prompt, so
+growing is the binary's business. `Panel::height` follows the content
+after every piece; the terminal gateway, when the panel wants more rows
+than it has, scrolls the screen by what would not fit below and opens the
+viewport again where the panel now stands. It never shrinks while open,
+and never past the design's fourteen rows: longer answers scroll inside,
+anchored at the top, where reading starts. A piece from another model
+starts afresh (the first model failed after it had begun); a piece that
+lands once the answer is whole is late and changes nothing; once the
+panel closes, its channel closes and the rest of the stream is dropped.
+Streaming is not "impl Future": the gateway was blocking and stays so,
+the panel's thread is where the waiting happens.
+
 ## What is not built, by priority
 
-1. The panel growing as answers arrive; streaming the answers into the
-   panel.
-2. SQLite behind the three storage ports; the pty harness in CI.
-3. `kintsu models` and `kintsu login` (pending); learning rules from
+1. SQLite behind the three storage ports; the pty harness in CI.
+2. `kintsu models` and `kintsu login` (pending); learning rules from
    accepted fixes; the cost ledger; budgets.
-4. A Homebrew tap and an apt repository.
+3. A Homebrew tap and an apt repository.
