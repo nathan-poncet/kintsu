@@ -1,16 +1,18 @@
 # The daemon
 
-*Status (2026-09-25): built as described below for the frames `hello`,
-`command_finished` (which carries the pane identity), `subscribe`,
-`pending`, `explain`, `act` and `shutdown`, the delivery into zsh, fish
-and bash, the on-demand start, the version handshake, the output capture
-from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and `service
-install`. `act` carries `case` and `action` and answers `ack` or `error`;
-the result arrives as a `bubble` in the case's shell. `command_finished`
-carries `pipestatus`, and a message that lands once the shell moved on to
-another command names its command and offers no keys. Not yet:
-`session_new`, `get_case`, the stderr tee, SQLite. The idle exit is not
-wanted. See [DECISIONS.md](DECISIONS.md), sections 2, 17, 20 and 23.*
+*Status (2026-09-29): built as described below for the frames `hello`,
+`session_new`, `command_finished` (which carries the pane identity),
+`subscribe`, `pending`, `explain`, `act` and `shutdown`, the delivery into
+zsh, fish and bash, the on-demand start, the version handshake, the output
+capture from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and
+`service install`. `act` carries `case` and `action` and answers `ack` or
+`error`; the result arrives as a `bubble` in the case's shell.
+`command_finished` carries `pipestatus`, and a message that lands once
+the shell moved on to another command names its command and offers no
+keys. `session_new` is sent once at the shell's start and answers the id
+the daemon knows the shell by, its pid today. Not yet: `get_case`, the
+stderr tee, SQLite. The idle exit is not wanted. See
+[DECISIONS.md](DECISIONS.md), sections 2, 17, 20, 23 and 28.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and
@@ -69,13 +71,26 @@ that one binds to loopback with a token.
 
 ## Sessions
 
-A session is one interactive shell. The hook obtains an id at shell
-startup (`kintsu session new`, a random token kept in a shell variable) so
-that `exec`, subshells and forked terminals do not confuse the daemon.
-With the id, the hook sends what it knows: shell and version, pid, tty,
-and the terminal identity the notifiers and output sources need
-(`TERM_PROGRAM`, `TMUX_PANE`, `HERDR_PANE`, `WEZTERM_PANE`,
-`KITTY_WINDOW_ID`, `ITERM_SESSION_ID`).
+A session is one interactive shell. At shell startup the hook runs
+`kintsu session new`, which sends what the shell knows: shell and
+version, pid, tty, the terminal identity the notifiers and output sources
+need (`TERM_PROGRAM`, `TMUX_PANE`, `HERDR_PANE`, `WEZTERM_PANE`,
+`KITTY_WINDOW_ID`, `ITERM_SESSION_ID`), its PATH and the key variables
+the configured models read. The daemon answers with the id it knows the
+shell by. Today that id is the shell's pid, which the hook chose
+beforehand (`KINTSU_SESSION`, DECISIONS §4); a random token chosen by the
+daemon, so that `exec`, subshells and forked terminals do not confuse it,
+would come back in this answer when it is built. Nothing at the shell's
+start waits on the daemon: when none listens, one is started for the
+frames that follow.
+
+A `command_finished` frame may then omit what the registration said:
+terminal identity, PATH, keys. The daemon takes what the frame says
+first, then what the shell registered, then its own environment, so a
+frame without a prior registration (an old hook, bash after a daemon
+restart) still works. A session whose shell is gone and that no
+subscriber listens for is forgotten on the next sweep, every twenty
+seconds, so the registry never grows past the shells that exist.
 
 Per session the daemon keeps a ring of the last commands with their
 status and duration, the current directory, the last case, the pending
@@ -92,7 +107,7 @@ Client to daemon:
 | type | fields | answer |
 |---|---|---|
 | `hello` | `version`, `session` (optional) | `welcome` or `outdated` |
-| `session_new` | shell, pid, tty, terminal identity | `session` (id) |
+| `session_new` | `session`, `shell`, `pid`, `tty`, `terminal`, `path`, `env` | `session` (id) |
 | `command_started` | `session`, `command`, `cwd` | none |
 | `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd`, `path`, `env` | `decision` within the sync budget, else `later` |
 | `subscribe` | `session` | a stream of `bubble` frames until the connection closes |

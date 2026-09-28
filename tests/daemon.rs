@@ -94,7 +94,7 @@ impl Fixture {
             answers.push(v);
             if matches!(
                 kind.as_str(),
-                "decision" | "welcome" | "outdated" | "done" | "bye" | "ack" | "error"
+                "decision" | "welcome" | "outdated" | "session" | "done" | "bye" | "ack" | "error"
             ) {
                 break;
             }
@@ -308,6 +308,42 @@ fn the_daemon_speaks_the_protocol() {
         not_theirs[0]["offer"]["fix"],
         serde_json::Value::Null,
         "git is on the daemon's PATH, not on this shell's"
+    );
+
+    // A shell that registered at start: a later frame that omits the PATH
+    // still gets the shell's, from the registration.
+    let registered = f.exchange(&format!(
+        r#"{{"v":1,"type":"session_new","session":"sn","shell":"zsh","pid":{},"tty":"/dev/ttys009","path":"{}","terminal":{{"program":"ghostty"}}}}"#,
+        std::process::id(),
+        shell_bin.display()
+    ));
+    assert_eq!(
+        (
+            registered[0]["type"].as_str(),
+            registered[0]["session"].as_str()
+        ),
+        (Some("session"), Some("sn"))
+    );
+    let from_registration = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sn","command":"frobnicat","status":127,"cwd":"/","shell":"zsh"}"#,
+    );
+    assert_eq!(
+        from_registration[0]["offer"]["fix"], "frobnicate",
+        "the PATH the shell registered with"
+    );
+    // The command the hooks run at start, with the client's own PATH.
+    let pid = std::process::id().to_string();
+    let (code, out, err) = f.run(
+        &["session", "new", "--shell", "zsh", "--pid", &pid],
+        Some("sn2"),
+    );
+    assert_eq!((code, out.as_str(), err.as_str()), (0, "", ""));
+    let via_cli = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sn2","command":"gti log","status":127,"cwd":"/","shell":"zsh"}"#,
+    );
+    assert_eq!(
+        via_cli[0]["offer"]["fix"], "git log",
+        "the client's PATH has git"
     );
 
     let pending = f.exchange(r#"{"v":1,"type":"pending","session":"s1"}"#);

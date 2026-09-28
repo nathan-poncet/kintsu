@@ -17,6 +17,11 @@ if [[ -o interactive ]]; then
   typeset -gi __kintsu_seq=0 __kintsu_pending_seq=-1
   typeset -g __kintsu_ghost_file="__KINTSU_STATE_DIR__/sessions/$$.ghost"
   typeset -g __kintsu_bubble_file="__KINTSU_STATE_DIR__/sessions/$$.bubble"
+  # Once, at start: what this shell is, so the daemon knows it before its
+  # first failure. Nothing waits on the answer.
+  if [[ -z "${KINTSU_DISABLE:-}" ]]; then
+    command kintsu session new --shell zsh --pid $$ >/dev/null 2>&1
+  fi
 
   # An "asking…" line still waiting when another command starts: once that
   # command has printed, its row can no longer be found, so it is blanked

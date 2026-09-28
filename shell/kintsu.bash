@@ -12,6 +12,11 @@ if [[ $- == *i* ]]; then
   __kintsu_last_history_number=""
   __kintsu_bubble_file="__KINTSU_STATE_DIR__/sessions/$$.bubble"
   __kintsu_asking_file="__KINTSU_STATE_DIR__/sessions/$$.asking"
+  # Once, at start: what this shell is, so the daemon knows it before its
+  # first failure. Nothing waits on the answer.
+  if [[ -z "${KINTSU_DISABLE:-}" ]]; then
+    command kintsu session new --shell bash --pid $$ >/dev/null 2>&1
+  fi
 
   # The bubble marker says what kintsu printed right above the prompt, the
   # asking marker that an "asking…" line waits under it. Another command's

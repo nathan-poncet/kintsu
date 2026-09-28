@@ -1,6 +1,8 @@
 //! One interactive shell, and what it ran recently.
 
-use crate::entities::{CommandOutcome, Shell};
+use std::collections::BTreeMap;
+
+use crate::entities::{CommandOutcome, Shell, TerminalIdentity};
 
 /// The identity of one interactive shell, chosen by its hook.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -16,6 +18,25 @@ impl SessionId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+/// What a shell says about itself when it starts, before any command
+/// failed: enough for the daemon to reach it, read its output and look up
+/// programs and keys the way the shell would.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SessionDetails {
+    pub shell: Option<Shell>,
+    /// The shell's process id, to notice when it is gone.
+    pub pid: Option<u32>,
+    /// The terminal device the shell sits on.
+    pub tty: Option<String>,
+    /// The pane, for the output capture.
+    pub terminal: TerminalIdentity,
+    /// The shell's PATH.
+    pub path: Option<String>,
+    /// The values of the variables the configured models read their keys
+    /// from, nothing else of the environment.
+    pub env: BTreeMap<String, String>,
 }
 
 /// A shell session: which shell, and its last command lines, newest last.
