@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
-    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
-    JsonlLedger, ShellAgents, SystemClock, load_settings, service,
+    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonlLedger,
+    ShellAgents, SqliteState, SystemClock, load_settings, service,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -21,7 +21,8 @@ use crate::daemon::{self, DaemonConfig};
 use crate::entities::{Hotkey, SessionId, Settings, Shell, TerminalIdentity, UiMode};
 use crate::use_cases::ports::SessionRegistry;
 use crate::use_cases::{
-    Costs, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
+    Check, Costs, Diagnose, Explain, FixLast, HandOff, Health, Ignore, IgnoreRequest, Privacy,
+    ScopeChoice,
 };
 
 mod desktop;
@@ -259,7 +260,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         links: settings.ui.links,
         hotkey: settings.ui.hotkey,
     };
-    let state = JsonState::new(&rt.state_dir);
+    let state = SqliteState::new(&rt.state_dir);
     let environment = FsEnvironment::new(rt.path_var.clone());
     let ledger = JsonlLedger::new(&rt.state_dir);
     let session = rt.session.as_ref();
@@ -439,7 +440,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             }
         }
         Command::Doctor => {
-            let checks = Diagnose {
+            let mut checks = Diagnose {
                 settings: &settings,
                 secrets: &EnvSecrets,
                 environment: &environment,
@@ -452,6 +453,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 clock: &SystemClock,
             }
             .run(session);
+            checks.push(store_check(&state));
             let places = Places {
                 config: &rt.config_path.display().to_string(),
                 config_exists: rt.config_path.is_file(),
@@ -482,16 +484,41 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     }
 }
 
+/// The store, as one line of the doctor's report.
+fn store_check(state: &SqliteState) -> Check {
+    match state.summary() {
+        Ok(summary) => Check {
+            subject: "state".into(),
+            health: Health::Ok,
+            detail: format!(
+                "SQLite {} · {} cases · {} sessions{}",
+                summary.path.display(),
+                summary.cases,
+                summary.sessions,
+                summary
+                    .migrated
+                    .map(|note| format!(" · {note}"))
+                    .unwrap_or_default()
+            ),
+        },
+        Err(detail) => Check {
+            subject: "state".into(),
+            health: Health::Problem,
+            detail,
+        },
+    }
+}
+
 /// The gateways the local path needs, built once per run.
 pub(super) struct Local<'a> {
     pub(super) settings: &'a Settings,
-    pub(super) state: &'a JsonState,
+    pub(super) state: &'a SqliteState,
     pub(super) environment: &'a FsEnvironment,
     pub(super) style: &'a Style,
 }
 
 fn silence(
-    state: &JsonState,
+    state: &SqliteState,
     session: Option<&SessionId>,
     request: IgnoreRequest,
     style: &Style,

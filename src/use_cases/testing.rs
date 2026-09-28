@@ -457,3 +457,150 @@ mod secret_store_tests {
         secret_store_contract(&MemorySecretStore::default());
     }
 }
+
+/// What every storage gateway must honour, and the fakes with them: the
+/// same tests run against the in-memory store, the JSON files and SQLite.
+pub mod storage_contract {
+    use super::*;
+
+    fn failure(text: &str, code: i32) -> CommandOutcome {
+        CommandOutcome::new(CommandLine::new(text).unwrap(), ExitStatus::new(code))
+    }
+
+    pub fn sessions_round_trip_with_their_shell_and_history(store: &impl SessionRegistry) {
+        let id = SessionId::new("42");
+        assert_eq!(store.load(&id).unwrap(), None);
+        let mut session = Session::new(id.clone(), Some(Shell::Fish));
+        session.remember(failure("ls", 0));
+        session.remember(failure("make", 2).lasting(Duration::from_secs(3)));
+        store.save(&session).unwrap();
+        assert_eq!(store.load(&id).unwrap(), Some(session.clone()));
+        session.remember(failure("make -j4", 0));
+        store.save(&session).unwrap();
+        assert_eq!(
+            store.load(&id).unwrap(),
+            Some(session),
+            "saving again replaces what was there"
+        );
+    }
+
+    pub fn a_pipelines_statuses_round_trip_with_the_outcome(store: &impl SessionRegistry) {
+        let pipeline = failure("gti status | head", 0)
+            .in_pipeline(vec![ExitStatus::new(127), ExitStatus::new(0)]);
+        let session = Session::with_recent(SessionId::new("p"), None, vec![pipeline.clone()]);
+        store.save(&session).unwrap();
+        let back = store.load(&SessionId::new("p")).unwrap().unwrap();
+        assert_eq!(back.recent(), &[pipeline]);
+    }
+
+    pub fn the_last_case_is_kept_per_session_and_overall(store: &impl CaseStore) {
+        let a = FailureCase::new(
+            CaseId::new("a"),
+            Timestamp::from_millis(1),
+            failure("make", 2),
+            Some("/w".into()),
+        )
+        .with_session(Some(SessionId::new("s1")))
+        .with_recent(vec![CommandLine::new("ls").unwrap()])
+        .with_output("boom".into())
+        .with_proposal(Some(Fix::new(
+            CommandLine::new("make -j4").unwrap(),
+            Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "suggested by local",
+        )))
+        .with_explanation(Explanation::new("local", "the target is missing"));
+        let b = FailureCase::new(
+            CaseId::new("b"),
+            Timestamp::from_millis(2),
+            failure("cargo", 101),
+            None,
+        )
+        .with_session(Some(SessionId::new("s2/odd id")));
+        store.save(&a).unwrap();
+        store.save(&b).unwrap();
+        assert_eq!(
+            store.last(Some(&SessionId::new("s1"))).unwrap(),
+            Some(a.clone())
+        );
+        assert_eq!(
+            store.last(Some(&SessionId::new("s2/odd id"))).unwrap(),
+            Some(b.clone())
+        );
+        assert_eq!(store.last(None).unwrap(), Some(b.clone()));
+        assert_eq!(store.last(Some(&SessionId::new("s3"))).unwrap(), None);
+        assert!(store.still_current(&a).unwrap());
+        let a_again = a
+            .clone()
+            .with_explanation(Explanation::new("cloud", "later"));
+        store.save(&a_again).unwrap();
+        assert_eq!(
+            store.last(Some(&SessionId::new("s1"))).unwrap(),
+            Some(a_again.clone()),
+            "saving a case again replaces it"
+        );
+        assert_eq!(
+            store.last(None).unwrap(),
+            Some(a_again),
+            "and makes it the last overall: callers check still_current first"
+        );
+        assert!(
+            store.still_current(&b).unwrap(),
+            "b is still the last of its own session"
+        );
+    }
+
+    pub fn the_ignore_list_round_trips(store: &impl IgnoreStore) {
+        assert!(store.entries().unwrap().is_empty());
+        let entries = vec![
+            IgnoreEntry::new(
+                IgnoreTarget::Program("make".into()),
+                IgnoreScope::Directory("/w".into()),
+            ),
+            IgnoreEntry::new(
+                IgnoreTarget::Command("npm test".into()),
+                IgnoreScope::Everywhere,
+            ),
+            IgnoreEntry::new(
+                IgnoreTarget::Program("x".into()),
+                IgnoreScope::Session(SessionId::new("7")),
+            ),
+            IgnoreEntry::mute_until(Timestamp::from_millis(99)),
+        ];
+        store.replace(&entries).unwrap();
+        assert_eq!(store.entries().unwrap(), entries);
+        store.replace(&entries[1..2]).unwrap();
+        assert_eq!(
+            store.entries().unwrap(),
+            entries[1..2].to_vec(),
+            "replaced, not appended"
+        );
+        store.replace(&[]).unwrap();
+        assert!(store.entries().unwrap().is_empty());
+    }
+
+    /// Every test of the contract, for a store that implements the three ports.
+    pub fn everything(store: &(impl SessionRegistry + CaseStore + IgnoreStore)) {
+        sessions_round_trip_with_their_shell_and_history(store);
+        a_pipelines_statuses_round_trip_with_the_outcome(store);
+        the_last_case_is_kept_per_session_and_overall(store);
+        the_ignore_list_round_trips(store);
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+
+    #[test]
+    fn the_in_memory_fakes_honour_the_storage_contract() {
+        storage_contract::sessions_round_trip_with_their_shell_and_history(
+            &MemoryRegistry::default(),
+        );
+        storage_contract::a_pipelines_statuses_round_trip_with_the_outcome(
+            &MemoryRegistry::default(),
+        );
+        storage_contract::the_last_case_is_kept_per_session_and_overall(&MemoryCases::default());
+        storage_contract::the_ignore_list_round_trips(&MemoryIgnores::default());
+    }
+}

@@ -6,6 +6,14 @@ All notable changes to kintsu are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- State lives in one SQLite file, `<state>/kintsu.db`, instead of JSON
+  files: sessions, the last cases and the ignore list. The first start
+  imports the JSON state and moves the files aside as `*.json.migrated`;
+  `kintsu doctor` shows the store, its counts and what was imported. The
+  newest 5000 cases are kept.
+
 ### Added
 
 - `[ui] hotkey`: the key that opens the panel is configurable (`^O`,

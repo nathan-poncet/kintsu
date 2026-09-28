@@ -88,9 +88,9 @@ built (2026-09-24, `src/daemon.rs`), following `docs/DAEMON.md`:
   `doctor` says when it is missing; the daemon log says which model
   refused and why. Keychain and command sources are read per call.
 - Not built: the panel, ghost text, clickable `kintsu://` words,
-  `kintsu service install`, SQLite (JSON files stay), `session_new`
-  (built on 2026-09-29, section 28; the session is still the shell's
-  pid), `act`/`get_case` frames.
+  `kintsu service install`, SQLite (built on 2026-09-29, section 34, the
+  JSON files imported once), `session_new` (built on 2026-09-29, section
+  28; the session is still the shell's pid), `act`/`get_case` frames.
 
 Two things learned building it: a lock on stdout held in `main` for the
 whole run deadlocked every daemon thread that logged (fixed by passing
@@ -166,7 +166,7 @@ ignored so a file written for the full schema loads. `provider = "gemini"`
 uses Gemini's OpenAI-compatible endpoint. `key = { keychain = true }`
 reads `security find-generic-password -s kintsu -a <model>` on macOS and
 `secret-tool lookup service kintsu account <model>` on Linux; `kintsu
-login` to *write* there came on 2026-09-29 (section 27).
+login` to *write* there came on 2026-09-29 (section 33).
 
 Removed from the entity while reviewing: `dismiss_cooldown`, because
 nothing can be dismissed without a panel.
@@ -336,9 +336,9 @@ presenters, the TOML and JSON edges. Changed:
 Known debt, accepted for now: the prompt-height arithmetic exists twice,
 once per shell, because the shells differ; state is JSON files behind
 the `SessionRegistry`, `CaseStore` and `IgnoreStore` ports, so the SQLite
-the design mentions is one more gateway when it is needed; `app.rs` is
-the largest file and will split once the panel arrives; the harness is
-manual, not in CI.
+the design mentions is one more gateway when it is needed (section 34
+made it the store); `app.rs` is the largest file and will split once the
+panel arrives; the harness is manual, not in CI.
 
 ## 17. v0.2, step A: the output is captured (2026-09-25)
 
@@ -360,7 +360,7 @@ Sources, tried in the configured order, each through its own CLI:
 this machine; the other three follow their documentation and are covered
 by the same invocation tests. Ghostty has no way to read a pane, so a
 Ghostty user gets capture only inside Herdr or tmux, or through the
-opt-in stderr tee of section 27, in zsh and bash.
+opt-in stderr tee of section 30, in zsh and bash.
 
 Two corrections after the first day of use. The echo of the command is
 the last line that *ends* with it, never a line kintsu wrote itself (the
@@ -483,7 +483,7 @@ evening, six of them after a fuller explanation. One is still *pending*.
 | 3. `ui.hotkey` | read it; `^K` stays the default |
 | 4. the panel's height | grows as answers arrive |
 | 5. the site | shows the current tag; "Play with it" stays as it is |
-| 6. the stderr tee for terminals without a readable pane | the maintainer asked why capture depends on the terminal when the shell is hooked; the answer is that the shell never sees the output, only the terminal holds it. Decided on 2026-09-29: build it, opt-in; section 27 |
+| 6. the stderr tee for terminals without a readable pane | the maintainer asked why capture depends on the terminal when the shell is hooked; the answer is that the shell never sees the output, only the terminal holds it. Decided on 2026-09-29: build it, opt-in; section 30 |
 | 7. project awareness: `Cargo.toml`, `.kintsu.toml`, `CLAUDE.md` in the brief | v0.3 |
 | 8. `$pipestatus` | build it; built, section 23 |
 | 9. email and IP redaction, custom patterns | v0.3 |
@@ -634,7 +634,7 @@ words, so a compiler's hint about a variable is left alone. Ties among
 several suggestions are refused, as in the typo rules. The local path
 (`KINTSU_NO_DAEMON`) captures but does not deliver: `kintsu fix` finds
 the rule's answer there. Without a readable pane (Ghostty) nothing of
-this fires unless the stderr tee of section 27 is on, in zsh or bash.
+this fires unless the stderr tee of section 30 is on, in zsh or bash.
 
 ## 27. The daemon reads the keys the shell sees (2026-09-29)
 
@@ -816,8 +816,44 @@ integration test through the real binary where the fake keychain is on a
 scratch PATH: `login`, then `models` finds the key, and no output ever
 contains it.
 
+## 34. SQLite behind the three storage ports (2026-09-29)
+
+One gateway, `sqlite_state.rs`, implements `SessionRegistry`, `CaseStore`
+and `IgnoreStore` over one file, `<state>/kintsu.db`, in WAL mode with
+`synchronous = NORMAL`; it is the only module that speaks SQL, and
+`tests/dependency_rule.rs` already forbade `rusqlite` in the inner rings.
+The three ports now have one contract suite, `storage_contract` next to
+the in-memory fakes in `use_cases/testing.rs`, and the fakes, the JSON
+files and SQLite pass the same tests. Cases are columns for what a query
+needs (id, session, time, command, status, cwd) plus the JSON document the
+JSON store already wrote; sessions keep their recent outcomes as one JSON
+column; the ignore list is one row per entry. A saved case becomes the
+newest of its session and overall, new or saved again, as the JSON store
+did (callers check `still_current` first). Where the JSON files kept one
+case per session forever, SQLite keeps the newest 5000 cases: the last of
+a shell that failed long ago goes with them.
+
+The first open creates the schema inside an immediate transaction and,
+when JSON state is there, imports the sessions, the cases (`last.json`
+last, so it stays the last overall) and the ignore list, then moves the
+files aside as `*.json.migrated`; a file that cannot be read is left out
+rather than failing the migration. A second process opening the file at
+the same moment waits on the lock and finds both done. `kintsu doctor`
+prints a `state` line: the file, the counts, and what the migration
+imported when it did. `JsonState` stays as the reader of that state and
+the owner of the document shapes; it is no longer a store the roots use.
+
+Measured end to end with the release binary, forty runs, the machine
+busy with four parallel builds: a failed command's triage took 23.4 ms
+median with SQLite against 20.9 ms with the JSON files, a successful one
+6.7 ms against 7.1 ms, and the process alone 5.6 ms. SQLite costs the
+quiet path nothing measurable beyond the noise of that load; the 5 ms
+budget is not met by either store on a loaded machine, and was measured
+before at a few milliseconds on an idle one. `cargo deny check` needed
+nothing: `rusqlite` and `libsqlite3-sys` are MIT.
+
 ## What is not built, by priority
 
-1. SQLite behind the three storage ports; the pty harness in CI.
+1. The pty harness in CI.
 2. Learning rules from accepted fixes.
 3. A Homebrew tap and an apt repository.

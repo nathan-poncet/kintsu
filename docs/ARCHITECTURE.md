@@ -102,7 +102,8 @@ kintsu/
             │                         service.rs (launchd, systemd, the kintsu:// handler) ·
             │                         tty_panel.rs (raw mode, the viewport on /dev/tty, OSC 52) ·
             │                         terminals.rs (OutputSource: the shell's stderr copy, herdr, tmux, wezterm, kitty, iterm2) ·
-            │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
+            │                         sqlite_state.rs (SessionRegistry + CaseStore + IgnoreStore over one kintsu.db; imports the JSON files once) ·
+            │                         json_state.rs (the JSON files of v0.1 and v0.2, read by the migration; the document shapes SQLite keeps) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · keychain.rs (SecretStore: security, secret-tool) ·
