@@ -153,6 +153,13 @@ impl Drop for Fixture {
             let _ = self.exchange(r#"{"v":1,"type":"shutdown"}"#);
         }
         if let Some(child) = self.child.as_mut() {
+            // An instrumented daemon writes its coverage profile as it
+            // exits; killed mid-write, it leaves a corrupt file that fails
+            // the whole merge. It was asked to stop: give it a moment.
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < deadline && matches!(child.try_wait(), Ok(None)) {
+                std::thread::sleep(Duration::from_millis(20));
+            }
             let _ = child.kill();
             let _ = child.wait();
         }
