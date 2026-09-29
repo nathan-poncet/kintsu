@@ -298,6 +298,7 @@ mod tests {
             models: &models,
             ledger: &ledger,
             clock: &FakeClock::at(1_790_637_207_000),
+            learned: &MemoryLearned::default(),
         };
         let first = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert!(first.fix.is_some());

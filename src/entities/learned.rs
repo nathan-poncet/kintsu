@@ -157,7 +157,7 @@ impl LearnedBook {
     /// The entries, most recently taken first.
     pub fn entries(&self) -> Vec<LearnedFix> {
         let mut entries = self.0.clone();
-        entries.sort_by(|a, b| b.last_accepted.cmp(&a.last_accepted));
+        entries.sort_by_key(|entry| std::cmp::Reverse(entry.last_accepted));
         entries
     }
 
