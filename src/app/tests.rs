@@ -283,6 +283,17 @@ fn privacy_doctor_and_config_commands_answer() {
         out.contains("✗ shell hook") && out.contains("! models"),
         "{out}"
     );
+    let (code, out, _) = b.run(&["costs"], None);
+    assert_eq!(code, ExitCode::SUCCESS);
+    assert!(
+        out.starts_with("Today (") && out.contains("no model call") && out.contains("No daily cap"),
+        "{out}"
+    );
+    let (code, out, _) = b.run(&["costs", "--json"], None);
+    assert_eq!(code, ExitCode::SUCCESS);
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(v["today"]["total_usd"], 0.0);
+    assert!(v["max_daily_cost_usd"].is_null());
     let (_, out, _) = b.run(&["config", "path"], None);
     assert!(out.contains("config.toml  (missing") && out.contains("socket  "));
     let (_, out, _) = b.run(&["default-config"], None);

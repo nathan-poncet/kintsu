@@ -9,6 +9,7 @@ pub mod brief;
 pub mod capture;
 pub mod case;
 pub mod command;
+pub mod cost;
 pub mod danger;
 pub mod distance;
 pub mod exit_status;
@@ -31,6 +32,10 @@ pub use brief::{CaseDocument, case_document, hand_off_brief};
 pub use capture::{TerminalIdentity, output_after};
 pub use case::{CaseId, Explanation, FailureCase};
 pub use command::{CommandLine, CommandLineError};
+pub use cost::{
+    Day, LedgerEntry, ModelSpend, Money, Task, Tokens, budget_reached, list_price, spend_by_model,
+    spent,
+};
 pub use danger::{Danger, classify_danger};
 pub use exit_status::ExitStatus;
 pub use fix::{Confidence, Fix, FixSource};

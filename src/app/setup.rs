@@ -4,7 +4,9 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use crate::adapters::controllers::Prompter;
-use crate::adapters::gateways::{EnvSecrets, FsEnvironment, HttpModels, render_settings};
+use crate::adapters::gateways::{
+    EnvSecrets, FsEnvironment, HttpModels, JsonlLedger, SystemClock, render_settings,
+};
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{Style, doctor_report};
 use crate::entities::{Hotkey, UiMode};
@@ -74,6 +76,8 @@ pub(super) fn run(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Wr
         models: &HttpModels,
         service_installed: super::service_installed(rt),
         shell: None,
+        ledger: &JsonlLedger::new(&rt.state_dir),
+        clock: &SystemClock,
     }
     .run(rt.session.as_ref());
     let places = Places {

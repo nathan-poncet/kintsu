@@ -8,8 +8,8 @@ use std::time::Duration as StdDuration;
 
 use serde_json::{Value, json};
 
-use crate::entities::{ModelSpec, Provider};
-use crate::use_cases::ports::{ModelError, ModelGateway, Prompt};
+use crate::entities::{ModelSpec, Provider, Tokens};
+use crate::use_cases::ports::{Answer, ModelError, ModelGateway, Prompt};
 
 /// Wait this long when the model has no timeout of its own.
 const DEFAULT_TIMEOUT_SECS: u64 = 45;
@@ -149,6 +149,23 @@ pub fn parse_answer(provider: Provider, status: u16, body: &Value) -> Result<Str
     };
     text.map(|t| t.trim().to_string())
         .ok_or_else(|| ModelError::Malformed("no text in the answer".into()))
+}
+
+/// The tokens the provider counted, where each one writes them; zero when
+/// it wrote nothing.
+pub fn parse_usage(provider: Provider, body: &Value) -> Tokens {
+    let count = |pointer: &str| body.pointer(pointer).and_then(Value::as_u64).unwrap_or(0);
+    match provider {
+        Provider::Ollama => Tokens::new(count("/prompt_eval_count"), count("/eval_count")),
+        Provider::OpenAiCompatible => Tokens::new(
+            count("/usage/prompt_tokens"),
+            count("/usage/completion_tokens"),
+        ),
+        Provider::Anthropic => {
+            Tokens::new(count("/usage/input_tokens"), count("/usage/output_tokens"))
+        }
+        Provider::CliAgent => Tokens::default(),
+    }
 }
 
 /// OpenAI's own endpoint retired `max_tokens` for its newer models; the
@@ -351,18 +368,31 @@ impl ModelGateway for HttpModels {
         key: Option<&str>,
         prompt: &Prompt,
     ) -> Result<String, ModelError> {
+        self.answer(spec, key, prompt).map(|answer| answer.text)
+    }
+
+    fn answer(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+    ) -> Result<Answer, ModelError> {
         let request = build_request(spec, key, prompt)?;
         let agent = agent_for(spec);
         let (status, body) = post(&agent, &request)?;
         let answer = parse_answer(spec.provider, status, &body);
+        let with_tokens = |text: String, body: &Value| Answer {
+            text,
+            tokens: parse_usage(spec.provider, body),
+        };
         let Err(ModelError::Refused(refusal)) = &answer else {
-            return answer;
+            return answer.map(|text| with_tokens(text, &body));
         };
         let Some(renamed) = renamed_output_limit(&request, refusal) else {
-            return answer;
+            return answer.map(|text| with_tokens(text, &body));
         };
         let (status, body) = post(&agent, &renamed)?;
-        parse_answer(spec.provider, status, &body)
+        parse_answer(spec.provider, status, &body).map(|text| with_tokens(text, &body))
     }
 
     fn stream(
@@ -564,6 +594,32 @@ mod tests {
             )
             .unwrap(),
             "hi"
+        );
+        assert_eq!(
+            parse_usage(
+                Provider::Ollama,
+                &json!({"prompt_eval_count": 120, "eval_count": 30})
+            ),
+            Tokens::new(120, 30)
+        );
+        assert_eq!(
+            parse_usage(
+                Provider::OpenAiCompatible,
+                &json!({"usage": {"prompt_tokens": 12, "completion_tokens": 3}})
+            ),
+            Tokens::new(12, 3)
+        );
+        assert_eq!(
+            parse_usage(
+                Provider::Anthropic,
+                &json!({"usage": {"input_tokens": 9, "output_tokens": 1}})
+            ),
+            Tokens::new(9, 1)
+        );
+        assert_eq!(
+            parse_usage(Provider::Anthropic, &json!({})),
+            Tokens::default(),
+            "nothing counted is zero, not an error"
         );
         assert_eq!(
             parse_answer(Provider::Ollama, 200, &json!({"nope": 1})).unwrap_err(),

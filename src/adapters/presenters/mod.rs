@@ -1,6 +1,7 @@
 //! Outbound adapters: from what a use case produced to what a surface shows.
 //! Pure functions of a value and a style; they never read the terminal.
 
+pub mod costs;
 pub mod doctor;
 pub mod frames;
 pub mod panel;
@@ -9,6 +10,7 @@ pub mod shell_hook;
 pub mod style;
 pub mod toast;
 
+pub use costs::{costs_json, costs_report};
 pub use doctor::doctor_report;
 pub use plain::{
     error_line, explanation, fix_report, hand_off_notice, ignored, privacy_report, raw_fix,

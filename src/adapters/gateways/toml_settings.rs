@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    CaptureSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Provider, QuietSettings,
-    Routing, Settings, Tier, UiMode, UiSettings,
+    CaptureSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Money, Provider,
+    QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -81,13 +81,21 @@ pub fn render_settings(settings: &Settings) -> String {
     }
     out.push_str("\n[routing.constraints]\n");
     out.push_str(&format!(
-        "sensitive_output = \"{}\"\n\n",
+        "sensitive_output = \"{}\"\n",
         if settings.sensitive_local_only {
             "local_only"
         } else {
             "allow"
         }
     ));
+    if let Some(cap) = settings.max_daily_cost {
+        out.push_str(&format!(
+            "max_daily_cost   = \"{}.{:02} USD\"\n",
+            cap.micro_usd() / 1_000_000,
+            (cap.micro_usd() % 1_000_000 + 5_000) / 10_000
+        ));
+    }
+    out.push('\n');
     out.push_str("[ui]\n");
     out.push_str(&format!(
         "mode      = \"{}\"\n",
@@ -188,6 +196,7 @@ struct RoutingDto {
 #[serde(default)]
 struct ConstraintsDto {
     sensitive_output: Option<String>,
+    max_daily_cost: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -256,6 +265,12 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
                 "routing.constraints.sensitive_output: `{other}` (local_only or allow)"
             )));
         }
+    };
+    let max_daily_cost = match file.routing.constraints.max_daily_cost.as_deref() {
+        None => None,
+        Some(text) => Some(Money::parse(text).map_err(|e| {
+            SettingsError::Invalid(format!("routing.constraints.max_daily_cost: {e}"))
+        })?),
     };
     let defaults = QuietSettings::default();
     let quiet = QuietSettings {
@@ -346,6 +361,7 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
         ui,
         capture,
         sensitive_local_only,
+        max_daily_cost,
     })
 }
 
@@ -660,6 +676,7 @@ investigate = ["claude-code"]
         let text = r#"
 [routing.constraints]
 sensitive_output = "allow"
+max_daily_cost = "0.50 USD"
 [quiet]
 never_triage = ["make watch"]
 ok_statuses = [1]
@@ -674,6 +691,19 @@ eager_fix = true
 "#;
         let s = parse_settings(text, Some("/home/me")).unwrap();
         assert!(!s.sensitive_local_only);
+        assert_eq!(s.max_daily_cost, Some(Money::from_micro_usd(500_000)));
+        assert!(
+            render_settings(&s).contains("max_daily_cost   = \"0.50 USD\"\n"),
+            "{}",
+            render_settings(&s)
+        );
+        assert!(
+            parse_settings("[routing.constraints]\nmax_daily_cost = \"1 EUR\"\n", None)
+                .unwrap_err()
+                .to_string()
+                .contains("only USD"),
+            "the currency is checked at the edge"
+        );
         assert_eq!(s.quiet.never_triage, vec!["make watch"]);
         assert_eq!(s.quiet.ok_statuses, vec![1]);
         assert_eq!(s.quiet.ok_commands, vec![("npm".to_string(), vec![1])]);

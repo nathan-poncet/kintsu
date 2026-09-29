@@ -112,8 +112,14 @@ any. With no answer at all Kintsu still works, rules only, and says so once.
 4. Call it. On timeout or error, move to the next candidate; on the last
    one, fail closed: `Classify` keeps the toast as it was, `QuickFix`
    shows nothing, `Explain` says which models were tried.
-5. Record latency, tokens and cost in the `CostLedger`. `kintsu models`
-   shows the table; `kintsu models test` probes every configured model.
+5. Record latency, tokens and cost in the `CostLedger`. Built: one JSON
+   line per call in `<state>/ledger.jsonl`, priced at the provider's list
+   price when the model id is known, free for local models, unpriced
+   otherwise; `kintsu costs` shows today and the last thirty days per
+   model. `max_daily_cost` under `[routing.constraints]` is USD only;
+   once today's priced calls reach it, remote models are skipped until
+   midnight UTC, local ones keep answering, and the shell is told once a
+   day. `kintsu models` and `kintsu models test` are not built yet.
 
 The router is an entity service: pure, tested with tables of attributes
 and candidate lists. Health and budgets come in through ports.

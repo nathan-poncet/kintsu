@@ -44,6 +44,7 @@ explain     = ["local"]                  # `kintsu why`; add a cloud model after
 
 [routing.constraints]
 sensitive_output = "local_only"          # a case with a secret never reaches a remote model
+# max_daily_cost = "1.00 USD"            # past it, remote models are skipped until midnight UTC; local ones are free
 
 # ── Quiet ───────────────────────────────────────────────────────────────
 [quiet]

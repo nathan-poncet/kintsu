@@ -156,6 +156,7 @@ The commands, all about the last failure of the current shell:
 | `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |
 | `kintsu mute [1h]` | nothing for a while |
 | `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
+| `kintsu costs [--json]` | what the models cost today and over the last thirty days, per model, against `max_daily_cost` |
 | `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |
 | `kintsu service install`, `service uninstall` | keep the daemon alive as a launchd agent or systemd user unit, and let the desktop hand `kintsu://` clicks to `kintsu open` |
 

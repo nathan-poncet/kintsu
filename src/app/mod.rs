@@ -10,18 +10,18 @@ use std::time::Duration;
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
     DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState,
-    ShellAgents, SystemClock, load_settings, service,
+    JsonlLedger, ShellAgents, SystemClock, load_settings, service,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
-    Style, doctor_report, error_line, explanation, fix_report, hand_off_notice, ignored,
-    pending_line, privacy_report, raw_fix, shell_hook,
+    Style, costs_json, costs_report, doctor_report, error_line, explanation, fix_report,
+    hand_off_notice, ignored, pending_line, privacy_report, raw_fix, shell_hook,
 };
 use crate::daemon::{self, DaemonConfig};
 use crate::entities::{Hotkey, SessionId, Settings, Shell, TerminalIdentity, UiMode};
 use crate::use_cases::ports::SessionRegistry;
 use crate::use_cases::{
-    Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
+    Costs, Diagnose, Explain, FixLast, HandOff, Ignore, IgnoreRequest, Privacy, ScopeChoice,
 };
 
 mod desktop;
@@ -58,6 +58,7 @@ Usage:
   kintsu mute [30m|1h|…]          nothing for a while (default 1h)
   kintsu setup [--yes]            three questions, then the configuration file
   kintsu doctor                   check the hook, the models, the keys
+  kintsu costs [--json]           what the models cost today and over 30 days
   kintsu default-config           the commented default configuration
   kintsu config path              where the files are
   kintsu daemon [run|stop|status] the resident process the hooks talk to
@@ -256,6 +257,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
     };
     let state = JsonState::new(&rt.state_dir);
     let environment = FsEnvironment::new(rt.path_var.clone());
+    let ledger = JsonlLedger::new(&rt.state_dir);
     let session = rt.session.as_ref();
 
     match command {
@@ -297,6 +299,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 environment: &environment,
                 secrets: &EnvSecrets,
                 models: &HttpModels,
+                ledger: &ledger,
+                clock: &SystemClock,
             };
             match fix_last.run(session) {
                 Ok(proposal) if raw => match raw_fix(&proposal) {
@@ -343,6 +347,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 cases: &state,
                 secrets: &EnvSecrets,
                 models: &HttpModels,
+                ledger: &ledger,
+                clock: &SystemClock,
             };
             match explain.run(session) {
                 Ok(e) => {
@@ -410,6 +416,24 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             out,
             err,
         ),
+        Command::Costs { json } => {
+            let costs = Costs {
+                settings: &settings,
+                ledger: &ledger,
+                clock: &SystemClock,
+            };
+            match costs.run() {
+                Ok(report) if json => {
+                    let _ = writeln!(out, "{}", costs_json(&report));
+                    ExitCode::SUCCESS
+                }
+                Ok(report) => {
+                    let _ = writeln!(out, "{}", costs_report(&report, &style));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => failure(err, &e.to_string(), &style, json),
+            }
+        }
         Command::Doctor => {
             let checks = Diagnose {
                 settings: &settings,
@@ -420,6 +444,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 shell: session
                     .and_then(|s| state.load(s).ok().flatten())
                     .and_then(|s| s.shell()),
+                ledger: &ledger,
+                clock: &SystemClock,
             }
             .run(session);
             let places = Places {

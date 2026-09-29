@@ -10,7 +10,11 @@ pub fn fix_report(proposal: &FixProposal, style: &Style) -> String {
     let Some(fix) = &proposal.fix else {
         let echo = style.abbreviate(proposal.case.outcome().command().as_str(), 60);
         let mut out = vec![style.line(&format!("No fix known for {}.", style.bold(&echo)))];
-        if proposal.failures.is_empty() {
+        if proposal.budget_reached {
+            out.push(style.line(
+                &style.dim("Today's model budget is spent: remote models wait for midnight UTC."),
+            ));
+        } else if proposal.failures.is_empty() {
             out.push(style.line(&style.dim(&format!(
                 "kintsu why explains it{}kintsu agent hands it over.",
                 style.dot()
@@ -177,6 +181,7 @@ mod tests {
             case: case("gti status"),
             fix: Some(fix("git status", FixSource::Rule("typo".into()))),
             failures: vec![],
+            budget_reached: false,
         };
         let text = fix_report(&p, &Style::PLAIN);
         assert_eq!(
@@ -188,6 +193,7 @@ mod tests {
             case: case("x"),
             fix: Some(fix("rm -rf build", FixSource::Model("local".into()))),
             failures: vec![],
+            budget_reached: false,
         };
         let text = fix_report(&rough, &Style::PLAIN);
         assert!(text.contains("| because (model local - not verified)"));
@@ -200,7 +206,17 @@ mod tests {
             case: case("make test"),
             fix: None,
             failures: vec![],
+            budget_reached: false,
         };
+        let capped = FixProposal {
+            budget_reached: true,
+            ..none.clone()
+        };
+        assert!(
+            fix_report(&capped, &Style::PLAIN).contains("| Today's model budget is spent"),
+            "{}",
+            fix_report(&capped, &Style::PLAIN)
+        );
         assert_eq!(
             fix_report(&none, &Style::PLAIN),
             "| No fix known for make test.\n| kintsu why explains it - kintsu agent hands it over."

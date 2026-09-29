@@ -92,6 +92,8 @@ pub enum Command {
     Mute(Duration),
     /// `kintsu doctor`.
     Doctor,
+    /// `kintsu costs [--json]`: what the models cost today and this month.
+    Costs { json: bool },
     /// `kintsu setup [--yes]`: three questions, then the configuration file.
     Setup { yes: bool },
     /// `kintsu default-config`.
@@ -186,6 +188,9 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
             .map(Command::Mute)
             .ok_or_else(|| CliError::InvalidDuration((*text).to_string())),
         ["doctor"] => Ok(Command::Doctor),
+        ["costs"] => Ok(Command::Costs { json: false }),
+        ["costs", "--json"] => Ok(Command::Costs { json: true }),
+        ["costs", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
         ["setup"] => Ok(Command::Setup { yes: false }),
         ["setup", "--yes" | "-y"] => Ok(Command::Setup { yes: true }),
         ["setup", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
@@ -713,6 +718,15 @@ mod tests {
     #[test]
     fn the_setup_commands_parse() {
         assert_eq!(parse_args(["doctor"]), Ok(Command::Doctor));
+        assert_eq!(parse_args(["costs"]), Ok(Command::Costs { json: false }));
+        assert_eq!(
+            parse_args(["costs", "--json"]),
+            Ok(Command::Costs { json: true })
+        );
+        assert_eq!(
+            parse_args(["costs", "--all"]),
+            Err(CliError::UnknownFlag("--all".into()))
+        );
         assert_eq!(parse_args(["setup"]), Ok(Command::Setup { yes: false }));
         assert_eq!(
             parse_args(["setup", "--yes"]),

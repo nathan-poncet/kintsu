@@ -4,6 +4,7 @@
 //! `impl Future` on the ports; the runtime stays in the outer rings.
 
 pub mod capture;
+pub mod costs;
 pub mod diagnose;
 pub mod explain;
 pub mod facts;
@@ -22,6 +23,7 @@ pub mod testing;
 pub mod triage;
 
 pub use capture::CaptureOutput;
+pub use costs::{CostReport, Costs};
 pub use diagnose::{Check, Diagnose, Health};
 pub use explain::{Explain, Explained};
 pub use fix_last::{FixLast, FixProposal};
