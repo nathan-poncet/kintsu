@@ -855,8 +855,41 @@ budget is not met by either store on a loaded machine, and was measured
 before at a few milliseconds on an idle one. `cargo deny check` needed
 nothing: `rusqlite` and `libsqlite3-sys` are MIT.
 
+## 35. A fix taken twice becomes a rule (2026-09-29)
+
+The vision's "learn from accepted fixes": a local memory that turns a
+repeated model fix into a rule. Built as its own port, `LearnedFixes`, with
+the in-memory fake, a contract suite, and a gateway over one JSON file,
+`<state>/learned.json`, kept apart from the case store so it moves into
+the SQLite store later without touching this. Sections 27 and 28 were
+taken by pull requests open at the same time; this is 29.
+
+*Accepted* means: in a session, the command line that followed a case is
+that case's proposal, word for word, and it succeeded. Triage sees it: a
+success right after a failure reads the shell's last case, and only then,
+so a plain success costs nothing on the quiet path; a store that cannot be
+read or written loses one lesson, never the decision. Only fixes worth
+learning count: a model's, a rule's guess that was not pre-typed (a
+pre-typed one is already instant; confirming `git commit -amend` →
+`--amend` is worth it), and a learned fix getting surer. A fix whose
+danger is not `None` is never learned. Two acceptances make a rule at
+confidence 0.8, pre-typed like the built-in ones; three make it 0.9.
+
+The key is the failure's shape: the command line's words and its exit
+status, the pair that already makes two failures one duplicate. The issue
+suggested program, subcommand and status; that would have offered `make
+-j4 test` for a failing `make build`, and `git push --set-upstream origin
+main` for a push of another branch. One entry per shape; a different fix
+taken for the same shape starts the count over; 500 entries at most, the
+one not taken for longest goes first.
+
+The learned fix comes after the built-in rules, on the line then on the
+output, and before any model, wherever `rule_fix` runs: triage, `kintsu
+fix`, the panel, the agent's brief, the daemon's messages. `kintsu
+learned` lists the entries, plain or `--json`; `kintsu learned forget
+<program>` or `--all` unlearns.
+
 ## What is not built, by priority
 
 1. The pty harness in CI.
-2. Learning rules from accepted fixes.
-3. A Homebrew tap and an apt repository.
+2. A Homebrew tap and an apt repository.

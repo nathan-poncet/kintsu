@@ -56,6 +56,7 @@ kintsu/
     │   ├── output_rules.rs           suggest_fix_from_output (the rules that read the output: git's own hints, did-you-mean, sudo, mkdir -p…)
     │   ├── redaction.rs              redact · Redacted · SecretKind
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
+    │   ├── learned.rs                FailureShape · LearnedFix · LearnedBook · accepted_proposal (a fix taken twice is a rule)
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
     │   ├── brief.rs                  case_document · hand_off_brief (output fenced as data)
     │   ├── capture.rs                TerminalIdentity · output_after (the command's output cut from a screen)
@@ -73,6 +74,7 @@ kintsu/
     │   ├── explain.rs                routed models, sensitive ⇒ local only
     │   ├── hand_off.rs               prepare the brief, then launch the agent
     │   ├── ignore.rs                 ignore and mute
+    │   ├── learned.rs                list and forget the learned fixes
     │   ├── privacy.rs                what would be sent
     │   ├── diagnose.rs               doctor's checks
     │   ├── costs.rs                  today and the last thirty days, per model, against the cap
@@ -80,11 +82,11 @@ kintsu/
     │   ├── login.rs                  a key into the keychain under the model's name
     │   ├── facts.rs · prompts.rs · routing.rs
     │   ├── testing.rs                in-memory fakes of every port (cfg(test))
-    │   ├── (planned)                 register_session · classify_failure · recall_case · learn_rule
+    │   ├── (planned)                 register_session · classify_failure · recall_case
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
     │       ├── ignore_store.rs · secrets.rs · secret_store.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
-    │       ├── output_source.rs · cost_ledger.rs
+    │       ├── output_source.rs · cost_ledger.rs · learned_fixes.rs
     │       └── (planned)             RuleBook
     │
     └── adapters/                 depends on the entities and the use cases
@@ -104,6 +106,7 @@ kintsu/
             │                         terminals.rs (OutputSource: the shell's stderr copy, herdr, tmux, wezterm, kitty, iterm2) ·
             │                         sqlite_state.rs (SessionRegistry + CaseStore + IgnoreStore over one kintsu.db; imports the JSON files once) ·
             │                         json_state.rs (the JSON files of v0.1 and v0.2, read by the migration; the document shapes SQLite keeps) ·
+            │                         learned_fixes.rs (LearnedFixes, one JSON file) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · keychain.rs (SecretStore: security, secret-tool) ·
