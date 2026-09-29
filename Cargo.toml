@@ -3,7 +3,7 @@ name = "kintsu"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
-description = "When a command fails, Kintsu offers to hand it to your AI agent, right there in the terminal. Any provider, your own key."
+description = "When a command fails, Kintsu offers to hand it to your AI agent, in the shell"
 license = "MIT"
 repository = "https://github.com/nathan-poncet/kintsu"
 readme = "README.md"
@@ -21,6 +21,26 @@ libc = "0.2"
 ratatui = "0.30"
 crossterm = "0.29"
 rusqlite = { version = "0.37", features = ["bundled"] }
+
+[package.metadata.deb]
+maintainer = "Nathan Poncet <112613712+nathan-poncet@users.noreply.github.com>"
+copyright = "2026, Nathan Poncet"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+Any provider, your own key. Kintsu hooks your shell (zsh, bash, fish). After
+a failed command it prints one bubble: what happened, a fix when a rule knows
+one, and the words to ask your models or hand the case to your coding agent,
+in your own terminal. Rules work with no configuration and nothing leaves the
+machine. Add the hook yourself: eval "$(kintsu init zsh)" in ~/.zshrc,
+eval "$(kintsu init bash)" in ~/.bashrc, or kintsu init fish | source in
+~/.config/fish/config.fish."""
+section = "utils"
+priority = "optional"
+revision = ""
+assets = [
+    ["target/release/kintsu", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/kintsu/README.md", "644"],
+]
 
 [profile.release]
 lto = true

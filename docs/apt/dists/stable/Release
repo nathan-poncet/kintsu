@@ -1,0 +1,23 @@
+Origin: kintsu
+Label: kintsu
+Suite: stable
+Codename: stable
+Date: Mon, 28 Sep 2026 23:56:24 GMT
+Architectures: amd64 arm64
+Components: main
+Description: kintsu, the bubble under failed commands
+MD5Sum:
+ 2340e71a8102f03a83fe4baabc85955a 1040 main/binary-amd64/Packages
+ c370cc8aacac3f92f091ff77b0f1c046 663 main/binary-amd64/Packages.gz
+ 3918e834b40ef259ad409a2424ab28a1 1040 main/binary-arm64/Packages
+ ffdf80815d1c6d679c65d85717f51293 665 main/binary-arm64/Packages.gz
+SHA1:
+ 3d2d5349f1adb4b2d48ddac7b346fa34e0b32c2f 1040 main/binary-amd64/Packages
+ 84c3287f5372c25e644367727b2fba7a9d183b1a 663 main/binary-amd64/Packages.gz
+ 2ae5d0a9d5929be7ac3d434054b817488c606614 1040 main/binary-arm64/Packages
+ b7a0d2a64e54dca071320027ef2d9fc6d852521c 665 main/binary-arm64/Packages.gz
+SHA256:
+ 66bd8c5794495dac12cff83a0d2544a9fbd9b72ddce2e5e241c522d2ec6c137c 1040 main/binary-amd64/Packages
+ 483997ba46c7d954c562c6b8ccfc5b4275036d8b7f7155d45b6c25c3cc595e98 663 main/binary-amd64/Packages.gz
+ bac82321da771a4b5a96e8698fddaa104ce5be7a053c5bbc8e19229c002dd0f8 1040 main/binary-arm64/Packages
+ c524799431d4bd183a564ee832421248e96d1a92efa97a8cf57a9176bff6cc51 665 main/binary-arm64/Packages.gz
