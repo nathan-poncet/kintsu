@@ -45,6 +45,21 @@ impl Fixture {
             .env_remove("KINTSU_NO_DAEMON")
             .env_remove("KINTSU_DISABLE")
             .env_remove("KINTSU_TEST_KEY");
+        // The hook client would otherwise read the pane the tests run in.
+        for identity in [
+            "TERM_PROGRAM",
+            "TMUX",
+            "TMUX_PANE",
+            "HERDR_PANE_ID",
+            "HERDR_SOCKET_PATH",
+            "HERDR_BIN_PATH",
+            "WEZTERM_PANE",
+            "KITTY_WINDOW_ID",
+            "KITTY_LISTEN_ON",
+            "ITERM_SESSION_ID",
+        ] {
+            cmd.env_remove(identity);
+        }
     }
 
     fn start_daemon(&mut self) {
