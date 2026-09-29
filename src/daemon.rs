@@ -18,8 +18,7 @@ use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
     FsEnvironment, HttpModels, JsonLearnedFixes, JsonlLedger, RandomIds, SessionSecrets, Sessions,
-    SqliteState,
-    SystemClock, TerminalOutput, load_settings, unix,
+    SqliteState, SystemClock, TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};

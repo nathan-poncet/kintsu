@@ -436,6 +436,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &ledger,
+            learned: &MemoryLearned::default(),
         };
         let failure = case("npm run build", 1, Some("42"));
         assert_eq!(uc.fix_candidate(&failure), None, "no asking… line");
