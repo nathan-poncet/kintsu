@@ -215,8 +215,10 @@ the environment). CI fails under 90 %. Three workflows: `ci.yml` (fmt,
 clippy, tests, release build, a scripted smoke run of every command, hook
 syntax, docs shell, installer, coverage, cargo-deny), `release.yml` on a
 `v*` tag (verifies the tag matches `Cargo.toml`, drafts the release from
-`CHANGELOG.md`, builds four targets, uploads `SHA256SUMS` in the format
-`install.sh` expects), `deps.yml` weekly (advisories fail). Dependabot
+`CHANGELOG.md`, builds four targets and a Debian package for each Linux
+one, uploads `SHA256SUMS` in the format `install.sh` expects, then
+publishes the apt repository to `docs/apt` on `main`, section 27),
+`deps.yml` weekly (advisories fail). Dependabot
 opens the update PRs. `deny.toml` allows MIT, Apache-2.0, BSD-3, ISC,
 Unicode-3.0, Zlib, CDLA-Permissive-2.0 and bans `openssl-sys`.
 
@@ -910,8 +912,51 @@ Creating the tap repository and the token stays the maintainer's: a
 public repository is a decision, not a build step. The site marks the
 Homebrew line "once the tap is published" until then.
 
+## 37. An apt repository on the site (2026-09-29)
+
+Priority 5 of the list below, asked for on 2026-09-29. Each release now
+ships `.deb` packages for `amd64` and `arm64` next to the tarballs: the
+release workflow wraps the static musl binaries it already cross-builds
+with `cargo deb --no-build` (`[package.metadata.deb]` in `Cargo.toml`; the
+binary, the README and the copyright, no maintainer script: the hook line
+is the user's to add, as with every other install). The crate's
+`description` became one sentence under eighty characters because Debian
+shows it as the package's synopsis and cargo-deb cut the old two-sentence
+one mid-phrase; "Any provider, your own key" opens the long description.
+
+The repository itself is the site: `docs/apt/` on `main`, served by
+GitHub Pages at `https://nathan-poncet.github.io/kintsu/apt`, suite
+`stable`, component `main`. `scripts/apt-repo.py` writes it in pure Python
+(it reads the control file out of each `.deb`, so no `dpkg-dev` is needed
+and it runs on the maintainer's Mac too): `pool/main/k/kintsu/` holds the
+packages, `dists/stable/main/binary-<arch>/Packages(.gz)` and
+`dists/stable/Release` are rewritten from what the pool holds, and a
+`--self-test` builds fake packages and checks the output. A last job of
+`release.yml` runs it on the tag's packages and commits `docs/apt` to
+`main` with the tagger's identity. Considered and not chosen: a flat
+repository on a rolling GitHub release (no binaries in git, but an unusual
+layout and a redirect chain apt has to follow); `Filename` must be
+relative to the repository root, so GitHub Pages cannot point at release
+assets. The pool therefore carries binaries in git, about 3.5 MB per
+release, and `--keep 3` prunes older versions so it does not grow
+forever. The v0.2.0 packages, built from the published release binaries,
+are in the pool from this change on, so `apt install kintsu` works as
+soon as it is merged.
+
+Signing: when the `APT_SIGNING_KEY` secret holds an ASCII-armored private
+key, the job imports it, signs `Release` into `InRelease` and
+`Release.gpg`, and exports the public key to `docs/apt/kintsu.gpg` and
+`kintsu.asc` for `signed-by`. Without it the repository is published
+unsigned and the documentation says `[trusted=yes]` is needed meanwhile.
+To create the key: `gpg --quick-gen-key "kintsu releases <email>" ed25519
+sign never`, then `gpg --armor --export-secret-keys <fingerprint> | gh
+secret set APT_SIGNING_KEY --repo nathan-poncet/kintsu`; on the next tag
+the site gets the public key, and the `[trusted=yes]` line leaves the
+docs. cargo-deb writes an empty `Depends:` field for a static binary;
+dpkg accepts it and the `Packages` index drops it.
+
 ## What is not built, by priority
 
 1. The pty harness in CI.
-2. An apt repository; the Homebrew tap's repository and token (section
-   36).
+2. The Homebrew tap's repository and token (section 36); the apt
+   signing key and its secret (section 37).
