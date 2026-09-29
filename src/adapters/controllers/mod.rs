@@ -6,7 +6,7 @@ pub mod setup_prompts;
 pub mod socket;
 pub mod url_scheme;
 
-pub use cli::{Command, DaemonAction, ScopeFlag, ServiceAction, parse_args};
+pub use cli::{Command, DaemonAction, LearnedAction, ScopeFlag, ServiceAction, parse_args};
 pub use panel_keys::key_for;
 pub use setup_prompts::Prompter;
 pub use socket::{Request, parse_frame};

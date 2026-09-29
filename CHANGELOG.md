@@ -45,6 +45,14 @@ All notable changes to kintsu are recorded here. The format follows
   name, where `key = { keychain = true }` already reads it;
   `--write-config` points the configuration at it, leaving every other
   line of the file as it was. Nothing prints the key.
+- A fix you take twice for the same failure becomes a rule: when the
+  command line after a failure is the proposed fix and it succeeds, kintsu
+  remembers; the second time, the same failure gets that fix instantly,
+  pre-typed, with no model asked. Model fixes and unsure rule fixes are
+  learned, pre-typed and dangerous ones are not. `kintsu learned` lists
+  what was learned (`--json` for programs), `kintsu learned forget
+  <program>` or `--all` unlearns. Kept in `<state>/learned.json`, 500
+  entries at most.
 
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,

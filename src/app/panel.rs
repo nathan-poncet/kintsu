@@ -7,7 +7,8 @@ use std::process::ExitCode;
 
 use crate::adapters::gateways::tty_panel;
 use crate::adapters::gateways::{
-    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonlLedger, SqliteState, SystemClock,
+    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonLearnedFixes, JsonlLedger, SqliteState,
+    SystemClock,
 };
 use crate::adapters::presenters::panel::{Arrival, Ask, Effect, Panel};
 use crate::adapters::presenters::{Style, ignored, privacy_report};
@@ -37,6 +38,7 @@ pub(super) fn expand(
         state,
         environment,
         style,
+        learned,
     } = *local;
     let focus = Focus {
         sessions: state,
@@ -60,6 +62,7 @@ pub(super) fn expand(
         models: &HttpModels,
         ledger: &ledger,
         clock: &SystemClock,
+        learned,
     };
     let known = fix_last.known(&case);
     let can_ask_fix = fix_last.candidate(&case).is_some();
@@ -196,6 +199,7 @@ impl Asker {
                         models: &HttpModels,
                         ledger: &ledger,
                         clock: &SystemClock,
+                        learned: &JsonLearnedFixes::new(&state_dir),
                     };
                     if let Ok(Some(case)) = state.last(session.as_ref())
                         && let Some(model) = fix_last.candidate(&case)

@@ -14,8 +14,8 @@ use crate::use_cases::facts::rule_fix;
 use crate::use_cases::fix_last::{FixError, FixLast};
 use crate::use_cases::focus::{Focus, FocusError};
 use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Clock, CostLedger, Environment, ModelError, ModelGateway, Notifier,
-    NotifyError, Secrets, SessionRegistry,
+    CaseStore, CaseStoreError, Clock, CostLedger, Environment, LearnedFixes, ModelError,
+    ModelGateway, Notifier, NotifyError, Secrets, SessionRegistry,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{
@@ -59,6 +59,7 @@ pub struct Messages<'a> {
     pub cases: &'a dyn CaseStore,
     pub sessions: &'a dyn SessionRegistry,
     pub ledger: &'a dyn CostLedger,
+    pub learned: &'a dyn LearnedFixes,
 }
 
 impl Messages<'_> {
@@ -143,7 +144,7 @@ impl Messages<'_> {
         environment: &dyn Environment,
     ) -> Option<Result<Message, MessagesError>> {
         case.output()?;
-        let fix = rule_fix(environment, case)?;
+        let fix = rule_fix(environment, self.learned, case)?;
         Some(
             self.focus()
                 .holds(case)
@@ -281,6 +282,7 @@ impl Messages<'_> {
             models: self.models,
             ledger: self.ledger,
             clock: self.clock,
+            learned: self.learned,
         };
         let proposal = fix_last.run(Some(session))?;
         let body = match proposal.fix {
@@ -338,6 +340,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         let message = uc.fix(&case("npm run build", 1, Some("42"))).unwrap();
         assert!(!message.is_late(), "nothing ran since");
@@ -374,6 +377,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         let environment = FakeEnvironment::with_executables(&[]);
         let silent = case("make test", 2, Some("42"));
@@ -473,6 +477,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         let message = uc.fix(&old).unwrap();
         assert!(message.is_late(), "the shell looks at another failure");
@@ -510,6 +515,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         let message = uc.fix(&failure).unwrap();
         assert!(message.is_late());
@@ -538,6 +544,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             off.fix(&case("make", 2, Some("42"))).unwrap_err(),
@@ -681,6 +688,7 @@ mod tests {
             cases: &cases,
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             uc.explain_candidate(&SessionId::new("42")).unwrap(),

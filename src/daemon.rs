@@ -17,7 +17,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
-    FsEnvironment, HttpModels, JsonlLedger, RandomIds, SessionSecrets, Sessions, SqliteState,
+    FsEnvironment, HttpModels, JsonLearnedFixes, JsonlLedger, RandomIds, SessionSecrets, Sessions,
+    SqliteState,
     SystemClock, TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::ignored;
@@ -82,10 +83,12 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
     if let Err(e) = state.prepare() {
         log(&format!("state: {e}"));
     }
+    let learned = JsonLearnedFixes::new(&cfg.state_dir);
     let daemon = Arc::new(Daemon {
         cfg,
         state,
         sessions,
+        learned,
         ascii,
         links,
         hotkey,
@@ -123,6 +126,7 @@ struct Daemon {
     cfg: DaemonConfig,
     state: SqliteState,
     sessions: Sessions,
+    learned: JsonLearnedFixes,
     ascii: Arc<AtomicBool>,
     links: Arc<AtomicBool>,
     /// The hotkey's letter, for the subscriber renderer that outlives a
@@ -314,6 +318,7 @@ fn on_command_finished(
         cases: state,
         ignores: state,
         environment: &environment,
+        learned: &daemon.learned,
     };
     let decision = match triage.run(input) {
         Ok(decision) => decision,
@@ -508,6 +513,7 @@ fn messages<'a>(
         cases: state,
         sessions: state,
         ledger: &daemon.ledger,
+        learned: &daemon.learned,
     }
 }
 

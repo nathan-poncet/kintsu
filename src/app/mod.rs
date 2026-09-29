@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
-    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonlLedger,
-    ShellAgents, SqliteState, SystemClock, load_settings, service,
+    DEFAULT_CONFIG, DaemonClient, EnvSecrets, FsEnvironment, HookNotes, HttpModels,
+    JsonLearnedFixes, JsonlLedger, ShellAgents, SqliteState, SystemClock, load_settings, service,
 };
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
@@ -27,6 +27,7 @@ use crate::use_cases::{
 
 mod desktop;
 mod hooks;
+mod learned;
 mod models;
 mod panel;
 mod setup;
@@ -58,6 +59,9 @@ Usage:
   kintsu privacy                  what a model or an agent would receive
   kintsu ignore [--command|--dir|--session|--always] [program]
   kintsu mute [30m|1h|…]          nothing for a while (default 1h)
+  kintsu learned [--json]         the fixes you took twice, now instant rules
+  kintsu learned forget <program>|--all
+                                  unlearn them
   kintsu setup [--yes]            three questions, then the configuration file
   kintsu doctor                   check the hook, the models, the keys
   kintsu costs [--json]           what the models cost today and over 30 days
@@ -261,6 +265,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
         hotkey: settings.ui.hotkey,
     };
     let state = SqliteState::new(&rt.state_dir);
+    let learned = JsonLearnedFixes::new(&rt.state_dir);
     let environment = FsEnvironment::new(rt.path_var.clone());
     let ledger = JsonlLedger::new(&rt.state_dir);
     let session = rt.session.as_ref();
@@ -279,6 +284,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 state: &state,
                 environment: &environment,
                 style: &style,
+                learned: &learned,
             },
             *input,
             signal_pid,
@@ -291,6 +297,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 state: &state,
                 environment: &environment,
                 style: &style,
+                learned: &learned,
             },
             session,
             above,
@@ -306,6 +313,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 models: &HttpModels,
                 ledger: &ledger,
                 clock: &SystemClock,
+                learned: &learned,
             };
             match fix_last.run(session) {
                 Ok(proposal) if raw => match raw_fix(&proposal) {
@@ -374,6 +382,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 cases: &state,
                 environment: &environment,
                 launcher: &launcher,
+                learned: &learned,
             };
             let plan = match hand_off.prepare(session, with.as_deref(), words.as_deref()) {
                 Ok(plan) => plan,
@@ -385,6 +394,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 Err(e) => failure(err, &e.to_string(), &style, false),
             }
         }
+        Command::Learned(action) => learned::run(&learned, action, &style, out, err),
         Command::Privacy => match (Privacy { cases: &state }).run(session) {
             Ok(doc) => {
                 let _ = writeln!(out, "{}", privacy_report(&doc, &style));
@@ -515,6 +525,7 @@ pub(super) struct Local<'a> {
     pub(super) state: &'a SqliteState,
     pub(super) environment: &'a FsEnvironment,
     pub(super) style: &'a Style,
+    pub(super) learned: &'a JsonLearnedFixes,
 }
 
 fn silence(

@@ -6,7 +6,9 @@ use thiserror::Error;
 
 use crate::entities::{CaseId, ModelSpec, Provider, SessionId, Settings, hand_off_brief};
 use crate::use_cases::facts::rule_fix;
-use crate::use_cases::ports::{AgentError, AgentLauncher, CaseStore, CaseStoreError, Environment};
+use crate::use_cases::ports::{
+    AgentError, AgentLauncher, CaseStore, CaseStoreError, Environment, LearnedFixes,
+};
 
 /// What is about to be sent, and to whom.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +41,7 @@ pub struct HandOff<'a> {
     pub cases: &'a dyn CaseStore,
     pub environment: &'a dyn Environment,
     pub launcher: &'a dyn AgentLauncher,
+    pub learned: &'a dyn LearnedFixes,
 }
 
 impl HandOff<'_> {
@@ -52,7 +55,7 @@ impl HandOff<'_> {
     ) -> Result<HandOffPlan, HandOffError> {
         let case = self.cases.last(session)?.ok_or(HandOffError::NoCase)?;
         let agent = self.pick(agent)?;
-        let fix = rule_fix(self.environment, &case);
+        let fix = rule_fix(self.environment, self.learned, &case);
         let brief = hand_off_brief(&case, fix.as_ref(), words);
         let redactions = crate::entities::case_document(&case).redactions;
         Ok(HandOffPlan {
@@ -123,6 +126,7 @@ mod tests {
             cases: &cases,
             environment: &FakeEnvironment::with_executables(&[]),
             launcher: &launcher,
+            learned: &MemoryLearned::default(),
         };
         let plan = uc
             .prepare(Some(&SessionId::new("42")), None, Some("do not touch prod"))
@@ -150,6 +154,7 @@ mod tests {
             cases: &cases,
             environment: &env,
             launcher: &launcher,
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             uc.prepare(None, Some("codex"), None).unwrap().agent.name,
@@ -185,6 +190,7 @@ mod tests {
             cases: &cases,
             environment: &env,
             launcher: &launcher,
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             uc.prepare(None, None, None).unwrap_err(),

@@ -15,7 +15,8 @@ pub use costs::{costs_json, costs_report};
 pub use doctor::doctor_report;
 pub use models::{login_notice, models_json, models_table, probes_json, probes_report};
 pub use plain::{
-    error_line, explanation, fix_report, hand_off_notice, ignored, privacy_report, raw_fix,
+    error_line, explanation, fix_report, forgotten, hand_off_notice, ignored, learned_json,
+    learned_report, privacy_report, raw_fix,
 };
 pub use shell_hook::shell_hook;
 pub use style::{Style, screen_rows};

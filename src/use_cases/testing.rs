@@ -84,6 +84,114 @@ impl IgnoreStore for MemoryIgnores {
 }
 
 #[derive(Default)]
+pub struct MemoryLearned(pub RefCell<LearnedBook>);
+
+impl LearnedFixes for MemoryLearned {
+    fn recall(&self, shape: &FailureShape) -> Result<Option<LearnedFix>, LearnedFixesError> {
+        Ok(self.0.borrow().recall(shape).cloned())
+    }
+
+    fn accept(
+        &self,
+        shape: &FailureShape,
+        command: &CommandLine,
+        at: Timestamp,
+    ) -> Result<LearnedFix, LearnedFixesError> {
+        Ok(self.0.borrow_mut().accept(shape, command, at))
+    }
+
+    fn entries(&self) -> Result<Vec<LearnedFix>, LearnedFixesError> {
+        Ok(self.0.borrow().entries())
+    }
+
+    fn forget(&self, program: Option<&str>) -> Result<usize, LearnedFixesError> {
+        Ok(self.0.borrow_mut().forget(program))
+    }
+}
+
+/// What every `LearnedFixes` store must do, the fake and the gateways alike.
+pub fn learned_fixes_contract(store: &dyn LearnedFixes) {
+    let shape = FailureShape::new("make test", ExitStatus::new(2));
+    let fix = CommandLine::new("make -j4 test").unwrap();
+    assert_eq!(store.recall(&shape).unwrap(), None, "nothing learned yet");
+    let once = store
+        .accept(&shape, &fix, Timestamp::from_millis(1))
+        .unwrap();
+    assert_eq!(once.acceptances(), 1);
+    assert!(once.as_rule().is_none(), "once is not a rule");
+    let twice = store
+        .accept(&shape, &fix, Timestamp::from_millis(2))
+        .unwrap();
+    assert_eq!(twice.acceptances(), 2);
+    assert_eq!(
+        store
+            .recall(&shape)
+            .unwrap()
+            .unwrap()
+            .as_rule()
+            .unwrap()
+            .command(),
+        &fix
+    );
+    let other = FailureShape::new("cargo publish", ExitStatus::new(101));
+    store
+        .accept(
+            &other,
+            &CommandLine::new("cargo publish --allow-dirty").unwrap(),
+            Timestamp::from_millis(9),
+        )
+        .unwrap();
+    let lines: Vec<String> = store
+        .entries()
+        .unwrap()
+        .iter()
+        .map(|e| e.shape().line().to_string())
+        .collect();
+    assert_eq!(
+        lines,
+        ["cargo publish", "make test"],
+        "most recently taken first"
+    );
+    let restarted = store
+        .accept(
+            &shape,
+            &CommandLine::new("make -j8 test").unwrap(),
+            Timestamp::from_millis(10),
+        )
+        .unwrap();
+    assert_eq!(
+        restarted.acceptances(),
+        1,
+        "another fix for the same failure starts over"
+    );
+    assert_eq!(store.forget(Some("make")).unwrap(), 1);
+    assert_eq!(store.recall(&shape).unwrap(), None);
+    assert_eq!(store.entries().unwrap().len(), 1);
+    assert_eq!(store.forget(None).unwrap(), 1);
+    assert!(store.entries().unwrap().is_empty());
+    for i in 0..=LearnedBook::CAPACITY {
+        let shape = FailureShape::new(&format!("cmd{i}"), ExitStatus::new(1));
+        let fix = CommandLine::new(format!("cmd{i} --fixed")).unwrap();
+        store
+            .accept(&shape, &fix, Timestamp::from_millis(i as u64 + 1))
+            .unwrap();
+    }
+    assert_eq!(
+        store.entries().unwrap().len(),
+        LearnedBook::CAPACITY,
+        "bounded"
+    );
+    assert_eq!(
+        store
+            .recall(&FailureShape::new("cmd0", ExitStatus::new(1)))
+            .unwrap(),
+        None,
+        "the one not taken for longest went"
+    );
+    store.forget(None).unwrap();
+}
+
+#[derive(Default)]
 pub struct FakeEnvironment {
     pub os: Option<Os>,
     pub executables: Vec<String>,

@@ -6,7 +6,8 @@ use thiserror::Error;
 use crate::entities::{FailureCase, Fix, SessionId, Settings, Task};
 use crate::use_cases::facts::rule_fix;
 use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Clock, CostLedger, Environment, ModelError, ModelGateway, Secrets,
+    CaseStore, CaseStoreError, Clock, CostLedger, Environment, LearnedFixes, ModelError,
+    ModelGateway, Secrets,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{
@@ -42,13 +43,15 @@ pub struct FixLast<'a> {
     pub models: &'a dyn ModelGateway,
     pub ledger: &'a dyn CostLedger,
     pub clock: &'a dyn Clock,
+    pub learned: &'a dyn LearnedFixes,
 }
 
 impl FixLast<'_> {
-    /// Rules, on the line then on the output, then the proposal a model
-    /// already left: what is known without asking anyone.
+    /// Rules, on the line then on the output, then what the user taught,
+    /// then the proposal a model already left: what is known without
+    /// asking anyone.
     pub fn known(&self, case: &FailureCase) -> Option<Fix> {
-        rule_fix(self.environment, case).or_else(|| case.proposal().cloned())
+        rule_fix(self.environment, self.learned, case).or_else(|| case.proposal().cloned())
     }
 
     /// The quick-fix model that would be asked first, if one is routed and
@@ -152,6 +155,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         let typo = case("gti status", 127, Some("42"));
         assert_eq!(uc.known(&typo).unwrap().command().as_str(), "git status");
@@ -189,6 +193,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "sudo touch /etc/hosts.new");
@@ -209,6 +214,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         let proposal = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix.unwrap().command().as_str(), "git status");
@@ -228,6 +234,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "npm test -- --runInBand");
@@ -251,6 +258,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(none.run(Some(&SessionId::new("42"))).unwrap().fix, None);
         let down = FixLast {
@@ -261,6 +269,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         let proposal = down.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix, None);
@@ -339,6 +348,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap().fix,
@@ -361,6 +371,7 @@ mod tests {
             models: &models,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            learned: &MemoryLearned::default(),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap_err(),
