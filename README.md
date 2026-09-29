@@ -134,6 +134,18 @@ By hand, with a Rust toolchain ([rustup.rs](https://rustup.rs)):
 cargo install --git https://github.com/nathan-poncet/kintsu
 ```
 
+On Debian and Ubuntu, from the apt repository the site serves (`amd64` and
+`arm64`):
+
+```sh
+curl -fsSL https://nathan-poncet.github.io/kintsu/apt/kintsu.gpg | sudo tee /usr/share/keyrings/kintsu.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/kintsu.gpg] https://nathan-poncet.github.io/kintsu/apt stable main" | sudo tee /etc/apt/sources.list.d/kintsu.list
+sudo apt update && sudo apt install kintsu
+```
+
+Until the release key is published the repository is unsigned: skip the
+first line and write `[trusted=yes]` in place of `[signed-by=…]`.
+
 Then, if you skipped the hook, in your shell configuration:
 
 ```sh

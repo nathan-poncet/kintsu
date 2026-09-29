@@ -120,6 +120,9 @@
       </div>
       <div class="tab-panel" data-tab="linux" role="tabpanel">
         <div class="config"><div class="config-head"><span>Homebrew on Linux</span><span class="soon">once the tap is published</span></div><pre><code>brew install nathan-poncet/kintsu/kintsu</code></pre><p class="card-note">x86_64 and arm64, the static musl builds.</p></div>
+        <div class="config"><div class="config-head"><span>Debian, Ubuntu: apt</span><span class="now">today</span></div><pre><code>curl -fsSL https://nathan-poncet.github.io/kintsu/apt/kintsu.gpg | sudo tee /usr/share/keyrings/kintsu.gpg &gt;/dev/null
+echo "deb [signed-by=/usr/share/keyrings/kintsu.gpg] https://nathan-poncet.github.io/kintsu/apt stable main" | sudo tee /etc/apt/sources.list.d/kintsu.list
+sudo apt update &amp;&amp; sudo apt install kintsu</code></pre><p class="card-note">Packages for <code>amd64</code> and <code>arm64</code>. Until the release key is published the repository is unsigned: skip the first line and write <code>[trusted=yes]</code> in place of <code>[signed-by=…]</code>.</p></div>
         <div class="or" aria-hidden="true"><span>or</span></div>
         <div class="config"><div class="config-head"><span>prebuilt binary</span></div><pre><code>curl -fsSLO https://github.com/nathan-poncet/kintsu/releases/latest/download/kintsu-x86_64-unknown-linux-musl.tar.gz\ntar xzf kintsu-x86_64-unknown-linux-musl.tar.gz &amp;&amp; install -m 755 kintsu ~/.local/bin/</code></pre><p class="card-note">Static build, any distribution. <code>aarch64</code> too.</p></div>
       </div>

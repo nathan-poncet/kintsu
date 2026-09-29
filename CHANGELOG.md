@@ -58,6 +58,10 @@ All notable changes to kintsu are recorded here. The format follows
   release job that pushes it to the tap `nathan-poncet/homebrew-kintsu`
   on every tag when the `HOMEBREW_TAP_TOKEN` secret is set. Once the tap
   is published: `brew install nathan-poncet/kintsu/kintsu`.
+- Debian packages for `amd64` and `arm64` with every release, and an apt
+  repository served by the site: `deb [signed-by=/usr/share/keyrings/kintsu.gpg]
+  https://nathan-poncet.github.io/kintsu/apt stable main`. Signed once the
+  release key is published; `[trusted=yes]` meanwhile.
 
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
