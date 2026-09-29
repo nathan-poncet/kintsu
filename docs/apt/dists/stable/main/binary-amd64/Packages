@@ -1,0 +1,21 @@
+Package: kintsu
+Version: 0.2.0
+Architecture: amd64
+Homepage: https://github.com/nathan-poncet/kintsu
+Section: utils
+Priority: optional
+Maintainer: Nathan Poncet <112613712+nathan-poncet@users.noreply.github.com>
+Installed-Size: 5009
+Filename: pool/main/k/kintsu/kintsu_0.2.0_amd64.deb
+Size: 1837344
+MD5sum: df9adf3456c9c0a44b5b8497e28f1b86
+SHA1: 96685588978ea8fbf6fbb3d73ae013b76edfd416
+SHA256: 9fe488651db30c4df3f74e3dfb7c38cd79fe1e96e10f46513352c13a3b44db2a
+Description: When a command fails, Kintsu offers to hand it to your AI agent, in the shell
+ Any provider, your own key. Kintsu hooks your shell (zsh, bash, fish). After
+ a failed command it prints one bubble: what happened, a fix when a rule knows
+ one, and the words to ask your models or hand the case to your coding agent,
+ in your own terminal. Rules work with no configuration and nothing leaves the
+ machine. Add the hook yourself: eval "$(kintsu init zsh)" in ~/.zshrc,
+ eval "$(kintsu init bash)" in ~/.bashrc, or kintsu init fish | source in
+ ~/.config/fish/config.fish.

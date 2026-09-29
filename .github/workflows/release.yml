@@ -68,19 +68,31 @@ jobs:
           tar: unix
           zip: none
           token: ${{ secrets.GITHUB_TOKEN }}
+      # The Debian package wraps the static binary built just above; the
+      # release profile already stripped it.
+      - uses: taiki-e/install-action@cargo-deb
+        if: contains(matrix.target, 'linux')
+      - name: Debian package
+        if: contains(matrix.target, 'linux')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo deb --no-build --no-strip --target "${{ matrix.target }}"
+          ls -l target/"${{ matrix.target }}"/debian/
+          gh release upload "${GITHUB_REF_NAME}" target/"${{ matrix.target }}"/debian/kintsu_*.deb --clobber
 
   checksums:
     name: publish SHA256SUMS
     needs: binaries
     runs-on: ubuntu-latest
     steps:
-      - name: Download every archive and sum them
+      - name: Download every archive and package and sum them
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release download "${GITHUB_REF_NAME}" --pattern 'kintsu-*.tar.gz'
-          sha256sum kintsu-*.tar.gz > SHA256SUMS
+          gh release download "${GITHUB_REF_NAME}" --pattern 'kintsu-*.tar.gz' --pattern 'kintsu_*.deb'
+          sha256sum kintsu-*.tar.gz kintsu_*.deb > SHA256SUMS
           cat SHA256SUMS
           gh release upload "${GITHUB_REF_NAME}" SHA256SUMS --clobber
 
@@ -133,3 +145,49 @@ jobs:
             cat kintsu.rb
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  apt:
+    name: publish the apt repository
+    needs: checksums
+    runs-on: ubuntu-latest
+    steps:
+      # The repository lives on main under docs/apt, where GitHub Pages
+      # serves the site from; the tag's tree is not what gets committed.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Download the packages of this release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release download "${GITHUB_REF_NAME}" --pattern 'kintsu_*.deb' --dir debs
+      - name: Import the signing key, when there is one
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          if [ -z "$APT_SIGNING_KEY" ]; then
+            echo "::notice::APT_SIGNING_KEY is not set: the apt repository is published unsigned"
+            echo "## apt repository published unsigned (no APT_SIGNING_KEY secret)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
+          fingerprint=$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')
+          echo "APT_KEY=$fingerprint" >> "$GITHUB_ENV"
+      - name: Generate dists and pool
+        run: |
+          if [ -n "${APT_KEY:-}" ]; then
+            python3 scripts/apt-repo.py --root docs/apt --keep 3 --sign-key "$APT_KEY" debs/*.deb
+          else
+            python3 scripts/apt-repo.py --root docs/apt --keep 3 debs/*.deb
+          fi
+          rm -rf debs
+      - name: Commit to main
+        run: |
+          # The commit carries the identity of whoever tagged, like every other.
+          git config user.name "$(git log -1 --format=%an "${GITHUB_REF_NAME}")"
+          git config user.email "$(git log -1 --format=%ae "${GITHUB_REF_NAME}")"
+          git add docs/apt
+          git commit -m "📦 apt repository: ${GITHUB_REF_NAME}"
+          git pull --rebase origin main
+          git push origin HEAD:main
