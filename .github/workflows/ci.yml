@@ -83,6 +83,33 @@ jobs:
           sh install.sh --dry-run --no-hook --dir "$RUNNER_TEMP/kintsu-bin"
           if command -v shellcheck >/dev/null; then shellcheck -s sh install.sh; fi
 
+  shells:
+    name: hooks in real shells (pty harness)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: zsh, fish and the screen emulator
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q zsh fish
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyte
+          zsh --version; fish --version; bash --version | head -1
+      - name: Build
+        run: cargo build --locked
+      - name: Every scenario, asserted
+        env:
+          # Short: it holds a Unix socket. The harness gives the shells their
+          # own socket, state and configuration; no user's daemon is reached.
+          ROOT: /tmp/kintsu-ci
+          BIN: ${{ github.workspace }}/target/debug
+          # A runner is slower than a laptop: every wait is doubled.
+          SLOW: "2"
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" scripts/shell-harness.py --check
+
   coverage:
     name: coverage ≥ 90 % of lines
     runs-on: ubuntu-latest
