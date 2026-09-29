@@ -381,3 +381,21 @@ fn a_broken_config_is_reported_and_triage_still_works() {
     assert_eq!(code, ExitCode::from(2));
     assert!(err.starts_with("kintsu: unknown command `frobnicate`"));
 }
+
+#[test]
+fn learned_lists_nothing_at_first_and_forgets_on_request() {
+    let b = Bench::new("learned");
+    let (code, out, _) = b.run(&["learned"], None);
+    assert_eq!(code, ExitCode::SUCCESS);
+    assert!(out.contains("Nothing learned yet"), "{out}");
+    let (code, out, _) = b.run(&["learned", "--json"], None);
+    assert_eq!((code, out.trim()), (ExitCode::SUCCESS, "[]"));
+    let (code, out, _) = b.run(&["learned", "forget", "--all"], None);
+    assert_eq!(
+        (code, out.as_str()),
+        (ExitCode::SUCCESS, "▎ Nothing learned.\n")
+    );
+    let (code, _, err) = b.run(&["learned", "forget"], None);
+    assert_eq!(code, ExitCode::from(2));
+    assert!(err.contains("needs a value"), "{err}");
+}

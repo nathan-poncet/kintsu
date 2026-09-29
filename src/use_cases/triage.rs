@@ -7,13 +7,13 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 use crate::entities::{
-    CommandLine, CommandOutcome, FailureCase, QuietReason, Session, SessionId, Settings, Shell,
-    TerminalIdentity, TriageDecision, suggest_fix,
+    CommandLine, CommandOutcome, FailureCase, FailureShape, QuietReason, Session, SessionId,
+    Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal, suggest_fix,
 };
-use crate::use_cases::facts::gather_facts;
+use crate::use_cases::facts::{gather_facts, learned_fix};
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, Environment, IdGenerator, IgnoreStore, IgnoreStoreError,
-    RegistryError, SessionRegistry,
+    LearnedFixes, RegistryError, SessionRegistry,
 };
 
 /// What the hook reports.
@@ -61,6 +61,7 @@ pub struct Triage<'a> {
     pub cases: &'a dyn CaseStore,
     pub ignores: &'a dyn IgnoreStore,
     pub environment: &'a dyn Environment,
+    pub learned: &'a dyn LearnedFixes,
 }
 
 impl Triage<'_> {
@@ -72,6 +73,9 @@ impl Triage<'_> {
         let outcome = &input.outcome;
         let status = outcome.status();
         if status.is_success() {
+            if let Some(failed) = previous.filter(|p| !p.status().is_success()) {
+                self.learn(&input, &failed);
+            }
             return Ok(TriageDecision::Quiet(QuietReason::Succeeded));
         }
         if status.is_interruption() {
@@ -106,13 +110,34 @@ impl Triage<'_> {
             .with_session(input.session.clone())
             .with_recent(recent);
         let facts = gather_facts(self.environment, case.outcome(), case.cwd());
-        let fix = suggest_fix(case.outcome(), &facts);
+        let fix = suggest_fix(case.outcome(), &facts)
+            .or_else(|| learned_fix(self.learned, case.outcome()));
         let case = case.with_proposal(fix.clone());
         self.cases.save(&case)?;
         Ok(TriageDecision::Offer {
             case: Box::new(case),
             fix,
         })
+    }
+
+    /// A success right after a failure: when the shell's last case is that
+    /// failure and this is its proposal, the user took it. The case is read
+    /// only then, so a plain success costs nothing; a store that cannot be
+    /// read or written loses one lesson, not the decision.
+    fn learn(&self, input: &TriageInput, failed: &CommandOutcome) {
+        let Ok(Some(case)) = self.cases.last(input.session.as_ref()) else {
+            return;
+        };
+        if case.outcome().fingerprint() != failed.fingerprint() {
+            return;
+        }
+        if let Some(fix) = accepted_proposal(&case, &input.outcome) {
+            let _ = self.learned.accept(
+                &FailureShape::of(case.outcome()),
+                fix.command(),
+                self.clock.now(),
+            );
+        }
     }
 
     /// Appends the outcome to its session; returns what ran just before
@@ -161,6 +186,7 @@ mod tests {
         cases: MemoryCases,
         ignores: MemoryIgnores,
         environment: FakeEnvironment,
+        learned: MemoryLearned,
     }
 
     impl World {
@@ -173,6 +199,7 @@ mod tests {
                 cases: MemoryCases::default(),
                 ignores: MemoryIgnores::default(),
                 environment: FakeEnvironment::with_executables(&["git", "make", "cargo"]),
+                learned: MemoryLearned::default(),
             }
         }
 
@@ -185,6 +212,7 @@ mod tests {
                 cases: &self.cases,
                 ignores: &self.ignores,
                 environment: &self.environment,
+                learned: &self.learned,
             }
         }
 
@@ -323,6 +351,72 @@ mod tests {
         assert_eq!(fix.command().as_str(), "git status");
         assert_eq!(fix.source(), &FixSource::Rule("command typo".into()));
         assert_eq!(w.environment.path_reads.get(), 1);
+    }
+
+    fn model_proposal(text: &str) -> crate::entities::Fix {
+        crate::entities::Fix::new(
+            CommandLine::new(text).unwrap(),
+            crate::entities::Confidence::new(0.6),
+            FixSource::Model("local".into()),
+            "",
+        )
+    }
+
+    #[test]
+    fn a_proposal_taken_twice_is_offered_as_a_rule_the_third_time_with_no_model() {
+        let w = World::new();
+        for _ in 0..2 {
+            let TriageDecision::Offer { case, fix } = w.run("make test", 2) else {
+                panic!("a failure no rule knows is offered")
+            };
+            assert!(fix.is_none(), "no rule knows make");
+            // The model's answer lands later and is kept with the case.
+            w.cases
+                .save(&(*case).with_proposal(Some(model_proposal("make -j4 test"))))
+                .unwrap();
+            assert_eq!(
+                w.run("make -j4 test", 0),
+                TriageDecision::Quiet(QuietReason::Succeeded)
+            );
+        }
+        match w.run("make test", 2) {
+            TriageDecision::Offer {
+                fix: Some(fix),
+                case,
+            } => {
+                assert_eq!(fix.command().as_str(), "make -j4 test");
+                assert_eq!(fix.source(), &FixSource::Rule("learned".into()));
+                assert!(fix.is_ghostable(), "sure enough to pre-type");
+                assert_eq!(case.proposal(), Some(&fix), "kept with the case");
+            }
+            other => panic!("the learned fix, instantly: {other:?}"),
+        }
+        assert_eq!(w.learned.0.borrow().entries()[0].acceptances(), 2);
+    }
+
+    #[test]
+    fn a_success_that_is_not_the_proposal_or_does_not_follow_the_failure_teaches_nothing() {
+        let w = World::new();
+        let TriageDecision::Offer { case, .. } = w.run("make test", 2) else {
+            panic!("offered")
+        };
+        w.cases
+            .save(&(*case).with_proposal(Some(model_proposal("make -j4 test"))))
+            .unwrap();
+        w.run("make -j8 test", 0);
+        assert!(
+            w.learned.0.borrow().entries().is_empty(),
+            "another command was typed"
+        );
+        w.run("make -j4 test", 0);
+        assert!(
+            w.learned.0.borrow().entries().is_empty(),
+            "the proposal, but after a success, not right after the failure"
+        );
+        assert!(matches!(
+            w.run("make test", 2),
+            TriageDecision::Offer { fix: None, .. }
+        ));
     }
 
     #[test]

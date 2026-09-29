@@ -39,6 +39,15 @@ pub enum ServiceAction {
     Uninstall,
 }
 
+/// What `kintsu learned` asks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LearnedAction {
+    /// `kintsu learned [--json]`: the fixes taken twice.
+    List { json: bool },
+    /// `kintsu learned forget <program>` or `--all`.
+    Forget { program: Option<String> },
+}
+
 /// What the user or a hook asked the binary to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
@@ -90,6 +99,8 @@ pub enum Command {
     },
     /// `kintsu mute [duration]`.
     Mute(Duration),
+    /// `kintsu learned [--json]`, `kintsu learned forget <program>|--all`.
+    Learned(LearnedAction),
     /// `kintsu doctor`.
     Doctor,
     /// `kintsu costs [--json]`: what the models cost today and this month.
@@ -192,6 +203,7 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["mute", text] => parse_duration(text)
             .map(Command::Mute)
             .ok_or_else(|| CliError::InvalidDuration((*text).to_string())),
+        ["learned", rest @ ..] => parse_learned(rest),
         ["doctor"] => Ok(Command::Doctor),
         ["costs"] => Ok(Command::Costs { json: false }),
         ["costs", "--json"] => Ok(Command::Costs { json: true }),
@@ -365,6 +377,27 @@ fn parse_ignore(rest: &[&str]) -> Result<Command, CliError> {
     Ok(Command::Ignore { program, scope })
 }
 
+fn parse_learned(rest: &[&str]) -> Result<Command, CliError> {
+    let action = match rest {
+        [] => LearnedAction::List { json: false },
+        ["--json"] => LearnedAction::List { json: true },
+        ["forget", "--all"] => LearnedAction::Forget { program: None },
+        ["forget"] => {
+            return Err(CliError::MissingValue(
+                "learned forget <program>|--all".into(),
+            ));
+        }
+        ["forget", flag] if flag.starts_with('-') => {
+            return Err(CliError::UnknownFlag((*flag).to_string()));
+        }
+        ["forget", program] => LearnedAction::Forget {
+            program: Some((*program).to_string()),
+        },
+        [other, ..] => return Err(CliError::UnknownFlag((*other).to_string())),
+    };
+    Ok(Command::Learned(action))
+}
+
 /// `90s`, `30m`, `1h`, `1h30m`, or bare minutes.
 pub fn parse_duration(text: &str) -> Option<Duration> {
     let text = text.trim();
@@ -405,6 +438,40 @@ mod tests {
             Command::Triage { input, .. } => *input,
             other => panic!("expected triage, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn learned_lists_forgets_by_program_or_all_and_refuses_the_rest() {
+        assert_eq!(
+            parse_args(["learned"]).unwrap(),
+            Command::Learned(LearnedAction::List { json: false })
+        );
+        assert_eq!(
+            parse_args(["learned", "--json"]).unwrap(),
+            Command::Learned(LearnedAction::List { json: true })
+        );
+        assert_eq!(
+            parse_args(["learned", "forget", "make"]).unwrap(),
+            Command::Learned(LearnedAction::Forget {
+                program: Some("make".into())
+            })
+        );
+        assert_eq!(
+            parse_args(["learned", "forget", "--all"]).unwrap(),
+            Command::Learned(LearnedAction::Forget { program: None })
+        );
+        assert!(matches!(
+            parse_args(["learned", "forget"]),
+            Err(CliError::MissingValue(_))
+        ));
+        assert!(matches!(
+            parse_args(["learned", "--verbose"]),
+            Err(CliError::UnknownFlag(_))
+        ));
+        assert!(matches!(
+            parse_args(["learned", "forget", "--never"]),
+            Err(CliError::UnknownFlag(_))
+        ));
     }
 
     #[test]

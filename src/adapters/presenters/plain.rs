@@ -1,6 +1,8 @@
 //! What the commands print: fix, why, agent, ignore, privacy, errors.
 
-use crate::entities::{CaseDocument, Danger, FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget};
+use crate::entities::{
+    CaseDocument, Danger, FixSource, IgnoreEntry, IgnoreScope, IgnoreTarget, LearnedFix,
+};
 use crate::use_cases::{Explained, FixProposal, HandOffPlan};
 
 use super::Style;
@@ -148,6 +150,63 @@ pub fn error_line(message: &str, style: &Style) -> String {
     style.line(&format!("kintsu: {message}"))
 }
 
+/// `kintsu learned`: the fixes taken twice, most recently taken first.
+pub fn learned_report(entries: &[LearnedFix], style: &Style) -> String {
+    if entries.is_empty() {
+        return style.line(&style.dim(
+            "Nothing learned yet: a fix you take twice for the same failure becomes a rule.",
+        ));
+    }
+    let mut lines: Vec<String> = entries
+        .iter()
+        .map(|entry| {
+            let taken = match entry.acceptances() {
+                1 => "taken once, a rule from twice".to_string(),
+                n => format!("taken {n} times"),
+            };
+            style.line(&format!(
+                "{} {}: {}{}{}",
+                style.bold(entry.shape().line()),
+                style.dim(&format!("exited {}", entry.shape().status().code())),
+                entry.command(),
+                style.dot(),
+                style.dim(&taken)
+            ))
+        })
+        .collect();
+    lines.push(style.line(&style.dim("kintsu learned forget <program>, or --all, to unlearn.")));
+    lines.join("\n")
+}
+
+/// `kintsu learned --json`: the same, for programs.
+pub fn learned_json(entries: &[LearnedFix]) -> String {
+    let items: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|entry| {
+            serde_json::json!({
+                "command": entry.shape().line(),
+                "status": entry.shape().status().code(),
+                "fix": entry.command().as_str(),
+                "acceptances": entry.acceptances(),
+                "last_accepted_ms": entry.last_accepted().as_millis(),
+                "rule": entry.as_rule().is_some(),
+            })
+        })
+        .collect();
+    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".into())
+}
+
+/// `kintsu learned forget`: what went.
+pub fn forgotten(count: usize, program: Option<&str>, style: &Style) -> String {
+    let scope = program.map_or(String::new(), |p| format!(" for {}", style.bold(p)));
+    let text = match count {
+        0 => format!("Nothing learned{scope}."),
+        1 => format!("Forgot 1 learned fix{scope}."),
+        n => format!("Forgot {n} learned fixes{scope}."),
+    };
+    style.line(&text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,6 +327,38 @@ mod tests {
         };
         let text = hand_off_notice(&plan, &Style::PLAIN);
         assert!(text.starts_with("| Handing this to codex: command, status, directory, recent commands (redacted: 1 secret)."));
+    }
+
+    #[test]
+    fn learned_fixes_read_as_a_list_a_json_array_and_a_farewell() {
+        use crate::entities::{CommandLine, ExitStatus, FailureShape, LearnedFix, Timestamp};
+        assert!(learned_report(&[], &Style::PLAIN).contains("Nothing learned yet"));
+        let once = LearnedFix::first(
+            FailureShape::new("make test", ExitStatus::new(2)),
+            CommandLine::new("make -j4 test").unwrap(),
+            Timestamp::from_millis(1),
+        );
+        let twice = once.clone().accepted(Timestamp::from_millis(2));
+        let report = learned_report(&[twice.clone(), once], &Style::PLAIN);
+        assert!(
+            report.starts_with("| make test exited 2: make -j4 test - taken 2 times\n"),
+            "{report}"
+        );
+        assert!(report.contains("taken once, a rule from twice"));
+        assert!(report.ends_with("to unlearn."));
+        let json: serde_json::Value = serde_json::from_str(&learned_json(&[twice])).unwrap();
+        assert_eq!(json[0]["fix"], "make -j4 test");
+        assert_eq!(json[0]["acceptances"], 2);
+        assert_eq!(json[0]["rule"], true);
+        assert_eq!(forgotten(0, None, &Style::PLAIN), "| Nothing learned.");
+        assert_eq!(
+            forgotten(1, Some("make"), &Style::PLAIN),
+            "| Forgot 1 learned fix for make."
+        );
+        assert_eq!(
+            forgotten(3, None, &Style::PLAIN),
+            "| Forgot 3 learned fixes."
+        );
     }
 
     #[test]

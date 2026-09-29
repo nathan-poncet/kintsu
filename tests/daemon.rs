@@ -750,3 +750,63 @@ fn the_shells_copy_of_stderr_feeds_the_capture_and_the_rules_that_read_it() {
         "{doctor}"
     );
 }
+
+#[test]
+fn a_fix_taken_twice_becomes_an_instant_rule_and_the_model_is_not_asked_again() {
+    let port = fake_ollama("make -j4 test");
+    let config = format!(
+        "[models.local]\nprovider = \"ollama\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\n[routing]\nquick_fix = [\"local\"]\n[ui]\neager_fix = true\n"
+    );
+    let mut f = Fixture::new("learned", &config);
+    f.start_daemon();
+    for _ in 0..2 {
+        let offered = f.exchange(
+            r#"{"v":1,"type":"command_finished","session":"s5","command":"make test","status":2,"cwd":"/"}"#,
+        );
+        assert_eq!(offered[0]["offer"]["fix"], serde_json::Value::Null);
+        assert_eq!(offered[0]["pending"], "local", "the model is asked");
+        // The model's fix is kept with the case before it is delivered; the
+        // bubble waiting for the shell says it landed.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut landed = false;
+        while Instant::now() < deadline && !landed {
+            std::thread::sleep(Duration::from_millis(50));
+            landed = f
+                .exchange(r#"{"v":1,"type":"pending","session":"s5"}"#)
+                .iter()
+                .any(|frame| {
+                    frame["text"]
+                        .as_str()
+                        .is_some_and(|t| t.contains("make -j4 test"))
+                });
+        }
+        assert!(landed, "the model's fix never arrived");
+        let taken = f.exchange(
+            r#"{"v":1,"type":"command_finished","session":"s5","command":"make -j4 test","status":0,"cwd":"/"}"#,
+        );
+        assert_eq!(taken[0]["quiet"], "succeeded");
+    }
+    let third = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"s5","command":"make test","status":2,"cwd":"/"}"#,
+    );
+    assert_eq!(
+        third[0]["offer"]["fix"], "make -j4 test",
+        "taken twice: a rule now"
+    );
+    assert_eq!(
+        third[0]["pending"],
+        serde_json::Value::Null,
+        "no model asked"
+    );
+    let (code, out, _) = f.run(&["learned"], None);
+    assert_eq!(code, 0);
+    assert!(
+        out.contains("make test exited 2: make -j4 test") && out.contains("taken 2 times"),
+        "{out}"
+    );
+    let (code, out, _) = f.run(&["learned", "forget", "make"], None);
+    assert_eq!(
+        (code, out.as_str()),
+        (0, "▎ Forgot 1 learned fix for make.\n")
+    );
+}
