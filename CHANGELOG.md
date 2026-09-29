@@ -64,8 +64,9 @@ All notable changes to kintsu are recorded here. The format follows
   release key is published; `[trusted=yes]` meanwhile.
 - The shell harness has a `--check` mode that asserts what each scenario
   shows (the bubble, the answer landing while typing, the late answer
-  naming its command, ghost text and Tab, the panel's keys) in real zsh,
-  fish and bash, and CI runs it. Between scenarios it stops its own daemon
+  naming its command, ghost text and Tab, the panel's keys and its
+  streamed explanation, the stderr tee's copy) in real zsh, fish and
+  bash, and CI runs it. Between scenarios it stops its own daemon
   only, never the one on your machine.
 - `[daemon] sync_budget` is read: how long the hook waits for the daemon's
   decision before deciding locally, 40 ms by default. The configuration
