@@ -155,6 +155,7 @@ The commands, all about the last failure of the current shell:
 | `kintsu privacy` | exactly what a model or an agent would receive, secrets masked |
 | `kintsu ignore [--command\|--dir\|--session\|--always] [program]` | quiet for that command line, or that program here / in this shell / everywhere |
 | `kintsu mute [1h]` | nothing for a while |
+| `kintsu learned [--json]`, `learned forget <program>|--all` | the fixes you took twice for the same failure, now instant rules; and unlearning them |
 | `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
 | `kintsu costs [--json]` | what the models cost today and over the last thirty days, per model, against `max_daily_cost` |
 | `kintsu models [test] [--json]` | every configured model: provider, tier, whether its key is found and where, whether its server answers; `test` asks each one word and times it |
