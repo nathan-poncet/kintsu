@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use crate::adapters::gateways::tty_panel;
 use crate::adapters::gateways::{
-    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState, SystemClock,
+    EnvSecrets, FsEnvironment, HookNotes, HttpModels, JsonState, JsonlLedger, SystemClock,
 };
 use crate::adapters::presenters::panel::{Arrival, Ask, Effect, Panel};
 use crate::adapters::presenters::{Style, ignored, privacy_report};
@@ -51,12 +51,15 @@ pub(super) fn expand(
         Err(e) => return failure(err, &e.to_string(), style, false),
     };
     let bubble = session.and_then(|s| HookNotes::new(&rt.state_dir).bubble(s).ok().flatten());
+    let ledger = JsonlLedger::new(&rt.state_dir);
     let fix_last = FixLast {
         settings,
         cases: state,
         environment,
         secrets: &EnvSecrets,
         models: &HttpModels,
+        ledger: &ledger,
+        clock: &SystemClock,
     };
     let known = fix_last.known(&case);
     let can_ask_fix = fix_last.candidate(&case).is_some();
@@ -150,6 +153,7 @@ impl Asker {
         let session = self.session.clone();
         std::thread::spawn(move || {
             let state = JsonState::new(&state_dir);
+            let ledger = JsonlLedger::new(&state_dir);
             match ask {
                 Ask::Explain => {
                     let explain = Explain {
@@ -157,6 +161,8 @@ impl Asker {
                         cases: &state,
                         secrets: &EnvSecrets,
                         models: &HttpModels,
+                        ledger: &ledger,
+                        clock: &SystemClock,
                     };
                     match explain.candidate(session.as_ref()) {
                         Ok(model) => {
@@ -188,6 +194,8 @@ impl Asker {
                         environment: &environment,
                         secrets: &EnvSecrets,
                         models: &HttpModels,
+                        ledger: &ledger,
+                        clock: &SystemClock,
                     };
                     if let Ok(Some(case)) = state.last(session.as_ref())
                         && let Some(model) = fix_last.candidate(&case)

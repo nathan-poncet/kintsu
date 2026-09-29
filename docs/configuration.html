@@ -170,7 +170,7 @@ summarize = <span class="s">"2s"</span></code></pre>
 sensitive_output = <span class="s">"local_only"</span>       <span class="c"># redaction found a secret in the command or the output</span>
 offline          = <span class="s">"local_only"</span>       <span class="c"># no network: nothing is even attempted</span>
 private_paths    = [<span class="s">"~/work/acme/**"</span>, <span class="s">"~/secrets/**"</span>]   <span class="c"># cases from these directories are local only</span>
-max_daily_cost   = <span class="s">"1.00 USD"</span>         <span class="c"># past it, paid candidates are skipped until midnight</span>
+max_daily_cost   = <span class="s">"1.00 USD"</span>         <span class="c"># past it, remote models are skipped until midnight UTC; local ones never are</span>
 max_case_lines   = 400                 <span class="c"># longer output is summarized first, or truncated</span></code></pre>
     </div>
     <table class="ref">
@@ -179,7 +179,7 @@ max_case_lines   = 400                 <span class="c"># longer output is summar
         <tr><td><code>sensitive_output</code></td><td><code>"local_only"</code> · <code>"ask"</code> · <code>"allow"</code></td><td>default <code>local_only</code>. <code>ask</code> shows the Privacy tab before any cloud call.</td></tr>
         <tr><td><code>offline</code></td><td><code>"local_only"</code></td><td>the only supported value.</td></tr>
         <tr><td><code>private_paths</code></td><td>globs</td><td>a case whose cwd matches is treated as sensitive.</td></tr>
-        <tr><td><code>max_daily_cost</code></td><td>an amount</td><td>tracked from the providers' token counts.</td></tr>
+        <tr><td><code>max_daily_cost</code></td><td>an amount in USD, <code>"1.00 USD"</code></td><td>tracked from the providers' token counts at list price, in <code>&lt;state&gt;/ledger.jsonl</code>. Once today's calls reach it, remote models are skipped until midnight UTC and local ones keep answering; the shell is told once. <code>kintsu costs</code> shows the ledger.</td></tr>
         <tr><td><code>max_case_lines</code></td><td>an integer</td><td>the <code>summarize</code> task runs first when exceeded.</td></tr>
       </tbody>
     </table>

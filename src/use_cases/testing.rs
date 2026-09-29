@@ -148,6 +148,8 @@ pub struct ScriptedModels {
     pub calls: RefCell<Vec<(String, Option<String>, Prompt)>>,
     /// Models whose server is not running.
     pub down: Vec<String>,
+    /// The tokens each model reports for an answer.
+    pub usage: HashMap<String, Tokens>,
 }
 
 impl ScriptedModels {
@@ -159,7 +161,14 @@ impl ScriptedModels {
                 .collect(),
             calls: RefCell::default(),
             down: Vec::new(),
+            usage: HashMap::new(),
         }
+    }
+
+    /// The same, with the tokens each model reports.
+    pub fn counting(mut self, pairs: &[(&str, Tokens)]) -> Self {
+        self.usage = pairs.iter().map(|(n, t)| (n.to_string(), *t)).collect();
+        self
     }
 
     pub fn asked(&self) -> Vec<String> {
@@ -210,6 +219,92 @@ impl ModelGateway for ScriptedModels {
         }
         Ok(answer)
     }
+
+    fn answer(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+    ) -> Result<Answer, ModelError> {
+        let text = self.complete(spec, key, prompt)?;
+        Ok(Answer {
+            text,
+            tokens: self.usage.get(&spec.name).copied().unwrap_or_default(),
+        })
+    }
+}
+
+/// Every call kept in memory; a day's budget note too.
+#[derive(Default)]
+pub struct MemoryLedger {
+    pub entries: RefCell<Vec<LedgerEntry>>,
+    pub noted: RefCell<Vec<Day>>,
+}
+
+impl CostLedger for MemoryLedger {
+    fn record(&self, entry: &LedgerEntry) -> Result<(), LedgerError> {
+        self.entries.borrow_mut().push(entry.clone());
+        Ok(())
+    }
+
+    fn since(&self, from: Timestamp) -> Result<Vec<LedgerEntry>, LedgerError> {
+        Ok(self
+            .entries
+            .borrow()
+            .iter()
+            .filter(|e| e.at >= from)
+            .cloned()
+            .collect())
+    }
+
+    fn budget_noted(&self, day: Day) -> Result<bool, LedgerError> {
+        Ok(self.noted.borrow().contains(&day))
+    }
+
+    fn note_budget(&self, day: Day) -> Result<(), LedgerError> {
+        self.noted.borrow_mut().push(day);
+        Ok(())
+    }
+}
+
+/// What every `CostLedger` must do, run against an empty one.
+pub fn cost_ledger_contract(ledger: &dyn CostLedger) {
+    let entry = |at: u64, model: &str| LedgerEntry {
+        at: Timestamp::from_millis(at),
+        model: model.into(),
+        task: Task::QuickFix,
+        tokens: Tokens::new(120, 30),
+        cost: (model != "mystery").then_some(Money::from_micro_usd(at)),
+        latency: Duration::from_millis(250),
+    };
+    assert!(ledger.since(Timestamp::from_millis(0)).unwrap().is_empty());
+    ledger.record(&entry(1_000, "haiku")).unwrap();
+    ledger.record(&entry(2_000, "mystery")).unwrap();
+    ledger.record(&entry(3_000, "haiku")).unwrap();
+    let all = ledger.since(Timestamp::from_millis(0)).unwrap();
+    assert_eq!(
+        all,
+        vec![
+            entry(1_000, "haiku"),
+            entry(2_000, "mystery"),
+            entry(3_000, "haiku")
+        ],
+        "oldest first, every field kept"
+    );
+    assert_eq!(all[1].cost, None, "an unpriced call stays unpriced");
+    assert_eq!(
+        ledger.since(Timestamp::from_millis(2_000)).unwrap().len(),
+        2,
+        "from is inclusive"
+    );
+    let today = Day::from_index(20_724);
+    assert!(!ledger.budget_noted(today).unwrap());
+    ledger.note_budget(today).unwrap();
+    assert!(ledger.budget_noted(today).unwrap());
+    assert!(
+        !ledger.budget_noted(today.minus(1)).unwrap(),
+        "one day at a time"
+    );
 }
 
 #[derive(Default)]

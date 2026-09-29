@@ -761,9 +761,33 @@ panel closes, its channel closes and the rest of the stream is dropped.
 Streaming is not "impl Future": the gateway was blocking and stays so,
 the panel's thread is where the waiting happens.
 
+## 32. The cost ledger and the daily budget (2026-09-29)
+
+Every model call goes through `routing::ask_first`, so that is where it is
+metered: the gateways answer with the tokens the provider counted (a new
+`answer` method on the `ModelGateway` port, additive; `complete` stays for
+callers that want the text alone), and a `CostLedger` port keeps one line
+per call in `<state>/ledger.jsonl`. Cost is the provider's list price for
+the model ids we know (a dated table in `entities/cost.rs`), zero for a
+local model, and *unknown* otherwise: never zero for a model we cannot
+price, so `kintsu costs` says "price unknown" rather than "free". Money is
+micro-dollars, USD only, validated at the edge (`"1.00 USD"`, `"$2"`,
+anything else is a configuration error). A day is a UTC day, because the
+entities have no clock and no time zone; the documentation says midnight
+UTC. `max_daily_cost` lives under `[routing.constraints]`, where the
+configuration page always had it, not under `[routing]`. Once today's
+priced spend reaches it, `model_candidates` drops the remote models the
+way it drops them for a sensitive case; local models are never skipped.
+The eager fix tells the shell once a day, through a `budget_noted` line in
+the ledger; `kintsu fix` and `kintsu why` say it every time, in their own
+report. A ledger that cannot be written never costs the user the answer
+it just paid for, and one that cannot be read counts as empty: the budget
+is a comfort, not a lock. Failed calls are not recorded: the providers
+report no usage for them.
+
 ## What is not built, by priority
 
 1. SQLite behind the three storage ports; the pty harness in CI.
 2. `kintsu models` and `kintsu login` (pending); learning rules from
-   accepted fixes; the cost ledger; budgets.
+   accepted fixes.
 3. A Homebrew tap and an apt repository.

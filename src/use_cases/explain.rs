@@ -3,11 +3,16 @@
 
 use thiserror::Error;
 
-use crate::entities::{Explanation, FailureCase, ModelSpec, SessionId, Settings, case_document};
-use crate::use_cases::ports::{CaseStore, CaseStoreError, ModelError, ModelGateway, Secrets};
+use crate::entities::{
+    Explanation, FailureCase, ModelSpec, SessionId, Settings, Task, case_document,
+};
+use crate::use_cases::ports::{
+    CaseStore, CaseStoreError, Clock, CostLedger, ModelError, ModelGateway, Secrets,
+};
 use crate::use_cases::prompts::explain_prompt;
 use crate::use_cases::routing::{
-    ask_first, ask_first_streaming, excluded_for_sensitivity, model_candidates,
+    Meter, ask_first, ask_first_streaming, excluded_for_budget, excluded_for_sensitivity,
+    model_candidates, over_budget,
 };
 
 /// An explanation and where it came from.
@@ -29,6 +34,10 @@ pub enum ExplainError {
     NoModel,
     #[error("this case holds a secret and only local models may see it; none is configured")]
     SensitiveWithoutLocalModel,
+    #[error(
+        "today's model budget is spent; remote models wait for midnight UTC and no local model is routed"
+    )]
+    BudgetReached,
     #[error("no model answered ({})", .0.iter().map(|(n, e)| format!("{n}: {e}")).collect::<Vec<_>>().join("; "))]
     AllFailed(Vec<(String, ModelError)>),
     #[error(transparent)]
@@ -41,6 +50,8 @@ pub struct Explain<'a> {
     pub cases: &'a dyn CaseStore,
     pub secrets: &'a dyn Secrets,
     pub models: &'a dyn ModelGateway,
+    pub ledger: &'a dyn CostLedger,
+    pub clock: &'a dyn Clock,
 }
 
 impl Explain<'_> {
@@ -51,10 +62,13 @@ impl Explain<'_> {
     ) -> Result<(FailureCase, Vec<&ModelSpec>), ExplainError> {
         let case = self.cases.last(session)?.ok_or(ExplainError::NoCase)?;
         let names = &self.settings.routing.explain;
-        let candidates = model_candidates(self.settings, names, &case);
+        let over = over_budget(self.settings, self.ledger, self.clock);
+        let candidates = model_candidates(self.settings, names, &case, over);
         if candidates.is_empty() {
             return Err(if excluded_for_sensitivity(self.settings, names, &case) {
                 ExplainError::SensitiveWithoutLocalModel
+            } else if excluded_for_budget(self.settings, names, over) {
+                ExplainError::BudgetReached
             } else {
                 ExplainError::NoModel
             });
@@ -78,6 +92,7 @@ impl Explain<'_> {
             self.secrets,
             &candidates,
             &explain_prompt(&case),
+            &self.meter(),
         );
         self.keep(case, answered)
     }
@@ -96,9 +111,18 @@ impl Explain<'_> {
             self.secrets,
             &candidates,
             &explain_prompt(&case),
+            &self.meter(),
             on_chunk,
         );
         self.keep(case, answered)
+    }
+
+    fn meter(&self) -> Meter<'_> {
+        Meter {
+            ledger: self.ledger,
+            clock: self.clock,
+            task: Task::Explain,
+        }
     }
 
     fn keep(
@@ -128,7 +152,7 @@ impl Explain<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{Provider, Routing, Tier};
+    use crate::entities::{Duration, LedgerEntry, Money, Provider, Routing, Tier, Tokens};
     use crate::use_cases::testing::*;
 
     fn settings(explain: &[&str]) -> Settings {
@@ -157,6 +181,8 @@ mod tests {
             cases: &cases,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let e = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(
@@ -180,6 +206,8 @@ mod tests {
             cases: &cases,
             secrets: &secrets,
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(none.run(None).unwrap_err(), ExplainError::NoCase);
         cases.save(&case("make", 2, None)).unwrap();
@@ -188,6 +216,8 @@ mod tests {
             cases: &cases,
             secrets: &secrets,
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(unconfigured.run(None).unwrap_err(), ExplainError::NoModel);
         assert!(matches!(none.run(None).unwrap_err(), ExplainError::AllFailed(f) if f.len() == 1));
@@ -208,6 +238,8 @@ mod tests {
             cases: &cases,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         uc.run(Some(&SessionId::new("42"))).unwrap();
         let kept = cases.last(Some(&SessionId::new("42"))).unwrap().unwrap();
@@ -230,6 +262,8 @@ mod tests {
             cases: &cases,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let mut pieces = Vec::new();
         let e = uc
@@ -248,6 +282,50 @@ mod tests {
     }
 
     #[test]
+    fn once_the_budget_is_spent_remote_models_wait_and_local_ones_still_answer() {
+        let cases = MemoryCases::default();
+        cases.save(&case("make", 2, Some("42"))).unwrap();
+        let ledger = MemoryLedger::default();
+        let clock = FakeClock::at(1_790_637_207_000);
+        ledger
+            .record(&LedgerEntry {
+                at: clock.now(),
+                model: "cloud".into(),
+                task: Task::Explain,
+                tokens: Tokens::new(1, 1),
+                cost: Some(Money::from_micro_usd(1_000)),
+                latency: Duration::from_millis(1),
+            })
+            .unwrap();
+        let mut remote_only = settings(&["cloud"]);
+        remote_only.max_daily_cost = Some(Money::from_micro_usd(1_000));
+        let models = ScriptedModels::answering(&[
+            ("cloud", Ok("from the cloud")),
+            ("local", Ok("from here")),
+        ]);
+        let uc = Explain {
+            settings: &remote_only,
+            cases: &cases,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            ledger: &ledger,
+            clock: &clock,
+        };
+        assert_eq!(
+            uc.run(Some(&SessionId::new("42"))).unwrap_err(),
+            ExplainError::BudgetReached
+        );
+        let mut with_local = settings(&["cloud", "local"]);
+        with_local.max_daily_cost = Some(Money::from_micro_usd(1_000));
+        let uc = Explain {
+            settings: &with_local,
+            ..uc
+        };
+        assert_eq!(uc.run(Some(&SessionId::new("42"))).unwrap().model, "local");
+        assert_eq!(models.asked(), vec!["local"]);
+    }
+
+    #[test]
     fn the_candidate_is_named_without_asking_anything() {
         let cases = MemoryCases::default();
         cases.save(&case("make", 2, Some("42"))).unwrap();
@@ -257,6 +335,8 @@ mod tests {
             cases: &cases,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(uc.candidate(Some(&SessionId::new("42"))).unwrap(), "cloud");
         assert_eq!(

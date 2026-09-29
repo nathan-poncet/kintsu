@@ -2,7 +2,8 @@
 //! principle, are the keys where the configuration says.
 
 use crate::entities::{KeySource, Provider, SessionId, Settings, Shell};
-use crate::use_cases::ports::{Environment, ModelGateway, Secrets};
+use crate::use_cases::ports::{Clock, CostLedger, Environment, ModelGateway, Secrets};
+use crate::use_cases::routing::spent_today;
 
 /// How a check went.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +32,8 @@ pub struct Diagnose<'a> {
     pub service_installed: bool,
     /// The shell of the session the report is for, when it is known.
     pub shell: Option<Shell>,
+    pub ledger: &'a dyn CostLedger,
+    pub clock: &'a dyn Clock,
 }
 
 impl Diagnose<'_> {
@@ -173,6 +176,29 @@ impl Diagnose<'_> {
                 }
             }
         }
+        let spent = spent_today(self.ledger, self.clock);
+        match self.settings.max_daily_cost {
+            Some(cap) if spent >= cap => checks.push(check(
+                "costs",
+                Health::Warning,
+                format!(
+                    "{spent} today, cap {cap}: remote models wait for midnight UTC; `kintsu costs` details it"
+                ),
+            )),
+            Some(cap) => checks.push(check(
+                "costs",
+                Health::Ok,
+                format!("{spent} today of {cap}; `kintsu costs` details it"),
+            )),
+            None if spent > crate::entities::Money::ZERO => checks.push(check(
+                "costs",
+                Health::Ok,
+                format!(
+                    "{spent} today, no daily cap (routing.constraints.max_daily_cost); `kintsu costs` details it"
+                ),
+            )),
+            None => {}
+        }
         checks
     }
 }
@@ -188,6 +214,7 @@ fn check(subject: impl Into<String>, health: Health, detail: impl Into<String>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::{Duration, LedgerEntry, Money, Task, Tokens};
     use crate::entities::{Routing, Tier};
     use crate::use_cases::testing::*;
 
@@ -223,6 +250,8 @@ mod tests {
             models: &ScriptedModels::default(),
             service_installed: false,
             shell: Some(Shell::Zsh),
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let health = |subject: &str| {
@@ -272,6 +301,8 @@ mod tests {
             models: &ScriptedModels::default(),
             service_installed: true,
             shell: None,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let daemon = report.iter().find(|c| c.subject == "daemon").unwrap();
@@ -301,11 +332,74 @@ mod tests {
             models: &ScriptedModels::default(),
             service_installed: false,
             shell: None,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let report = uc.run(None);
         assert_eq!(report[0].health, Health::Problem);
         assert_eq!(report[1].subject, "models");
         assert_eq!(report[1].health, Health::Warning);
+        assert!(
+            report.iter().all(|c| c.subject != "costs"),
+            "nothing spent, no cap: nothing to say"
+        );
+    }
+
+    #[test]
+    fn the_days_spend_is_reported_against_the_cap() {
+        let ledger = MemoryLedger::default();
+        let clock = FakeClock::at(1_790_637_207_000);
+        ledger
+            .record(&LedgerEntry {
+                at: clock.now(),
+                model: "cloud".into(),
+                task: Task::Explain,
+                tokens: Tokens::new(10, 10),
+                cost: Some(Money::from_micro_usd(120_000)),
+                latency: Duration::from_millis(1),
+            })
+            .unwrap();
+        let capped = |micro: Option<u64>| Settings {
+            max_daily_cost: micro.map(Money::from_micro_usd),
+            ..Settings::default()
+        };
+        let costs = |settings: &Settings| {
+            Diagnose {
+                settings,
+                secrets: &MapSecrets::with(&[]),
+                environment: &FakeEnvironment::with_executables(&[]),
+                models: &ScriptedModels::default(),
+                ledger: &ledger,
+                clock: &clock,
+                service_installed: false,
+                shell: None,
+            }
+            .run(None)
+            .into_iter()
+            .find(|c| c.subject == "costs")
+            .unwrap()
+        };
+        let uncapped = costs(&capped(None));
+        assert_eq!(uncapped.health, Health::Ok);
+        assert!(
+            uncapped.detail.contains("$0.12 today, no daily cap"),
+            "{}",
+            uncapped.detail
+        );
+        let within = costs(&capped(Some(1_000_000)));
+        assert_eq!(within.health, Health::Ok);
+        assert!(
+            within.detail.contains("$0.12 today of $1.00"),
+            "{}",
+            within.detail
+        );
+        let reached = costs(&capped(Some(100_000)));
+        assert_eq!(reached.health, Health::Warning);
+        assert!(
+            reached.detail.contains("midnight UTC"),
+            "{}",
+            reached.detail
+        );
     }
 
     #[test]
@@ -320,6 +414,8 @@ mod tests {
                 models: &ScriptedModels::default(),
                 shell,
                 service_installed: false,
+                ledger: &MemoryLedger::default(),
+                clock: &FakeClock::at(0),
             }
             .run(Some(&SessionId::new("42")))
             .into_iter()

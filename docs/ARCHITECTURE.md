@@ -61,7 +61,8 @@ kintsu/
     │   ├── message.rs                Message · MessageBody (what arrives later)
     │   ├── triage.rs                 TriageDecision · QuietReason
     │   ├── shell.rs                  Shell
-    │   └── (planned)                 CapturedOutput · Task · Budget · Bubble · Action
+    │   ├── cost.rs                   Tokens · Money · list_price · Task · LedgerEntry · Day · spend_by_model
+    │   └── (planned)                 CapturedOutput · Bubble · Action
     │
     ├── use_cases/                application rules, depends on the entities only
     │   ├── triage.rs                 record, quiet checks, ignore, duplicate, rules → fix, save
@@ -73,21 +74,22 @@ kintsu/
     │   ├── ignore.rs                 ignore and mute
     │   ├── privacy.rs                what would be sent
     │   ├── diagnose.rs               doctor's checks
+    │   ├── costs.rs                  today and the last thirty days, per model, against the cap
     │   ├── facts.rs · prompts.rs · routing.rs
     │   ├── testing.rs                in-memory fakes of every port (cfg(test))
     │   ├── (planned)                 register_session · classify_failure · recall_case · learn_rule
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
     │       ├── ignore_store.rs · secrets.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
-    │       ├── output_source.rs
-    │       └── (planned)             RuleBook · CostLedger
+    │       ├── output_source.rs · cost_ledger.rs
+    │       └── (planned)             RuleBook
     │
     └── adapters/                 depends on the entities and the use cases
         ├── controllers/              cli.rs (argv → Command; the environment is main's job) ·
         │                             socket.rs (daemon frames → Request) · url_scheme.rs (kintsu://act) ·
         │                             setup_prompts.rs (the three questions) · panel_keys.rs (crossterm → panel keys)
         ├── presenters/               style.rs (the seam) · toast.rs (toast, message_toast) · plain.rs ·
-        │   │                         doctor.rs · shell_hook.rs · frames.rs (daemon → client frames) ·
+        │   │                         doctor.rs · costs.rs (text and JSON) · shell_hook.rs · frames.rs (daemon → client frames) ·
         │   │                         panel.rs (the panel's view model, drawn by ratatui)
         │   └── (planned)             json.rs
         └── gateways/                 daemon_client.rs (the thin client, spawns the daemon) ·
@@ -99,7 +101,8 @@ kintsu/
             │                         json_state.rs (SessionRegistry + CaseStore + IgnoreStore) ·
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
-            │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs
+            │                         env_secrets.rs (env, command, keychain) · system_clock.rs · random_ids.rs ·
+            │                         jsonl_ledger.rs (CostLedger: one JSON line per call)
             └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2}.rs ·
                                       store/sqlite.rs · notify/{zle_fd,signal,next_prompt}.rs
 ```

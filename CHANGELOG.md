@@ -50,6 +50,14 @@ All notable changes to kintsu are recorded here. The format follows
   `--help`, and `sudo`, or its removal. A rule's fix arrives as a bubble
   like a model's would, with no model configured at all. `ssh-keygen -R`
   gets a red line.
+- A cost ledger and a daily budget. Every model call is kept in
+  `<state>/ledger.jsonl` with its tokens, latency and cost at the
+  provider's list price (free for local models, unpriced when the model
+  id is unknown). `kintsu costs [--json]` shows today and the last thirty
+  days per model. `[routing.constraints] max_daily_cost = "1.00 USD"`
+  skips remote models for the rest of the UTC day once reached; local
+  ones keep answering, the shell is told once a day, and `kintsu doctor`
+  shows the day's spend.
 
 ### Fixed
 

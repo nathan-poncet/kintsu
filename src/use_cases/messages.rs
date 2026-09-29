@@ -6,17 +6,21 @@
 
 use thiserror::Error;
 
-use crate::entities::{CaseId, FailureCase, Fix, Message, MessageBody, SessionId, Settings};
+use crate::entities::{
+    CaseId, Day, FailureCase, Fix, Message, MessageBody, SessionId, Settings, Task,
+};
 use crate::use_cases::explain::{Explain, ExplainError};
 use crate::use_cases::facts::rule_fix;
 use crate::use_cases::fix_last::{FixError, FixLast};
 use crate::use_cases::focus::{Focus, FocusError};
 use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Clock, Environment, ModelError, ModelGateway, Notifier, NotifyError,
-    Secrets, SessionRegistry,
+    CaseStore, CaseStoreError, Clock, CostLedger, Environment, ModelError, ModelGateway, Notifier,
+    NotifyError, Secrets, SessionRegistry,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
-use crate::use_cases::routing::{ask_first, model_candidates};
+use crate::use_cases::routing::{
+    Meter, ask_first, excluded_for_budget, model_candidates, over_budget,
+};
 
 /// Why nothing was sent.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -33,6 +37,8 @@ pub enum MessagesError {
     NotRunning(String),
     #[error("the model had no fix")]
     NoFix,
+    #[error("today's model budget is spent; remote models wait for midnight UTC")]
+    BudgetReached,
     #[error("no model answered ({})", .0.iter().map(|(n, e)| format!("{n}: {e}")).collect::<Vec<_>>().join("; "))]
     AllFailed(Vec<(String, ModelError)>),
     #[error(transparent)]
@@ -52,13 +58,16 @@ pub struct Messages<'a> {
     pub notifier: &'a dyn Notifier,
     pub cases: &'a dyn CaseStore,
     pub sessions: &'a dyn SessionRegistry,
+    pub ledger: &'a dyn CostLedger,
 }
 
 impl Messages<'_> {
     /// The model that will be asked for a fix first, when one will be.
     pub fn fix_candidate(&self, case: &FailureCase) -> Option<String> {
         case.session()?;
-        let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
+        let over = over_budget(self.settings, self.ledger, self.clock);
+        let candidates =
+            model_candidates(self.settings, &self.settings.routing.quick_fix, case, over);
         let first = candidates.first()?;
         (self.settings.ui.eager_fix.allows(first) && self.models.is_reachable(first))
             .then(|| first.name.clone())
@@ -72,8 +81,14 @@ impl Messages<'_> {
         let session = case
             .session()
             .ok_or_else(|| NotifyError::UnknownSession("none".into()))?;
-        let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, case);
+        let names = &self.settings.routing.quick_fix;
+        let over = over_budget(self.settings, self.ledger, self.clock);
+        let candidates = model_candidates(self.settings, names, case, over);
         if candidates.is_empty() {
+            if excluded_for_budget(self.settings, names, over) {
+                self.say_budget_is_spent_once(case, session)?;
+                return Err(MessagesError::BudgetReached);
+            }
             return Err(MessagesError::NoModel);
         }
         if !self.settings.ui.eager_fix.allows(candidates[0]) {
@@ -83,11 +98,17 @@ impl Messages<'_> {
             return Err(MessagesError::NotRunning(candidates[0].name.clone()));
         }
         let first = candidates[0].name.clone();
+        let meter = Meter {
+            ledger: self.ledger,
+            clock: self.clock,
+            task: Task::QuickFix,
+        };
         let answer = ask_first(
             self.models,
             self.secrets,
             &candidates,
             &quick_fix_prompt(case),
+            &meter,
         );
         let in_focus = self.focus().holds(case)?;
         let (name, answer) = match answer {
@@ -176,6 +197,37 @@ impl Messages<'_> {
         Ok(message)
     }
 
+    /// The first time each day the budget stops a fix, the shell is told;
+    /// after that the day stays quiet about it.
+    fn say_budget_is_spent_once(
+        &self,
+        case: &FailureCase,
+        session: &SessionId,
+    ) -> Result<(), MessagesError> {
+        let today = Day::of(self.clock.now());
+        if self.ledger.budget_noted(today).unwrap_or(true) {
+            return Ok(());
+        }
+        let cap = self
+            .settings
+            .max_daily_cost
+            .map(|cap| cap.to_string())
+            .unwrap_or_default();
+        let in_focus = self.focus().holds(case)?;
+        self.notifier.deliver(
+            session,
+            self.message(
+                case,
+                MessageBody::Note(format!(
+                    "today's model budget ({cap}) is spent: remote models wait for midnight UTC, local ones still answer"
+                )),
+                in_focus,
+            ),
+        )?;
+        let _ = self.ledger.note_budget(today);
+        Ok(())
+    }
+
     /// A message about `case`, dated now, late when the shell has moved on.
     fn message(&self, case: &FailureCase, body: MessageBody, in_focus: bool) -> Message {
         let message = Message::new(case.id().clone(), self.clock.now(), body)
@@ -196,6 +248,8 @@ impl Messages<'_> {
             cases: self.cases,
             secrets: self.secrets,
             models: self.models,
+            ledger: self.ledger,
+            clock: self.clock,
         }
     }
 
@@ -225,6 +279,8 @@ impl Messages<'_> {
             environment,
             secrets: self.secrets,
             models: self.models,
+            ledger: self.ledger,
+            clock: self.clock,
         };
         let proposal = fix_last.run(Some(session))?;
         let body = match proposal.fix {
@@ -243,7 +299,10 @@ impl Messages<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{EagerFix, Provider, Routing, Session, SessionId, Tier, UiSettings};
+    use crate::entities::{
+        Duration, EagerFix, LedgerEntry, Money, Provider, Routing, Session, SessionId, Tier,
+        Tokens, UiSettings,
+    };
     use crate::use_cases::testing::*;
 
     fn settings(eager: EagerFix, quick_fix: &[&str]) -> Settings {
@@ -278,6 +337,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         let message = uc.fix(&case("npm run build", 1, Some("42"))).unwrap();
         assert!(!message.is_late(), "nothing ran since");
@@ -313,6 +373,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         let environment = FakeEnvironment::with_executables(&[]);
         let silent = case("make test", 2, Some("42"));
@@ -343,6 +404,50 @@ mod tests {
     }
 
     #[test]
+    fn the_spent_budget_is_announced_once_a_day_and_the_remote_fix_is_not_asked() {
+        let sessions = MemoryRegistry::default();
+        let models = ScriptedModels::answering(&[("cloud", Ok("nvm use 22"))]);
+        let notifier = MemoryNotifier::default();
+        let cases = MemoryCases::default();
+        let ledger = MemoryLedger::default();
+        let clock = FakeClock::at(1_790_637_207_000);
+        ledger
+            .record(&LedgerEntry {
+                at: clock.now(),
+                model: "cloud".into(),
+                task: Task::QuickFix,
+                tokens: Tokens::new(1, 1),
+                cost: Some(Money::from_micro_usd(1_000_000)),
+                latency: Duration::from_millis(1),
+            })
+            .unwrap();
+        let mut capped = settings(EagerFix::On, &["cloud"]);
+        capped.max_daily_cost = Some(Money::from_micro_usd(1_000_000));
+        let uc = Messages {
+            settings: &capped,
+            clock: &clock,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            notifier: &notifier,
+            cases: &cases,
+            sessions: &sessions,
+            ledger: &ledger,
+        };
+        let failure = case("npm run build", 1, Some("42"));
+        assert_eq!(uc.fix_candidate(&failure), None, "no asking… line");
+        assert_eq!(uc.fix(&failure).unwrap_err(), MessagesError::BudgetReached);
+        assert_eq!(uc.fix(&failure).unwrap_err(), MessagesError::BudgetReached);
+        assert!(models.asked().is_empty());
+        let delivered = notifier.delivered.borrow();
+        assert_eq!(delivered.len(), 1, "said once");
+        assert!(
+            matches!(&delivered[0].1.body(), MessageBody::Note(t) if t.contains("$1.00") && t.contains("midnight UTC")),
+            "{:?}",
+            delivered[0].1.body()
+        );
+    }
+
+    #[test]
     fn a_late_answer_names_its_command_and_is_not_saved_over_a_newer_failure() {
         let sessions = MemoryRegistry::default();
         use crate::entities::{CaseId, Timestamp};
@@ -367,6 +472,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         let message = uc.fix(&old).unwrap();
         assert!(message.is_late(), "the shell looks at another failure");
@@ -403,6 +509,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         let message = uc.fix(&failure).unwrap();
         assert!(message.is_late());
@@ -430,6 +537,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         assert_eq!(
             off.fix(&case("make", 2, Some("42"))).unwrap_err(),
@@ -572,6 +680,7 @@ mod tests {
             notifier: &notifier,
             cases: &cases,
             sessions: &sessions,
+            ledger: &MemoryLedger::default(),
         };
         assert_eq!(
             uc.explain_candidate(&SessionId::new("42")).unwrap(),

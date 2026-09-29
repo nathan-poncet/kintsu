@@ -4,7 +4,7 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::entities::Duration;
+use crate::entities::{Duration, Money};
 
 /// Which client speaks to a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -338,6 +338,8 @@ pub struct Settings {
     pub capture: CaptureSettings,
     /// Never send a case with a secret to a model that is not local.
     pub sensitive_local_only: bool,
+    /// Past this much in a UTC day, remote models are skipped until midnight.
+    pub max_daily_cost: Option<Money>,
 }
 
 impl Default for Settings {
@@ -349,6 +351,7 @@ impl Default for Settings {
             ui: UiSettings::default(),
             capture: CaptureSettings::default(),
             sensitive_local_only: true,
+            max_daily_cost: None,
         }
     }
 }

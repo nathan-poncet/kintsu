@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use crate::entities::ModelSpec;
+use crate::entities::{ModelSpec, Tokens};
 
 /// What a model is asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +35,14 @@ pub enum ModelError {
     Malformed(String),
 }
 
+/// A whole answer and what the provider counted for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Answer {
+    pub text: String,
+    /// Zero when the provider reported nothing.
+    pub tokens: Tokens,
+}
+
 /// Speaks to models.
 pub trait ModelGateway {
     /// Asks and waits for the whole answer.
@@ -44,6 +52,20 @@ pub trait ModelGateway {
         key: Option<&str>,
         prompt: &Prompt,
     ) -> Result<String, ModelError>;
+
+    /// Asks and waits for the whole answer, with the tokens it cost; a
+    /// gateway that cannot count says zero.
+    fn answer(
+        &self,
+        spec: &ModelSpec,
+        key: Option<&str>,
+        prompt: &Prompt,
+    ) -> Result<Answer, ModelError> {
+        self.complete(spec, key, prompt).map(|text| Answer {
+            text,
+            tokens: Tokens::default(),
+        })
+    }
 
     /// Asks and hands the answer over as it comes, then returns it whole.
     /// A gateway that cannot stream hands it over in one piece.

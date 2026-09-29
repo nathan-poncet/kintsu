@@ -17,8 +17,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::adapters::controllers::{Request, parse_frame};
 use crate::adapters::gateways::ndjson::{read_line, send_line};
 use crate::adapters::gateways::{
-    FsEnvironment, HttpModels, JsonState, RandomIds, SessionSecrets, Sessions, SystemClock,
-    TerminalOutput, load_settings, unix,
+    FsEnvironment, HttpModels, JsonState, JsonlLedger, RandomIds, SessionSecrets, Sessions,
+    SystemClock, TerminalOutput, load_settings, unix,
 };
 use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
@@ -77,6 +77,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         }),
         frames::ping(),
     );
+    let ledger = JsonlLedger::new(&cfg.state_dir);
     let daemon = Arc::new(Daemon {
         cfg,
         sessions,
@@ -84,6 +85,7 @@ pub fn run(cfg: DaemonConfig) -> ExitCode {
         links,
         hotkey,
         settings: Mutex::new(None),
+        ledger,
     });
     daemon.settings();
     let pinger = Arc::clone(&daemon);
@@ -121,6 +123,7 @@ struct Daemon {
     /// settings reload.
     hotkey: Arc<AtomicU8>,
     settings: Mutex<Option<(Settings, Option<SystemTime>)>>,
+    ledger: JsonlLedger,
 }
 
 /// The letter kept in the atomic, back to a key; it came from a parsed
@@ -498,6 +501,7 @@ fn messages<'a>(
         notifier: &daemon.sessions,
         cases: state,
         sessions: state,
+        ledger: &daemon.ledger,
     }
 }
 

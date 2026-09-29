@@ -3,13 +3,15 @@
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, Fix, SessionId, Settings};
+use crate::entities::{FailureCase, Fix, SessionId, Settings, Task};
 use crate::use_cases::facts::rule_fix;
 use crate::use_cases::ports::{
-    CaseStore, CaseStoreError, Environment, ModelError, ModelGateway, Secrets,
+    CaseStore, CaseStoreError, Clock, CostLedger, Environment, ModelError, ModelGateway, Secrets,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
-use crate::use_cases::routing::{ask_first, model_candidates};
+use crate::use_cases::routing::{
+    Meter, ask_first, excluded_for_budget, model_candidates, over_budget,
+};
 
 /// The last case and what to type instead, when anyone knows.
 #[derive(Debug, Clone, PartialEq)]
@@ -18,6 +20,8 @@ pub struct FixProposal {
     pub fix: Option<Fix>,
     /// Models that were asked and did not help.
     pub failures: Vec<(String, ModelError)>,
+    /// A remote model would have been asked, but today's budget is spent.
+    pub budget_reached: bool,
 }
 
 /// Why there is nothing to fix.
@@ -36,6 +40,8 @@ pub struct FixLast<'a> {
     pub environment: &'a dyn Environment,
     pub secrets: &'a dyn Secrets,
     pub models: &'a dyn ModelGateway,
+    pub ledger: &'a dyn CostLedger,
+    pub clock: &'a dyn Clock,
 }
 
 impl FixLast<'_> {
@@ -45,9 +51,11 @@ impl FixLast<'_> {
         rule_fix(self.environment, case).or_else(|| case.proposal().cloned())
     }
 
-    /// The quick-fix model that would be asked first, if one is routed.
+    /// The quick-fix model that would be asked first, if one is routed and
+    /// may still be paid for today.
     pub fn candidate(&self, case: &FailureCase) -> Option<String> {
-        model_candidates(self.settings, &self.settings.routing.quick_fix, case)
+        let over = over_budget(self.settings, self.ledger, self.clock);
+        model_candidates(self.settings, &self.settings.routing.quick_fix, case, over)
             .first()
             .map(|model| model.name.clone())
     }
@@ -60,21 +68,31 @@ impl FixLast<'_> {
                 case,
                 fix: Some(fix),
                 failures: Vec::new(),
+                budget_reached: false,
             });
         }
-        let candidates = model_candidates(self.settings, &self.settings.routing.quick_fix, &case);
+        let names = &self.settings.routing.quick_fix;
+        let over = over_budget(self.settings, self.ledger, self.clock);
+        let candidates = model_candidates(self.settings, names, &case, over);
         if candidates.is_empty() {
             return Ok(FixProposal {
                 case,
                 fix: None,
                 failures: Vec::new(),
+                budget_reached: excluded_for_budget(self.settings, names, over),
             });
         }
+        let meter = Meter {
+            ledger: self.ledger,
+            clock: self.clock,
+            task: Task::QuickFix,
+        };
         match ask_first(
             self.models,
             self.secrets,
             &candidates,
             &quick_fix_prompt(&case),
+            &meter,
         ) {
             Ok((name, answer)) => {
                 let fix = parse_quick_fix(&answer, &name, case.outcome().command());
@@ -85,12 +103,14 @@ impl FixLast<'_> {
                     fix,
                     case,
                     failures: Vec::new(),
+                    budget_reached: false,
                 })
             }
             Err(failures) => Ok(FixProposal {
                 case,
                 fix: None,
                 failures,
+                budget_reached: false,
             }),
         }
     }
@@ -99,7 +119,7 @@ impl FixLast<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::{CommandLine, Confidence, Fix, FixSource, Provider, Tier};
+    use crate::entities::{CommandLine, Confidence, Fix, FixSource, Money, Provider, Tier, Tokens};
     use crate::use_cases::testing::*;
 
     fn settings(quick_fix: &[&str]) -> Settings {
@@ -130,6 +150,8 @@ mod tests {
             environment: &environment,
             secrets: &secrets,
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let typo = case("gti status", 127, Some("42"));
         assert_eq!(uc.known(&typo).unwrap().command().as_str(), "git status");
@@ -165,6 +187,8 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&[]),
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "sudo touch /etc/hosts.new");
@@ -183,6 +207,8 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&["git"]),
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let proposal = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix.unwrap().command().as_str(), "git status");
@@ -200,6 +226,8 @@ mod tests {
             environment: &FakeEnvironment::with_executables(&["npm"]),
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "npm test -- --runInBand");
@@ -221,6 +249,8 @@ mod tests {
             environment: &env,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(none.run(Some(&SessionId::new("42"))).unwrap().fix, None);
         let down = FixLast {
@@ -229,12 +259,61 @@ mod tests {
             environment: &env,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         let proposal = down.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix, None);
         assert_eq!(
             proposal.failures,
             vec![("local".to_string(), ModelError::Unreachable("down".into()))]
+        );
+    }
+
+    #[test]
+    fn the_second_remote_call_of_the_day_is_refused_once_the_budget_is_spent() {
+        let cases = MemoryCases::default();
+        cases.save(&case("npm test", 1, Some("42"))).unwrap();
+        let mut settings = settings(&["cloud"]);
+        settings.models[1].model = "claude-haiku-4-5-20251001".into();
+        settings.max_daily_cost = Some(Money::from_micro_usd(1_000));
+        let models = ScriptedModels::answering(&[("cloud", Ok("npm test -- --runInBand"))])
+            .counting(&[("cloud", Tokens::new(1_000, 200))]);
+        let ledger = MemoryLedger::default();
+        let env = FakeEnvironment::with_executables(&["npm"]);
+        let uc = FixLast {
+            settings: &settings,
+            cases: &cases,
+            environment: &env,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            ledger: &ledger,
+            clock: &FakeClock::at(1_790_637_207_000),
+        };
+        let first = uc.run(Some(&SessionId::new("42"))).unwrap();
+        assert!(first.fix.is_some());
+        assert!(!first.budget_reached);
+        assert_eq!(
+            ledger.entries.borrow()[0].cost,
+            Some(Money::from_micro_usd(2_000)),
+            "the ledger holds the first call, over the cap on its own"
+        );
+        cases.save(&case("npm run build", 1, Some("42"))).unwrap();
+        let second = uc.run(Some(&SessionId::new("42"))).unwrap();
+        assert_eq!(second.fix, None);
+        assert!(
+            second.budget_reached,
+            "a remote model was skipped for the budget"
+        );
+        assert!(
+            second.failures.is_empty(),
+            "nobody was asked, nobody failed"
+        );
+        assert_eq!(models.asked().len(), 1);
+        assert_eq!(
+            uc.candidate(&case("npm run build", 1, Some("42"))),
+            None,
+            "nothing to announce as asking"
         );
     }
 
@@ -258,6 +337,8 @@ mod tests {
             environment: &env,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap().fix,
@@ -278,6 +359,8 @@ mod tests {
             environment: &env,
             secrets: &MapSecrets::with(&[]),
             models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap_err(),
