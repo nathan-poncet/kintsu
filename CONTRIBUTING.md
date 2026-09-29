@@ -30,10 +30,12 @@ cargo deny check                                                                
 
 The hooks draw above a live prompt, which no unit test can see. After a
 change under `shell/`, run the screen harness (needs `pip install pyte`,
-zsh and fish):
+zsh and fish). It drives real shells in a pseudo-terminal against a fake
+model and its own daemon, on a scratch socket, and never touches yours:
 
 ```sh
-cargo build && python3 scripts/shell-harness.py && python3 scripts/shell-harness.py zsh
+cargo build && python3 scripts/shell-harness.py --check   # what CI runs: every scenario, asserted
+python3 scripts/shell-harness.py panel                    # one scenario, the screens for your eyes
 ```
 
 A release is a tag: bump `version` in `Cargo.toml`, move the `[Unreleased]`

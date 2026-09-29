@@ -213,7 +213,9 @@ for `kintsu://` links, which do not exist yet.
 Measured locally: 96 % of lines with `src/main.rs` excluded (it only reads
 the environment). CI fails under 90 %. Three workflows: `ci.yml` (fmt,
 clippy, tests, release build, a scripted smoke run of every command, hook
-syntax, docs shell, installer, coverage, cargo-deny), `release.yml` on a
+syntax, docs shell, installer, coverage, cargo-deny, and since 2026-09-29
+the pseudo-terminal harness in check mode on real zsh, fish and bash,
+section 38), `release.yml` on a
 `v*` tag (verifies the tag matches `Cargo.toml`, drafts the release from
 `CHANGELOG.md`, builds four targets and a Debian package for each Linux
 one, uploads `SHA256SUMS` in the format `install.sh` expects, then
@@ -954,6 +956,35 @@ secret set APT_SIGNING_KEY --repo nathan-poncet/kintsu`; on the next tag
 the site gets the public key, and the `[trusted=yes]` line leaves the
 docs. cargo-deb writes an empty `Depends:` field for a static binary;
 dpkg accepts it and the `Packages` index drops it.
+## 38. The harness runs in CI (2026-09-29)
+
+Open question 18 of 2026-09-25, answered "in CI". `scripts/shell-harness.py
+--check` runs every scenario and asserts what a human read on the screen
+until now: the bubble under a failure and the model's answer under it, the
+answer landing above a line being typed with the typed text intact, the
+answer after another command, `kintsu why`, a slow model's answer naming
+its command once the shell moved on, the rule fix pre-typed in zsh and
+taken by Tab in fish, and the panel's steps in the three shells, the
+remembered explanation proven by the fake model's call count. On a
+mismatch the screen is dumped and the exit status is 1. The human mode is
+unchanged.
+
+Two things the check mode does not assert, on purpose. `kintsu why` comes
+after a `clear`, so the shell has moved on and the explanation names its
+command; where that answer lands relative to the `kintsu why` line depends
+on whether it arrives before or after the next prompt is drawn, and one
+run out of several put it over the prompt's rows. That is the prompt
+arithmetic of issue #1's family, not the harness's business. And the
+scenarios wait fixed times: `SLOW` stretches them all, CI runs with 2.
+
+The harness used to `pkill` every `kintsu daemon run` between scenarios,
+the maintainer's included; it now asks the daemon on its own socket to
+stop, and no other. Several harnesses can run at once with distinct
+`ROOT`s.
+
+The CI job installs Ubuntu's zsh and fish; the maintainer runs fish 4,
+Ubuntu ships 3. Whether every scenario passes on both is what the job
+answers on every pull request from now on.
 
 ## What is not built, by priority
 
