@@ -136,7 +136,6 @@ if status is-interactive
     # bubble says "Tab to fix".
     function __kintsu_tab
         if test -z (commandline) -a -r "$__kintsu_ghost_file"
-            commandline -r -- (cat "$__kintsu_ghost_file")
             command rm -f -- "$__kintsu_ghost_file"
             commandline -f end-of-line
         else
