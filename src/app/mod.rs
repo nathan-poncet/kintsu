@@ -5,7 +5,6 @@
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Duration;
 
 use crate::adapters::controllers::{Command, DaemonAction, ScopeFlag, parse_args};
 use crate::adapters::gateways::{
@@ -79,9 +78,6 @@ Usage:
 Environment: KINTSU_CONFIG, KINTSU_STATE_DIR, KINTSU_SOCKET, KINTSU_NO_DAEMON,
 KINTSU_DISABLE=1, NO_COLOR.
 ";
-
-/// The sync budget: how long a hook waits for the daemon's decision.
-pub(super) const SYNC_BUDGET: Duration = Duration::from_millis(40);
 
 /// What the process knows about its surroundings; read once in `main`.
 pub struct Runtime {

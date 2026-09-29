@@ -161,7 +161,8 @@ configuration page: `[models.<name>]` with `provider`, `model`, `base_url`,
 with `quick_fix`, `explain`, `investigate` (`classify`, `summarize` and
 `budgets` are accepted and ignored); `[routing.constraints]
 sensitive_output`; `[quiet]` `never_triage`, `ok_statuses`, `ok_commands`,
-`same_failure`, `off_in`; `[ui]` `mode`, `ascii`. Unknown keys are
+`same_failure`, `off_in`; `[ui]` `mode`, `ascii`; `[daemon]` `sync_budget`
+(ignored until 2026-09-29, read since, section 35). Unknown keys are
 ignored so a file written for the full schema loads. `provider = "gemini"`
 uses Gemini's OpenAI-compatible endpoint. `key = { keychain = true }`
 reads `security find-generic-password -s kintsu -a <model>` on macOS and
@@ -982,9 +983,18 @@ the maintainer's included; it now asks the daemon on its own socket to
 stop, and no other. Several harnesses can run at once with distinct
 `ROOT`s.
 
-The CI job installs Ubuntu's zsh and fish; the maintainer runs fish 4,
-Ubuntu ships 3. Whether every scenario passes on both is what the job
-answers on every pull request from now on.
+The CI job installs Ubuntu's zsh 5.9, fish 3.7 and bash 5.2; the
+maintainer runs fish 4.8 and bash 5.3. Every scenario passes on both.
+
+The first CI run showed a race the laptop never did: the runner missed
+the 40 ms sync budget on a frame, the hook decided locally and saved a
+second case for the same failure, and the daemon's answer, arriving on the
+subscription a moment later, was labelled late because the case it was
+about was no longer the shell's last. The configuration page has
+documented `[daemon] sync_budget` since v0.1 while the binary ignored it;
+it is read now (default 40 ms, section 8 corrected) and the harness sets
+it to 2 s. Fixing the race itself, one case for one failure whichever
+side decided, is left open.
 
 ## What is not built, by priority
 

@@ -347,6 +347,22 @@ impl Default for CaptureSettings {
     }
 }
 
+/// The resident process, as the hooks talk to it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DaemonSettings {
+    /// How long a hook waits for the daemon's decision before deciding
+    /// locally; the prompt never waits longer.
+    pub sync_budget: Duration,
+}
+
+impl Default for DaemonSettings {
+    fn default() -> Self {
+        Self {
+            sync_budget: Duration::from_millis(40),
+        }
+    }
+}
+
 /// Everything the user configured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
@@ -360,6 +376,8 @@ pub struct Settings {
     pub ui: UiSettings,
     /// Where the output comes from.
     pub capture: CaptureSettings,
+    /// The resident process.
+    pub daemon: DaemonSettings,
     /// Never send a case with a secret to a model that is not local.
     pub sensitive_local_only: bool,
     /// Past this much in a UTC day, remote models are skipped until midnight.
@@ -374,6 +392,7 @@ impl Default for Settings {
             quiet: QuietSettings::default(),
             ui: UiSettings::default(),
             capture: CaptureSettings::default(),
+            daemon: DaemonSettings::default(),
             sensitive_local_only: true,
             max_daily_cost: None,
         }
@@ -496,6 +515,7 @@ mod tests {
         assert!(s.quiet.same_failure_once);
         assert!(s.sensitive_local_only);
         assert_eq!(s.ui.mode, UiMode::Toast);
+        assert_eq!(s.daemon.sync_budget, Duration::from_millis(40));
         assert_eq!(s.ui.eager_fix, EagerFix::Auto);
         assert!(EagerFix::Auto.allows(&spec("t", Provider::Ollama, None)));
         assert!(!EagerFix::Auto.allows(&spec("a", Provider::Anthropic, None)));
