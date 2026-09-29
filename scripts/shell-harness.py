@@ -21,7 +21,7 @@ ROOT (scratch directory, default /tmp/kintsu-harness; keep it short, it
 holds a Unix socket), PYLIB (extra sys.path entry for pyte).
 
     python3 scripts/shell-harness.py --check            # every scenario, asserted; CI runs this
-    python3 scripts/shell-harness.py --check ghost panel
+    python3 scripts/shell-harness.py --check ghost panel tee
 
 In check mode nothing is printed unless an expectation fails; then the
 screen is dumped and the exit status is 1. The daemon it stops between
@@ -50,11 +50,14 @@ class H(http.server.BaseHTTPRequestHandler):
             # The panel asks for the answer as it comes: eight pieces, a
             # fifth of a second apart, so the screen shows it growing.
             self.send_response(200); self.send_header("content-type", "application/x-ndjson"); self.send_header("transfer-encoding", "chunked"); self.send_header("connection", "close"); self.end_headers()
-            for piece in STREAMED + [None]:
-                line = json.dumps({"message": {"role": "assistant", "content": piece or ""}, "done": piece is None}).encode() + b"\n"
-                self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n"); self.wfile.flush()
-                if piece is not None: time.sleep(0.2)
-            self.wfile.write(b"0\r\n\r\n"); self.wfile.flush()
+            try:
+                for piece in STREAMED + [None]:
+                    line = json.dumps({"message": {"role": "assistant", "content": piece or ""}, "done": piece is None}).encode() + b"\n"
+                    self.wfile.write(f"{len(line):x}\r\n".encode() + line + b"\r\n"); self.wfile.flush()
+                    if piece is not None: time.sleep(0.2)
+                self.wfile.write(b"0\r\n\r\n"); self.wfile.flush()
+            except BrokenPipeError:
+                pass   # the panel closed: the rest of the stream has no reader
             return
         body = json.dumps({"message": {"role": "assistant", "content": "nvm use 22 && npm run build"}, "done": True}).encode()
         self.send_response(200); self.send_header("content-type", "application/json"); self.send_header("content-length", str(len(body))); self.send_header("connection", "close"); self.end_headers(); self.wfile.write(body)
@@ -281,6 +284,7 @@ def panel_steps(send, screen, shell, record=None):
     send("\x0b", 1.5)
     snap("^K after a plain failure: Why asks at once, the explanation streams in, the panel grows")
     send("w", 1.6)
+    if record is not None: send("", 1.6)   # checked once the whole answer has landed
     snap("w: why, from the model, whole")
     send("\x1b", 1.0)
     snap("Esc: closed")
@@ -418,16 +422,30 @@ def check_panel(shell):
            ["▎ gti status · exit 127", PANEL_HEADER, "▎ git status", "rule command typo", "Insert ⏎ · Copy c"])
     expect(f"{shell}: Enter puts the fix in the line and closes", rec["Enter: the fix is in the line, the panel is gone"],
            typo_line, [PANEL_HEADER], last="❯ git status")
-    expect(f"{shell}: ^K after a plain failure", rec["^K after a plain failure"],
+    plain = "^K after a plain failure: Why asks at once, the explanation streams in, the panel grows"
+    expect(f"{shell}: ^K after a plain failure", rec[plain],
            ["▎ false · exit 1", PANEL_HEADER, "suggested by local"])
-    expect(f"{shell}: w asks why", rec["w: why, from the model"], [PANEL_HEADER, "▎ — local"])
+    expect(f"{shell}: w asks why and the whole answer streams in", rec["w: why, from the model, whole"],
+           [PANEL_HEADER, "▎ Node 20 is too old for this build.", "▎ That is all."])
     expect(f"{shell}: Esc closes and puts the bubble back", rec["Esc: closed"], ["▎ false exited 1."], [PANEL_HEADER])
     asked_before = rec["Esc: closed · model calls"]
     expect(f"{shell}: ^K again shows the remembered answer", rec["^K again, w: the explanation is remembered, nobody is asked"],
-           [PANEL_HEADER, "▎ — local"])
+           [PANEL_HEADER, "▎ Node 20 is too old for this build."])
     if rec["^K again, w: the explanation is remembered, nobody is asked · model calls"] != asked_before:
         print(f"FAIL: {shell}: the remembered explanation asked the model again"); srv.shutdown(); sys.exit(1)
     expect(f"{shell}: ^K after a success opens nothing", rec["^K after a success: nothing opens"], ["❯ true"], [PANEL_HEADER], last="❯")
+
+def check_tee(shell):
+    """`[capture] stderr_tee`: the hook copies the command's stderr, the
+    daemon keeps it with the case, `kintsu privacy` shows it under Output."""
+    write_config(tee=True)
+    try:
+        screen = run_zsh(tee=True) if shell == "zsh" else run_bash(tee=True)
+    finally:
+        write_config(TEE)
+    # BSD touch says "touch: /etc/x: Permission denied", GNU "touch: cannot touch '/etc/x': …"
+    expect(f"{shell}: stderr copied by the hook", screen.display,
+           ["## Output", "kintsu-harness-denied", "Permission denied"])
 
 CHECKS = {
     "fish": lambda: check_shell_messages("fish"),
@@ -436,6 +454,7 @@ CHECKS = {
     "late": lambda: [check_late(s) for s in ("fish", "zsh")],
     "ghost": lambda: [check_ghost(s) for s in ("fish", "zsh")],
     "panel": lambda: [check_panel(s) for s in ("fish", "zsh", "bash")],
+    "tee": lambda: [check_tee(s) for s in ("zsh", "bash")],
 }
 
 if "--check" in sys.argv:

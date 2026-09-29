@@ -162,7 +162,7 @@ with `quick_fix`, `explain`, `investigate` (`classify`, `summarize` and
 `budgets` are accepted and ignored); `[routing.constraints]
 sensitive_output`; `[quiet]` `never_triage`, `ok_statuses`, `ok_commands`,
 `same_failure`, `off_in`; `[ui]` `mode`, `ascii`; `[daemon]` `sync_budget`
-(ignored until 2026-09-29, read since, section 35). Unknown keys are
+(ignored until 2026-09-29, read since, section 38). Unknown keys are
 ignored so a file written for the full schema loads. `provider = "gemini"`
 uses Gemini's OpenAI-compatible endpoint. `key = { keychain = true }`
 reads `security find-generic-password -s kintsu -a <model>` on macOS and
@@ -957,6 +957,7 @@ secret set APT_SIGNING_KEY --repo nathan-poncet/kintsu`; on the next tag
 the site gets the public key, and the `[trusted=yes]` line leaves the
 docs. cargo-deb writes an empty `Depends:` field for a static binary;
 dpkg accepts it and the `Packages` index drops it.
+
 ## 38. The harness runs in CI (2026-09-29)
 
 Open question 18 of 2026-09-25, answered "in CI". `scripts/shell-harness.py
@@ -965,10 +966,11 @@ until now: the bubble under a failure and the model's answer under it, the
 answer landing above a line being typed with the typed text intact, the
 answer after another command, `kintsu why`, a slow model's answer naming
 its command once the shell moved on, the rule fix pre-typed in zsh and
-taken by Tab in fish, and the panel's steps in the three shells, the
-remembered explanation proven by the fake model's call count. On a
-mismatch the screen is dumped and the exit status is 1. The human mode is
-unchanged.
+taken by Tab in fish, the panel's steps in the three shells with the
+explanation streaming in whole, the remembered explanation proven by the
+fake model's call count, and the stderr tee's copy under `kintsu
+privacy` in zsh and bash. On a mismatch the screen and the daemon's log
+are dumped and the exit status is 1. The human mode is unchanged.
 
 Two things the check mode does not assert, on purpose. `kintsu why` comes
 after a `clear`, so the shell has moved on and the explanation names its
