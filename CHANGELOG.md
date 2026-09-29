@@ -67,6 +67,9 @@ All notable changes to kintsu are recorded here. The format follows
   naming its command, ghost text and Tab, the panel's keys) in real zsh,
   fish and bash, and CI runs it. Between scenarios it stops its own daemon
   only, never the one on your machine.
+- `[daemon] sync_budget` is read: how long the hook waits for the daemon's
+  decision before deciding locally, 40 ms by default. The configuration
+  page documented it; the binary ignored it.
 - Sixteen more instant rules, several after thefuck's: `$ cmd` pasted
   with its prompt, a no-break space or a trailing `ç` in the line, `cd..`,
   `git-log` and `gitpush`, `mandiff`, `gradle` for `./gradlew`, `app.py`

@@ -15,7 +15,7 @@ use crate::entities::{KeySource, SessionDetails, SessionId, Settings, Shell, Tri
 use crate::use_cases::ports::Secrets;
 use crate::use_cases::{CaptureOutput, Triage, TriageInput};
 
-use super::{Local, Runtime, SYNC_BUDGET};
+use super::{Local, Runtime};
 
 /// The hook's call: the daemon within the budget when it may, the local
 /// path otherwise. The prompt never waits longer than the budget.
@@ -39,10 +39,11 @@ pub(super) fn triage(
     if let Some(session) = &input.session {
         input.terminal.stderr_copy = HookNotes::new(&rt.state_dir).stderr_copy(session);
     }
+    let budget = sync_budget(settings);
     if rt.daemon
         && let Some(view) = rt
             .client()
-            .command_finished(&input, rt.color, signal_pid, SYNC_BUDGET)
+            .command_finished(&input, rt.color, signal_pid, budget)
     {
         for text in view.toast.iter().chain(view.bubbles.iter()) {
             let _ = writeln!(err, "{text}");
@@ -159,8 +160,15 @@ pub(super) fn session_new(
         path: Some(rt.path_var.clone()),
         env: keys_the_models_read(settings),
     };
-    let _ = rt.client().session_new(&session, &details, SYNC_BUDGET);
+    let _ = rt
+        .client()
+        .session_new(&session, &details, sync_budget(settings));
     ExitCode::SUCCESS
+}
+
+/// How long a hook waits for the daemon, as the configuration says.
+fn sync_budget(settings: &Settings) -> std::time::Duration {
+    std::time::Duration::from_millis(settings.daemon.sync_budget.as_millis())
 }
 
 /// `kintsu subscribe`: prints every bubble the daemon sends for the session

@@ -51,8 +51,8 @@ pub use rules::{DirEntry, Facts, Os, suggest_fix};
 pub use secret::SecretKey;
 pub use session::{Session, SessionDetails, SessionId};
 pub use settings::{
-    CaptureSettings, EagerFix, Hotkey, KeySource, ModelSpec, Provider, QuietSettings, Routing,
-    Settings, Tier, UiMode, UiSettings,
+    CaptureSettings, DaemonSettings, EagerFix, Hotkey, KeySource, ModelSpec, Provider,
+    QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
 };
 pub use shell::Shell;
 pub use time::{Duration, Timestamp};

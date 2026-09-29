@@ -63,8 +63,13 @@ srv = socketserver.TCPServer(("127.0.0.1", 0), H); port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 os.makedirs(ROOT, exist_ok=True)
 TEE = sys.argv[1:] == ["tee"]
-capture = '[capture]\nstderr_tee = true\n' if TEE else ''
-open(f"{ROOT}/config.toml", "w").write(f'[models.local]\nprovider = "ollama"\nmodel = "m"\nbase_url = "http://127.0.0.1:{port}"\n[routing]\nquick_fix = ["local"]\nexplain = ["local"]\n{capture}[ui]\neager_fix = true\n')
+def write_config(tee):
+    """The daemon's configuration; a generous sync budget, because on a slow
+    machine the hook would otherwise decide locally, save a second case,
+    and the daemon's answer would read as late."""
+    capture = '[capture]\nstderr_tee = true\n' if tee else ''
+    open(f"{ROOT}/config.toml", "w").write(f'[models.local]\nprovider = "ollama"\nmodel = "m"\nbase_url = "http://127.0.0.1:{port}"\n[routing]\nquick_fix = ["local"]\nexplain = ["local"]\n{capture}[ui]\neager_fix = true\n[daemon]\nsync_budget = "2s"\n')
+write_config(TEE)
 # A small, known PATH: the binary under test, a fake `git` so `gti` has one
 # unambiguous neighbour, and the system directories.
 os.makedirs(f"{ROOT}/bin", exist_ok=True)
@@ -345,6 +350,10 @@ def expect(title, lines, present=(), absent=(), last=None):
     if wrong_last: print(f"   expected last line {last!r}, saw {tail[-1] if tail else ''!r}")
     for i, line in enumerate(lines):
         if line.strip(): print(f"{i:2}| {line.rstrip()}")
+    try:
+        print("   daemon.log: " + " | ".join(open(f"{ROOT}/state/daemon.log").read().splitlines()[-5:]))
+    except FileNotFoundError:
+        print("   daemon.log: none")
     srv.shutdown(); sys.exit(1)
 
 BUBBLE = ["▎ false exited 1.", "▎ kintsu fix · kintsu why · kintsu agent · kintsu ignore · ^K more"]

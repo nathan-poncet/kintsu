@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    CaptureSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Money, Provider,
-    QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
+    CaptureSettings, DaemonSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Money,
+    Provider, QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -178,6 +178,7 @@ struct FileDto {
     quiet: QuietDto,
     ui: UiDto,
     capture: CaptureDto,
+    daemon: DaemonDto,
 }
 
 #[derive(Deserialize, Default)]
@@ -186,6 +187,12 @@ struct CaptureDto {
     sources: Option<Vec<String>>,
     max_lines: Option<usize>,
     stderr_tee: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct DaemonDto {
+    sync_budget: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -326,6 +333,14 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             .map(|d| expand_dir(d, home))
             .collect(),
     };
+    let daemon = DaemonSettings {
+        sync_budget: match file.daemon.sync_budget {
+            None => DaemonSettings::default().sync_budget,
+            Some(text) => parse_timeout(&text).ok_or_else(|| {
+                SettingsError::Invalid(format!("daemon.sync_budget: `{text}` (try 40ms, 2s)"))
+            })?,
+        },
+    };
     let ui = UiSettings {
         mode: match file.ui.mode.as_deref() {
             None | Some("toast") | Some("panel") => UiMode::Toast,
@@ -388,6 +403,7 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
         quiet,
         ui,
         capture,
+        daemon,
         sensitive_local_only,
         max_daily_cost,
     })
@@ -574,6 +590,27 @@ mod tests {
             parse_settings(&bare, None).unwrap(),
             Settings::default(),
             "{bare}"
+        );
+    }
+
+    #[test]
+    fn the_daemons_sync_budget_is_read_and_a_bad_one_is_named() {
+        assert_eq!(
+            parse_settings("", None).unwrap().daemon.sync_budget,
+            Duration::from_millis(40)
+        );
+        assert_eq!(
+            parse_settings("[daemon]\nsync_budget = \"2s\"\n", None)
+                .unwrap()
+                .daemon
+                .sync_budget,
+            Duration::from_secs(2)
+        );
+        assert!(
+            parse_settings("[daemon]\nsync_budget = \"soon\"\n", None)
+                .unwrap_err()
+                .to_string()
+                .contains("daemon.sync_budget: `soon`")
         );
     }
 
