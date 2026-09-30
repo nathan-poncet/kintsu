@@ -125,7 +125,7 @@ jobs:
           cargo llvm-cov --all-targets --locked --ignore-filename-regex 'src/main\.rs' \
             --fail-under-lines 90 --lcov --output-path lcov.info
           cargo llvm-cov report --ignore-filename-regex 'src/main\.rs' --summary-only >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lcov
           path: lcov.info
