@@ -10,4 +10,6 @@ pub trait Environment {
     fn executables(&self) -> Vec<String>;
     /// The entries of a directory; empty when it cannot be read.
     fn entries(&self, dir: &str) -> Vec<DirEntry>;
+    /// Whether Docker Desktop is installed: `/Applications/Docker.app`.
+    fn docker_desktop(&self) -> bool;
 }

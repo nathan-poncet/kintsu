@@ -5,7 +5,7 @@
 //! these follow rules of thefuck (MIT), redone here.
 
 use crate::entities::{
-    CommandLine, CommandOutcome, Confidence, Facts, Fix, FixSource, distance::closest,
+    CommandLine, CommandOutcome, Confidence, Facts, Fix, FixSource, Os, distance::closest,
 };
 
 type OutputRule = fn(&CommandOutcome, &Facts, &str) -> Option<Fix>;
@@ -36,8 +36,13 @@ pub fn suggest_fix_from_output(
         git_rm_recursive,
         git_rm_keeps_the_file,
         did_you_mean,
+        pip_externally_managed,
         pip_installs_for_the_user,
         python_module_missing,
+        docker_daemon_down,
+        git_dubious_ownership,
+        ssh_key_not_taken,
+        linker_cc_missing,
         mkdir_missing_parent,
         destination_directory_missing,
         rm_on_a_directory,
@@ -529,6 +534,38 @@ fn did_you_mean(outcome: &CommandOutcome, _: &Facts, output: &str) -> Option<Fix
     )
 }
 
+/// pip refused by a Python the system manages (PEP 668: Debian 12,
+/// Homebrew's): a project virtualenv takes the packages, the one here when
+/// there is one. `--break-system-packages` is what pip itself warns against.
+fn pip_externally_managed(outcome: &CommandOutcome, facts: &Facts, output: &str) -> Option<Fix> {
+    if !output.contains("externally-managed-environment") {
+        return None;
+    }
+    let words = outcome.command().words();
+    if !matches!(words.first().copied(), Some("pip" | "pip3")) {
+        return None;
+    }
+    let install = position(&words, "install")?;
+    let packages = words[install + 1..].join(" ");
+    if packages.is_empty() {
+        return None;
+    }
+    if facts.is_dir_here(".venv") {
+        return fix(
+            format!(".venv/bin/pip install {packages}"),
+            0.7,
+            "externally managed",
+            "This Python is managed by the system (PEP 668); the project's `.venv` takes the packages.".into(),
+        );
+    }
+    fix(
+        format!("python3 -m venv .venv && .venv/bin/pip install {packages}"),
+        0.7,
+        "externally managed",
+        "This Python is managed by the system (PEP 668); a project virtualenv takes the packages. For a tool you run, `pipx install` instead.".into(),
+    )
+}
+
 /// `pip install` refused for the system's site-packages.
 fn pip_installs_for_the_user(outcome: &CommandOutcome, _: &Facts, output: &str) -> Option<Fix> {
     let words = outcome.command().words();
@@ -595,6 +632,121 @@ fn python_module_missing(outcome: &CommandOutcome, _: &Facts, output: &str) -> O
         0.7,
         "missing module",
         format!("`{top}` is not installed for this Python; `{package}` is its package."),
+    )
+}
+
+/// "Cannot connect to the Docker daemon": nothing listens on its socket;
+/// start whatever runs it on this machine. Docker Desktop takes a while to
+/// come up, so the command is not chained after it.
+fn docker_daemon_down(outcome: &CommandOutcome, facts: &Facts, output: &str) -> Option<Fix> {
+    if !output.contains("Cannot connect to the Docker daemon") {
+        return None;
+    }
+    let command = outcome.command().as_str();
+    if facts.os == Some(Os::Mac) && facts.docker_desktop {
+        return fix(
+            "open -a Docker".into(),
+            0.75,
+            "docker daemon",
+            "The Docker daemon is not running; Docker Desktop starts it. Run the command again once it is up.".into(),
+        );
+    }
+    if facts.has_program("colima") {
+        return fix(
+            format!("colima start && {command}"),
+            0.75,
+            "docker daemon",
+            "The Docker daemon is not running; `colima start` brings it up.".into(),
+        );
+    }
+    if facts.os == Some(Os::Linux) {
+        return fix(
+            format!("sudo systemctl start docker && {command}"),
+            0.75,
+            "docker daemon",
+            "The Docker daemon is not running; systemd starts it.".into(),
+        );
+    }
+    None
+}
+
+/// git refuses a repository another user owns, and prints the exception
+/// to add. The path goes back into the command only as a plain path.
+fn git_dubious_ownership(outcome: &CommandOutcome, _: &Facts, output: &str) -> Option<Fix> {
+    if !output.contains("detected dubious ownership in repository at '") {
+        return None;
+    }
+    let dir = safe_token(between(
+        output,
+        "detected dubious ownership in repository at '",
+        "'",
+    )?)?;
+    fix(
+        format!(
+            "git config --global --add safe.directory {dir} && {}",
+            outcome.command().as_str()
+        ),
+        0.75,
+        "dubious ownership",
+        format!(
+            "`{dir}` belongs to another user; git refuses it until you say you trust that directory."
+        ),
+    )
+}
+
+/// "Permission denied (publickey)": the server took none of the keys the
+/// agent offered. Loading the default key is the usual cure; a key that
+/// was never set up for this host is the other cause, said in the rationale.
+fn ssh_key_not_taken(outcome: &CommandOutcome, facts: &Facts, output: &str) -> Option<Fix> {
+    if !output.contains("Permission denied (publickey") {
+        return None;
+    }
+    let add = if facts.os == Some(Os::Mac) {
+        "ssh-add --apple-use-keychain"
+    } else {
+        "ssh-add"
+    };
+    fix(
+        format!("{add} && {}", outcome.command().as_str()),
+        0.6,
+        "ssh key",
+        "The server took none of the keys the agent offered; `ssh-add` loads your default key. If no key is set up for this host, that is the cause.".into(),
+    )
+}
+
+/// rustc, or any C build, without a linker: the system's build tools are
+/// missing. A link that failed for a missing library is another story and
+/// is left alone.
+fn linker_cc_missing(outcome: &CommandOutcome, facts: &Facts, output: &str) -> Option<Fix> {
+    let no_linker = output.contains("linker `cc` not found")
+        || (output.contains("linking with `cc` failed")
+            && contains_any(
+                output,
+                &[
+                    "cc: not found",
+                    "cc: command not found",
+                    "No such file or directory (os error 2)",
+                ],
+            ));
+    if !no_linker {
+        return None;
+    }
+    let command = outcome.command().as_str();
+    let install = match facts.os {
+        Some(Os::Mac) => "xcode-select --install".to_string(),
+        _ if facts.has_program("apt") || facts.has_program("apt-get") => {
+            format!("sudo apt install build-essential && {command}")
+        }
+        _ if facts.has_program("dnf") => {
+            format!("sudo dnf groupinstall \"Development Tools\" && {command}")
+        }
+        _ => return None,
+    };
+    fix(
+        install,
+        0.75,
+        "no linker",
+        "No C linker (`cc`) is installed; the system's build tools provide one.".into(),
     )
 }
 
@@ -884,6 +1036,164 @@ mod tests {
     }
     fn none(text: &str, code: i32, output: &str) -> bool {
         suggest_fix_from_output(&outcome(text, code), &Facts::default(), output).is_none()
+    }
+    fn machine(os: Os, programs: &[&str], dirs: &[&str], docker_desktop: bool) -> Facts {
+        Facts {
+            os: Some(os),
+            executables: programs.iter().map(|p| p.to_string()).collect(),
+            cwd_entries: dirs
+                .iter()
+                .map(|d| crate::entities::DirEntry {
+                    name: d.to_string(),
+                    is_dir: true,
+                    is_executable: true,
+                })
+                .collect(),
+            docker_desktop,
+        }
+    }
+
+    const PEP_668: &str = "error: externally-managed-environment\n\n× This environment is externally managed\n╰─> To install Python packages system-wide, try apt install\n    python3-xyz, where xyz is the package you are trying to\n    install.\n    \n    If you wish to install a non-Debian-packaged Python package,\n    create a virtual environment using python3 -m venv path/to/venv.\n\nnote: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.\nhint: See PEP 668 for the detailed specification.";
+
+    #[test]
+    fn a_system_managed_python_sends_pip_to_a_virtualenv_the_one_here_first() {
+        let fix = fixed("pip install requests", 1, PEP_668);
+        assert_eq!(
+            fix.command().as_str(),
+            "python3 -m venv .venv && .venv/bin/pip install requests"
+        );
+        assert!(!fix.is_ghostable(), "a guess about the project");
+        assert!(
+            fix.rationale().contains("pipx"),
+            "the tool case is said, not guessed"
+        );
+        let with_venv = machine(Os::Linux, &["pip3"], &[".venv"], false);
+        assert_eq!(
+            fixed_with("pip3 install -r requirements.txt", 1, PEP_668, &with_venv)
+                .command()
+                .as_str(),
+            ".venv/bin/pip install -r requirements.txt"
+        );
+        assert!(none("pip install", 1, PEP_668), "nothing to install");
+        assert!(
+            none("pip list", 1, PEP_668),
+            "only an install is redirected"
+        );
+    }
+
+    const NO_DOCKER: &str = "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?";
+
+    #[test]
+    fn a_docker_daemon_that_is_down_is_started_the_way_this_machine_runs_it() {
+        let desktop = machine(Os::Mac, &["docker"], &[], true);
+        assert_eq!(
+            fixed_with("docker ps", 1, NO_DOCKER, &desktop)
+                .command()
+                .as_str(),
+            "open -a Docker",
+            "Docker Desktop takes a while: the command is not chained"
+        );
+        let colima = machine(Os::Mac, &["docker", "colima"], &[], false);
+        assert_eq!(
+            fixed_with("docker compose up -d", 1, NO_DOCKER, &colima)
+                .command()
+                .as_str(),
+            "colima start && docker compose up -d"
+        );
+        let linux = machine(Os::Linux, &["docker"], &[], false);
+        let fix = fixed_with("docker ps", 1, NO_DOCKER, &linux);
+        assert_eq!(
+            fix.command().as_str(),
+            "sudo systemctl start docker && docker ps"
+        );
+        assert_eq!(fix.danger(), &Danger::NeedsPrivilege);
+        let bare_mac = machine(Os::Mac, &["docker"], &[], false);
+        assert!(
+            suggest_fix_from_output(&outcome("docker ps", 1), &bare_mac, NO_DOCKER).is_none(),
+            "neither Docker Desktop nor colima: nothing to start"
+        );
+    }
+
+    #[test]
+    fn a_repository_another_user_owns_is_trusted_by_the_line_git_prints() {
+        let out = "fatal: detected dubious ownership in repository at '/srv/app'\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory /srv/app";
+        let fix = fixed("git status", 128, out);
+        assert_eq!(
+            fix.command().as_str(),
+            "git config --global --add safe.directory /srv/app && git status"
+        );
+        assert!(!fix.is_ghostable(), "trust is the user's call");
+        assert!(
+            none(
+                "git status",
+                128,
+                "fatal: detected dubious ownership in repository at '/srv/$(rm -rf ~)'"
+            ),
+            "nothing from the output that the shell would read as syntax"
+        );
+    }
+
+    #[test]
+    fn a_key_the_server_took_none_of_is_loaded_into_the_agent_first() {
+        let out = "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.";
+        let linux = machine(Os::Linux, &["git"], &[], false);
+        let fix = fixed_with("git push", 128, out, &linux);
+        assert_eq!(fix.command().as_str(), "ssh-add && git push");
+        assert!(
+            fix.confidence().value() < 0.7,
+            "a guess: the key may not exist"
+        );
+        let mac = machine(Os::Mac, &["ssh"], &[], false);
+        assert_eq!(
+            fixed_with(
+                "ssh deploy@host",
+                255,
+                "deploy@host: Permission denied (publickey,password).",
+                &mac
+            )
+            .command()
+            .as_str(),
+            "ssh-add --apple-use-keychain && ssh deploy@host"
+        );
+    }
+
+    #[test]
+    fn a_missing_linker_installs_the_build_tools_a_missing_library_does_not() {
+        let no_linker = "error: linker `cc` not found\n  |\n  = note: No such file or directory (os error 2)\n\nerror: could not compile `kintsu` (bin \"kintsu\") due to 1 previous error";
+        let mac = machine(Os::Mac, &["cargo"], &[], false);
+        assert_eq!(
+            fixed_with("cargo build", 101, no_linker, &mac)
+                .command()
+                .as_str(),
+            "xcode-select --install"
+        );
+        let debian = machine(Os::Linux, &["cargo", "apt"], &[], false);
+        assert_eq!(
+            fixed_with("cargo build", 101, no_linker, &debian)
+                .command()
+                .as_str(),
+            "sudo apt install build-essential && cargo build"
+        );
+        let fedora = machine(Os::Linux, &["cargo", "dnf"], &[], false);
+        assert_eq!(
+            fixed_with("cargo build", 101, no_linker, &fedora)
+                .command()
+                .as_str(),
+            "sudo dnf groupinstall \"Development Tools\" && cargo build"
+        );
+        let missing_lib = "error: linking with `cc` failed: exit status: 1\n  = note: /usr/bin/ld: cannot find -lssl: No such file or directory\n          collect2: error: ld returned 1 exit status";
+        assert!(
+            suggest_fix_from_output(&outcome("cargo build", 101), &debian, missing_lib).is_none(),
+            "a library is missing, not the linker"
+        );
+        let no_cc =
+            "error: linking with `cc` failed: exit status: 127\n  = note: sh: 1: cc: not found";
+        assert_eq!(
+            fixed_with("cargo build", 101, no_cc, &debian)
+                .command()
+                .as_str(),
+            "sudo apt install build-essential && cargo build"
+        );
     }
 
     #[test]
@@ -1302,11 +1612,12 @@ mod tests {
     #[test]
     fn sudo_is_not_offered_where_it_would_be_wrong() {
         assert!(
-            none(
+            command(
                 "git push",
                 128,
                 "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository."
-            ),
+            )
+            .starts_with("ssh-add"),
             "an ssh key problem, not a root one"
         );
         assert!(

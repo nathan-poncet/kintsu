@@ -197,6 +197,8 @@ pub struct FakeEnvironment {
     pub executables: Vec<String>,
     pub entries: HashMap<String, Vec<DirEntry>>,
     pub path_reads: Cell<u32>,
+    pub docker_desktop: bool,
+    pub docker_reads: Cell<u32>,
 }
 
 impl FakeEnvironment {
@@ -221,6 +223,11 @@ impl Environment for FakeEnvironment {
 
     fn entries(&self, dir: &str) -> Vec<DirEntry> {
         self.entries.get(dir).cloned().unwrap_or_default()
+    }
+
+    fn docker_desktop(&self) -> bool {
+        self.docker_reads.set(self.docker_reads.get() + 1);
+        self.docker_desktop
     }
 }
 
