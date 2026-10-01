@@ -25,6 +25,7 @@ impl Bench {
             log_path: self.dir.join("d.log"),
             exe: PathBuf::from("/definitely/not/kintsu"),
             path_var: self.dir.join("bin").display().to_string(),
+            locale: None,
             color: false,
             tty_color: false,
             terminal_color: false,

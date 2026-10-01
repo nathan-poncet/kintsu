@@ -17,7 +17,7 @@ use crate::adapters::presenters::{
     hand_off_notice, ignored, pending_line, privacy_report, raw_fix, shell_hook,
 };
 use crate::daemon::{self, DaemonConfig};
-use crate::entities::{Hotkey, SessionId, Settings, Shell, TerminalIdentity, UiMode};
+use crate::entities::{Hotkey, Language, SessionId, Settings, Shell, TerminalIdentity, UiMode};
 use crate::use_cases::ports::SessionRegistry;
 use crate::use_cases::{
     Check, Costs, Diagnose, Explain, FixLast, HandOff, Health, Ignore, IgnoreRequest, Privacy,
@@ -91,6 +91,9 @@ pub struct Runtime {
     pub log_path: PathBuf,
     pub exe: PathBuf,
     pub path_var: String,
+    /// The locale variable the process found first (`LC_ALL`, `LC_MESSAGES`,
+    /// `LANG`), name and value, for the models' language and the doctor.
+    pub locale: Option<(String, String)>,
     pub color: bool,
     /// Colour for what is drawn on the tty itself, whatever stdout is.
     pub tty_color: bool,
@@ -108,6 +111,13 @@ pub struct Runtime {
 impl Runtime {
     fn client(&self) -> DaemonClient {
         DaemonClient::new(&self.socket_path, &self.exe, &self.log_path)
+    }
+
+    /// The language the locale names, when kintsu knows it.
+    pub fn machine_language(&self) -> Option<Language> {
+        self.locale
+            .as_ref()
+            .and_then(|(_, value)| Language::from_locale(value))
     }
 }
 
@@ -183,6 +193,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 config_path: rt.config_path.clone(),
                 home: rt.home.clone(),
                 path_var: rt.path_var.clone(),
+                language: rt.machine_language(),
             });
         }
         Command::Daemon(DaemonAction::Stop) => {
@@ -253,6 +264,10 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             }
         }
     };
+    // `auto` settles on this machine's language; the doctor still says what
+    // the file asked for and where the language came from.
+    let configured_language = settings.ui.language;
+    let settings = settings.with_machine_language(rt.machine_language());
     let style = Style {
         color: rt.color,
         ascii: settings.ui.ascii,
@@ -457,6 +472,8 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                     .and_then(|s| s.shell()),
                 ledger: &ledger,
                 clock: &SystemClock,
+                configured_language,
+                locale: rt.locale.as_ref().map(|(n, v)| (n.as_str(), v.as_str())),
             }
             .run(session);
             checks.push(store_check(&state));

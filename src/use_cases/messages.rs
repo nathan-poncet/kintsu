@@ -108,7 +108,7 @@ impl Messages<'_> {
             self.models,
             self.secrets,
             &candidates,
-            &quick_fix_prompt(case),
+            &quick_fix_prompt(case, self.settings.language()),
             &meter,
         );
         let in_focus = self.focus().holds(case)?;

@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::entities::TerminalIdentity;
 use crate::entities::{
-    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, SessionDetails, SessionId,
-    Shell,
+    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, Language, SessionDetails,
+    SessionId, Shell,
 };
 use crate::use_cases::TriageInput;
 
@@ -153,6 +153,7 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 terminal: terminal_identity(v.get("terminal")),
                 path: optional("path"),
                 env: forwarded_env(v.get("env")),
+                language: optional("language").and_then(|tag| Language::from_tag(&tag)),
             }),
         }),
         "command_finished" => {
@@ -184,6 +185,7 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 terminal: terminal_identity(v.get("terminal")),
                 path: optional("path"),
                 env: forwarded_env(v.get("env")),
+                language: optional("language").and_then(|tag| Language::from_tag(&tag)),
             };
             let signal_pid = v
                 .get("signal_pid")
@@ -245,7 +247,7 @@ mod tests {
 
     #[test]
     fn a_shell_that_starts_registers_what_it_is() {
-        let line = r#"{"v":1,"type":"session_new","version":"0.2.0","session":"4242","shell":"fish","pid":4242,"tty":"/dev/ttys004","path":"/w/bin","env":{"K":"v"},"terminal":{"program":"ghostty","kitty_window":"7"}}"#;
+        let line = r#"{"v":1,"type":"session_new","version":"0.2.0","session":"4242","shell":"fish","pid":4242,"tty":"/dev/ttys004","path":"/w/bin","env":{"K":"v"},"language":"fr","terminal":{"program":"ghostty","kitty_window":"7"}}"#;
         let Request::SessionNew { session, details } = parse_frame(line).unwrap() else {
             panic!()
         };
@@ -255,6 +257,7 @@ mod tests {
         assert_eq!(details.tty.as_deref(), Some("/dev/ttys004"));
         assert_eq!(details.path.as_deref(), Some("/w/bin"));
         assert_eq!(details.env.get("K").map(String::as_str), Some("v"));
+        assert_eq!(details.language, Some(Language::French));
         assert_eq!(details.terminal.kitty_window.as_deref(), Some("7"));
         let bare = parse_frame(r#"{"v":1,"type":"session_new","session":"1"}"#).unwrap();
         let Request::SessionNew { details, .. } = bare else {
@@ -269,7 +272,7 @@ mod tests {
 
     #[test]
     fn a_finished_command_becomes_a_triage_input() {
-        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","env":{"ANTHROPIC_API_KEY":"sk-test","ODD":7},"color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty","stderr_copy":"/s/sessions/42.stderr"}}"#;
+        let line = r#"{"v":1,"type":"command_finished","session":"42","command":"make test","status":2,"duration_ms":12000,"cwd":"/w","shell":"zsh","path":"/w/bin:/usr/bin","env":{"ANTHROPIC_API_KEY":"sk-test","ODD":7},"language":"de","color":true,"signal_pid":4242,"terminal":{"herdr_pane":"wS:p1","tmux_pane":"","program":"ghostty","stderr_copy":"/s/sessions/42.stderr"}}"#;
         let Request::CommandFinished {
             input,
             color,

@@ -91,7 +91,7 @@ impl Explain<'_> {
             self.models,
             self.secrets,
             &candidates,
-            &explain_prompt(&case),
+            &explain_prompt(&case, self.settings.language()),
             &self.meter(),
         );
         self.keep(case, answered)
@@ -110,7 +110,7 @@ impl Explain<'_> {
             self.models,
             self.secrets,
             &candidates,
-            &explain_prompt(&case),
+            &explain_prompt(&case, self.settings.language()),
             &self.meter(),
             on_chunk,
         );

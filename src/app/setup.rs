@@ -78,6 +78,8 @@ pub(super) fn run(rt: &Runtime, yes: bool, out: &mut dyn Write, err: &mut dyn Wr
         shell: None,
         ledger: &JsonlLedger::new(&rt.state_dir),
         clock: &SystemClock,
+        configured_language: settings.ui.language,
+        locale: rt.locale.as_ref().map(|(n, v)| (n.as_str(), v.as_str())),
     }
     .run(rt.session.as_ref());
     let places = Places {

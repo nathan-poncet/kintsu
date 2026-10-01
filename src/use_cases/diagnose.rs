@@ -1,7 +1,7 @@
 //! `kintsu doctor`: is the hook active, are the models reachable in
 //! principle, are the keys where the configuration says.
 
-use crate::entities::{KeySource, Provider, SessionId, Settings, Shell};
+use crate::entities::{KeySource, Language, LanguageSetting, Provider, SessionId, Settings, Shell};
 use crate::use_cases::ports::{Clock, CostLedger, Environment, ModelGateway, Secrets};
 use crate::use_cases::routing::spent_today;
 
@@ -34,6 +34,10 @@ pub struct Diagnose<'a> {
     pub shell: Option<Shell>,
     pub ledger: &'a dyn CostLedger,
     pub clock: &'a dyn Clock,
+    /// `[ui] language` as the file says it, before `auto` was settled.
+    pub configured_language: LanguageSetting,
+    /// The locale variable the process found first, name and value.
+    pub locale: Option<(&'a str, &'a str)>,
 }
 
 impl Diagnose<'_> {
@@ -160,6 +164,25 @@ impl Diagnose<'_> {
                 None => {}
             }
         }
+        let (health, detail) = match (self.configured_language, self.locale) {
+            (LanguageSetting::Fixed(language), _) => {
+                (Health::Ok, format!("{language}, from [ui] language"))
+            }
+            (LanguageSetting::Auto, Some((name, value))) => match Language::from_locale(value) {
+                Some(language) => (Health::Ok, format!("{language}, from {name}={value}")),
+                None => (
+                    Health::Warning,
+                    format!(
+                        "English, the default: {name}={value} names no language kintsu knows; set [ui] language"
+                    ),
+                ),
+            },
+            (LanguageSetting::Auto, None) => (
+                Health::Ok,
+                "English, the default: no LC_ALL, LC_MESSAGES or LANG in the environment".into(),
+            ),
+        };
+        checks.push(check("language", health, detail));
         let routing = &self.settings.routing;
         for (task, names) in [
             ("explain", &routing.explain),
@@ -219,6 +242,60 @@ mod tests {
     use crate::use_cases::testing::*;
 
     #[test]
+    fn the_language_check_says_which_and_where_it_came_from() {
+        let settings = Settings::default();
+        let base = Diagnose {
+            settings: &settings,
+            secrets: &MapSecrets::with(&[]),
+            environment: &FakeEnvironment::with_executables(&[]),
+            models: &ScriptedModels::default(),
+            service_installed: false,
+            shell: None,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
+            configured_language: LanguageSetting::Auto,
+            locale: None,
+        };
+        let language = |uc: &Diagnose<'_>| {
+            uc.run(None)
+                .into_iter()
+                .find(|c| c.subject == "language")
+                .unwrap()
+        };
+        let none = language(&base);
+        assert_eq!(none.health, Health::Ok);
+        assert!(
+            none.detail.starts_with("English, the default"),
+            "{}",
+            none.detail
+        );
+        let french = language(&Diagnose {
+            locale: Some(("LANG", "fr_FR.UTF-8")),
+            ..base
+        });
+        assert_eq!(
+            (french.health, french.detail.as_str()),
+            (Health::Ok, "French, from LANG=fr_FR.UTF-8")
+        );
+        let unknown = language(&Diagnose {
+            locale: Some(("LC_ALL", "xx_YY")),
+            ..base
+        });
+        assert_eq!(unknown.health, Health::Warning);
+        assert!(
+            unknown.detail.contains("LC_ALL=xx_YY"),
+            "{}",
+            unknown.detail
+        );
+        let fixed = language(&Diagnose {
+            configured_language: LanguageSetting::Fixed(Language::German),
+            locale: Some(("LANG", "fr_FR.UTF-8")),
+            ..base
+        });
+        assert_eq!(fixed.detail, "German, from [ui] language");
+    }
+
+    #[test]
     fn every_kind_of_setup_gets_a_verdict() {
         let mut cloud = spec("cloud", Provider::Anthropic, Tier::Small);
         cloud.key = KeySource::Env("ANTHROPIC_API_KEY".into());
@@ -252,6 +329,8 @@ mod tests {
             shell: Some(Shell::Zsh),
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            configured_language: LanguageSetting::Auto,
+            locale: None,
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let health = |subject: &str| {
@@ -303,6 +382,8 @@ mod tests {
             shell: None,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            configured_language: LanguageSetting::Auto,
+            locale: None,
         };
         let report = uc.run(Some(&SessionId::new("42")));
         let daemon = report.iter().find(|c| c.subject == "daemon").unwrap();
@@ -334,6 +415,8 @@ mod tests {
             shell: None,
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
+            configured_language: LanguageSetting::Auto,
+            locale: None,
         };
         let report = uc.run(None);
         assert_eq!(report[0].health, Health::Problem);
@@ -373,6 +456,8 @@ mod tests {
                 clock: &clock,
                 service_installed: false,
                 shell: None,
+                configured_language: LanguageSetting::Auto,
+                locale: None,
             }
             .run(None)
             .into_iter()
@@ -416,6 +501,8 @@ mod tests {
                 service_installed: false,
                 ledger: &MemoryLedger::default(),
                 clock: &FakeClock::at(0),
+                configured_language: LanguageSetting::Auto,
+                locale: None,
             }
             .run(Some(&SessionId::new("42")))
             .into_iter()

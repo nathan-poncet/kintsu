@@ -72,6 +72,9 @@ fn main() -> ExitCode {
         socket_path,
         home,
         path_var: std::env::var("PATH").unwrap_or_default(),
+        locale: ["LC_ALL", "LC_MESSAGES", "LANG"]
+            .iter()
+            .find_map(|name| var(name).map(|value| (name.to_string(), value))),
         color: std::env::var_os("NO_COLOR").is_none()
             && std::io::stderr().is_terminal()
             && std::io::stdout().is_terminal(),

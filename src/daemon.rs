@@ -22,7 +22,9 @@ use crate::adapters::gateways::{
 };
 use crate::adapters::presenters::ignored;
 use crate::adapters::presenters::{Style, frames, message_toast, pending_line, toast};
-use crate::entities::{Action, CaseId, Hotkey, SessionId, Settings, Shell, TriageDecision, UiMode};
+use crate::entities::{
+    Action, CaseId, Hotkey, Language, SessionId, Settings, Shell, TriageDecision, UiMode,
+};
 use crate::use_cases::ports::Secrets;
 use crate::use_cases::{
     CaptureOutput, Focus, Ignore, IgnoreRequest, Messages, ScopeChoice, Triage, TriageInput,
@@ -38,6 +40,9 @@ pub struct DaemonConfig {
     pub config_path: PathBuf,
     pub home: Option<String>,
     pub path_var: String,
+    /// What the daemon's own locale names; the last resort for a shell
+    /// that said nothing.
+    pub language: Option<Language>,
 }
 
 /// Runs until `shutdown`, an outdated client, or a fatal error.
@@ -175,6 +180,16 @@ impl Daemon {
         SessionSecrets::new(session.map(|s| self.sessions.env_of(s)).unwrap_or_default())
     }
 
+    /// The configuration with `auto` settled on the shell's language: what
+    /// the frame says, else what the shell registered, else the daemon's own
+    /// locale, which under launchd or systemd names nothing.
+    fn settings_for(&self, session: Option<&SessionId>, reported: Option<Language>) -> Settings {
+        let machine = reported
+            .or_else(|| session.and_then(|s| self.sessions.language_of(s)))
+            .or(self.cfg.language);
+        self.settings().with_machine_language(machine)
+    }
+
     fn state(&self) -> &SqliteState {
         &self.state
     }
@@ -275,7 +290,7 @@ fn on_command_finished(
     color: bool,
     signal_pid: Option<u32>,
 ) {
-    let settings = daemon.settings();
+    let settings = daemon.settings_for(input.session.as_ref(), input.language);
     let style = daemon.style(&settings, color);
     let session = input.session.clone();
     let ghost_shell = input.shell.is_some_and(Shell::supports_ghost_text);
@@ -289,6 +304,9 @@ fn on_command_finished(
         && !input.env.is_empty()
     {
         daemon.sessions.remember_env(session, input.env.clone());
+    }
+    if let (Some(session), Some(language)) = (&session, input.language) {
+        daemon.sessions.remember_language(session, language);
     }
     // What the frame does not say, the shell's registration may have said.
     // The daemon's own PATH, the bare system one under launchd or systemd,
@@ -398,7 +416,7 @@ fn on_command_finished(
 
 /// `kintsu why` through the daemon: say which model is asked, answer later.
 fn on_explain(daemon: &Arc<Daemon>, stream: &mut UnixStream, session: SessionId) {
-    let settings = daemon.settings();
+    let settings = daemon.settings_for(Some(&session), None);
     let state = daemon.state();
     let secrets = daemon.secrets_for(Some(&session));
     let candidate = messages(daemon, &settings, state, &secrets).explain_candidate(&session);
@@ -434,7 +452,7 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
     let _ = send_line(stream, &frames::ack());
     let daemon = Arc::clone(daemon);
     std::thread::spawn(move || {
-        let settings = daemon.settings();
+        let settings = daemon.settings_for(Some(&session), None);
         let state = daemon.state();
         let secrets = daemon.secrets_for(Some(&session));
         let messages = messages(&daemon, &settings, state, &secrets);

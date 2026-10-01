@@ -293,6 +293,124 @@ impl fmt::Display for Hotkey {
     }
 }
 
+/// The language the models answer in. Commands and code have none; rule
+/// texts are code too and stay English.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Language {
+    #[default]
+    English,
+    French,
+    German,
+    Spanish,
+    Italian,
+    Portuguese,
+    Dutch,
+    Polish,
+    Russian,
+    Japanese,
+    Chinese,
+    Korean,
+}
+
+/// ISO 639-1 code, English name.
+const LANGUAGES: &[(Language, &str, &str)] = &[
+    (Language::English, "en", "English"),
+    (Language::French, "fr", "French"),
+    (Language::German, "de", "German"),
+    (Language::Spanish, "es", "Spanish"),
+    (Language::Italian, "it", "Italian"),
+    (Language::Portuguese, "pt", "Portuguese"),
+    (Language::Dutch, "nl", "Dutch"),
+    (Language::Polish, "pl", "Polish"),
+    (Language::Russian, "ru", "Russian"),
+    (Language::Japanese, "ja", "Japanese"),
+    (Language::Chinese, "zh", "Chinese"),
+    (Language::Korean, "ko", "Korean"),
+];
+
+impl Language {
+    /// From a code or an English name, any case: `fr`, `FR`, `french`.
+    pub fn from_tag(tag: &str) -> Option<Self> {
+        let tag = tag.trim().to_ascii_lowercase();
+        LANGUAGES
+            .iter()
+            .find(|(_, code, name)| *code == tag || name.to_ascii_lowercase() == tag)
+            .map(|(language, _, _)| *language)
+    }
+
+    /// From a locale as `LANG` holds it: `fr_FR.UTF-8`, `fr-CA`, `fr`.
+    /// `C` and `POSIX` are English; a language this list does not know is
+    /// nothing, and the caller falls back to English.
+    pub fn from_locale(locale: &str) -> Option<Self> {
+        let locale = locale.trim();
+        let language = locale
+            .split(['_', '-', '.', '@'])
+            .next()
+            .unwrap_or_default();
+        match language {
+            "" | "C" | "POSIX" => Some(Language::English),
+            code => Self::from_tag(code),
+        }
+    }
+
+    /// The ISO 639-1 code: `fr`.
+    pub fn code(self) -> &'static str {
+        LANGUAGES
+            .iter()
+            .find(|(language, _, _)| *language == self)
+            .map_or("en", |(_, code, _)| code)
+    }
+
+    /// The English name, for a prompt: `French`.
+    pub fn name(self) -> &'static str {
+        LANGUAGES
+            .iter()
+            .find(|(language, _, _)| *language == self)
+            .map_or("English", |(_, _, name)| name)
+    }
+
+    /// Every code the configuration accepts, for an error message.
+    pub fn codes() -> impl Iterator<Item = &'static str> {
+        LANGUAGES.iter().map(|(_, code, _)| *code)
+    }
+}
+
+/// For people: `French`.
+impl fmt::Display for Language {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+/// `[ui] language`: follow the machine, or one language whatever it says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LanguageSetting {
+    /// The shell's locale decides; English when it says nothing kintsu knows.
+    #[default]
+    Auto,
+    Fixed(Language),
+}
+
+impl LanguageSetting {
+    /// From the configuration: `auto`, a code or an English name.
+    pub fn parse(text: &str) -> Result<Self, LanguageError> {
+        let text = text.trim();
+        if text.eq_ignore_ascii_case("auto") {
+            return Ok(Self::Auto);
+        }
+        Language::from_tag(text)
+            .map(Self::Fixed)
+            .ok_or_else(|| LanguageError::Unknown(text.to_string()))
+    }
+}
+
+/// Why a configuration value is not a language.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum LanguageError {
+    #[error("`{0}` is not a language kintsu knows; write `auto` or one of {codes}", codes = Language::codes().collect::<Vec<_>>().join(", "))]
+    Unknown(String),
+}
+
 /// Presentation choices.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UiSettings {
@@ -306,6 +424,8 @@ pub struct UiSettings {
     pub links: bool,
     /// The key that opens the panel.
     pub hotkey: Hotkey,
+    /// The language the models answer in.
+    pub language: LanguageSetting,
 }
 
 impl Default for UiSettings {
@@ -316,6 +436,7 @@ impl Default for UiSettings {
             eager_fix: EagerFix::default(),
             links: true,
             hotkey: Hotkey::DEFAULT,
+            language: LanguageSetting::Auto,
         }
     }
 }
@@ -409,11 +530,92 @@ impl Settings {
     pub fn candidates(&self, names: &[String]) -> Vec<&ModelSpec> {
         names.iter().filter_map(|n| self.model(n)).collect()
     }
+
+    /// The language the models answer in: the configured one, else what
+    /// `with_machine_language` settled on, else English.
+    pub fn language(&self) -> Language {
+        match self.ui.language {
+            LanguageSetting::Fixed(language) => language,
+            LanguageSetting::Auto => Language::English,
+        }
+    }
+
+    /// Settles `auto` on the machine's language, when the edge knows it. A
+    /// configured language is left alone.
+    pub fn with_machine_language(mut self, machine: Option<Language>) -> Self {
+        if let (LanguageSetting::Auto, Some(language)) = (self.ui.language, machine) {
+            self.ui.language = LanguageSetting::Fixed(language);
+        }
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_locale_names_its_language_and_c_and_posix_mean_english() {
+        assert_eq!(Language::from_locale("fr_FR.UTF-8"), Some(Language::French));
+        assert_eq!(Language::from_locale("fr-CA"), Some(Language::French));
+        assert_eq!(Language::from_locale("de_DE@euro"), Some(Language::German));
+        assert_eq!(
+            Language::from_locale("en_US.UTF-8"),
+            Some(Language::English)
+        );
+        for plain in ["C", "POSIX", "C.UTF-8", ""] {
+            assert_eq!(
+                Language::from_locale(plain),
+                Some(Language::English),
+                "{plain}"
+            );
+        }
+        assert_eq!(
+            Language::from_locale("xx_YY.UTF-8"),
+            None,
+            "unknown: the caller's default"
+        );
+        assert_eq!(Language::from_tag("FR"), Some(Language::French));
+        assert_eq!(Language::from_tag("french"), Some(Language::French));
+        assert_eq!(Language::from_tag("klingon"), None);
+        assert_eq!(Language::French.code(), "fr");
+        assert_eq!(Language::French.to_string(), "French");
+    }
+
+    #[test]
+    fn the_language_setting_follows_the_machine_unless_the_configuration_fixes_one() {
+        assert_eq!(LanguageSetting::parse("auto"), Ok(LanguageSetting::Auto));
+        assert_eq!(
+            LanguageSetting::parse("fr"),
+            Ok(LanguageSetting::Fixed(Language::French))
+        );
+        let err = LanguageSetting::parse("xx").unwrap_err().to_string();
+        assert!(
+            err.contains("`xx`") && err.contains("auto") && err.contains("fr"),
+            "{err}"
+        );
+        let auto = Settings::default();
+        assert_eq!(auto.language(), Language::English, "nothing known: English");
+        assert_eq!(
+            auto.clone()
+                .with_machine_language(Some(Language::French))
+                .language(),
+            Language::French
+        );
+        assert_eq!(
+            auto.with_machine_language(None).language(),
+            Language::English
+        );
+        let mut fixed = Settings::default();
+        fixed.ui.language = LanguageSetting::Fixed(Language::German);
+        assert_eq!(
+            fixed
+                .with_machine_language(Some(Language::French))
+                .language(),
+            Language::German,
+            "the configuration wins over the machine"
+        );
+    }
 
     #[test]
     fn a_hotkey_is_one_control_letter_in_any_of_the_usual_notations() {
