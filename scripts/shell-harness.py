@@ -110,10 +110,12 @@ def alias_steps(send, screen, record):
     """An alias whose program is gone, then a typo of it: the rule explains
     the first and corrects the second, because the shell listed its aliases
     when it registered."""
-    send("hmz\n", 1.0)
+    # The first frame reaches a daemon that just started with the shell's
+    # registration: runners need more than the usual second here.
+    send("hmz\n", 1.6)
     gone = [l.rstrip() for l in screen.display if l.strip()]
     send("clear\n", 0.5)
-    send("hmz2\n", 1.0)
+    send("hmz2\n", 1.2)
     typo = [l.rstrip() for l in screen.display if l.strip()]
     if record is not None:
         record["alias gone"] = gone; record["alias typo"] = typo
