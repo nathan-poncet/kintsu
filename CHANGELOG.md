@@ -142,6 +142,17 @@ All notable changes to kintsu are recorded here. The format follows
   and its keys before its first failure. A frame that omits them gets
   what the shell registered. Shells that are gone are forgotten, so the
   daemon's registry never grows past the shells that exist.
+- The quick fix is asked for as a JSON object, `{command, confidence,
+  rationale}`: a forced tool call at Anthropic, a JSON schema at
+  OpenAI-compatible endpoints, `format` at Ollama; a server that refuses
+  the shape is asked again in plain text, and a plain-text answer is
+  still read. A model's confidence is kept under the pre-typing line. The
+  prompt carries two short examples.
+- `kintsu stats [--json]`: the last thirty days, failures looked at per
+  day, fixes offered and taken by each rule and model with its acceptance
+  rate, explanations asked. Every bubble, every proposal and every
+  proposal run next and succeeded is marked on a scoreboard kept in
+  `<state>/ledger.jsonl` next to the costs.
 
 ## [0.2.0] - 2026-09-25
 

@@ -28,7 +28,11 @@ when a brain is missing.
 
 `Classify` and `QuickFix` ask for structured output (a JSON schema:
 `{command, confidence, danger, rationale}`) so the presenter never parses
-prose. `Explain` streams. `Investigate` produces no model call from
+prose. Built for `QuickFix` on 2026-10-01: `{command, confidence,
+rationale}` as a forced tool call at Anthropic, a JSON schema
+`response_format` at OpenAI-compatible endpoints, `format` at Ollama, the
+plain line still read as a fallback; danger is classified from the command
+itself, never trusted from a model (DECISIONS §42). `Explain` streams. `Investigate` produces no model call from
 Kintsu at all when an agent is configured: Kintsu writes the brief and
 launches the agent.
 
@@ -112,7 +116,8 @@ any. With no answer at all Kintsu still works, rules only, and says so once.
 4. Call it. On timeout or error, move to the next candidate; on the last
    one, fail closed: `Classify` keeps the toast as it was, `QuickFix`
    shows nothing, `Explain` says which models were tried.
-5. Record latency, tokens and cost in the `CostLedger`. Built: one JSON
+5. Record latency, tokens and cost in the `CostLedger`, and what became of
+   the fix on the `Scoreboard` (offered, taken; `kintsu stats`). Built: one JSON
    line per call in `<state>/ledger.jsonl`, priced at the provider's list
    price when the model id is known, free for local models, unpriced
    otherwise; `kintsu costs` shows today and the last thirty days per
