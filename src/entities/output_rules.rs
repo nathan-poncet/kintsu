@@ -1050,6 +1050,7 @@ mod tests {
                 })
                 .collect(),
             docker_desktop,
+            aliases: Vec::new(),
         }
     }
 

@@ -117,6 +117,13 @@ All notable changes to kintsu are recorded here. The format follows
   fixes one whatever the locale, `"auto"` is the default; `C` and `POSIX`
   are English. Commands, paths, code and the rules' own sentences stay as
   they are. `kintsu doctor` shows the language and where it came from.
+- The rules know the shell's aliases and functions: the hook lists them
+  at the shell's first prompt, the daemon keeps them per session, a typo
+  of an alias is corrected like a program's, an alias is never "not on
+  your PATH", and an alias whose program is gone is explained: "`hmz` is
+  an alias for `~/.dotnet/tools/hmz`, which is not there." A rule's
+  explanation is the bubble's sentence, the panel opens on it and
+  `kintsu why` answers it at once, no model asked.
 
 ### Fixed
 

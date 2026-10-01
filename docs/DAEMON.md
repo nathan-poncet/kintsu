@@ -9,11 +9,12 @@ capture from Herdr, tmux, WezTerm, Kitty and iTerm2 after an offer, and
 `error`; the result arrives as a `bubble` in the case's shell.
 `command_finished` carries `pipestatus`, and a message that lands once
 the shell moved on to another command names its command and offers no
-keys. `session_new` is sent once at the shell's start and answers the id
-the daemon knows the shell by, its pid today. The opt-in stderr tee (zsh,
-bash) names its copy in the frame's terminal identity (`stderr_copy`).
-Not yet: `get_case`, SQLite. The idle exit is not wanted. See
-[DECISIONS.md](DECISIONS.md), sections 2, 17, 20, 23, 28 and 30.*
+keys. `session_new` is sent once at the shell's first prompt, with the
+shell's aliases and functions, and answers the id the daemon knows the
+shell by, its pid today. The opt-in stderr tee (zsh, bash) names its copy
+in the frame's terminal identity (`stderr_copy`). Not yet: `get_case`.
+The idle exit is not wanted. See [DECISIONS.md](DECISIONS.md), sections
+2, 17, 20, 23, 28, 30, 34 and 39.*
 
 Kintsu is resident. One process per user, started once, alive across
 every shell and every terminal window, whatever the shell. The hooks and
@@ -72,13 +73,16 @@ that one binds to loopback with a token.
 
 ## Sessions
 
-A session is one interactive shell. At shell startup the hook runs
-`kintsu session new`, which sends what the shell knows: shell and
-version, pid, tty, the terminal identity the notifiers and output sources
-need (`TERM_PROGRAM`, `TMUX_PANE`, `HERDR_PANE`, `WEZTERM_PANE`,
-`KITTY_WINDOW_ID`, `ITERM_SESSION_ID`), its PATH and the key variables
-the configured models read. The daemon answers with the id it knows the
-shell by. Today that id is the shell's pid, which the hook chose
+A session is one interactive shell. At its first prompt, once the rc
+files have finished defining things, the hook runs `kintsu session new`,
+which sends what the shell knows: shell and version, pid, tty, the
+terminal identity the notifiers and output sources need (`TERM_PROGRAM`,
+`TMUX_PANE`, `HERDR_PANE`, `WEZTERM_PANE`, `KITTY_WINDOW_ID`,
+`ITERM_SESSION_ID`), its PATH, the key variables the configured models
+read, and what it can run besides its PATH: its aliases, with their
+expansions, and its functions, piped in one per line. The rules then
+look up a program the way the shell would (DECISIONS §39). The daemon
+answers with the id it knows the shell by. Today that id is the shell's pid, which the hook chose
 beforehand (`KINTSU_SESSION`, DECISIONS §4); a random token chosen by the
 daemon, so that `exec`, subshells and forked terminals do not confuse it,
 would come back in this answer when it is built. Nothing at the shell's
@@ -108,7 +112,7 @@ Client to daemon:
 | type | fields | answer |
 |---|---|---|
 | `hello` | `version`, `session` (optional) | `welcome` or `outdated` |
-| `session_new` | `session`, `shell`, `pid`, `tty`, `terminal`, `path`, `env` | `session` (id) |
+| `session_new` | `session`, `shell`, `pid`, `tty`, `terminal`, `path`, `env`, `commands` (`functions`, `aliases`) | `session` (id) |
 | `command_started` | `session`, `command`, `cwd` | none |
 | `command_finished` | `session`, `command`, `status`, `pipestatus`, `duration_ms`, `cwd`, `path`, `env` | `decision` within the sync budget, else `later` |
 | `subscribe` | `session` | a stream of `bubble` frames until the connection closes |
