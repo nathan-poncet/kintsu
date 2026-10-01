@@ -110,6 +110,13 @@ All notable changes to kintsu are recorded here. The format follows
   `ssh-add`; a missing `cc` linker installs the system's build tools; and a
   Python tool not found while `.venv/` is here runs from `.venv/bin/`, on
   the quiet path, before the typo guess.
+- The models answer in the machine's language: the hook's process reads
+  `LC_ALL`, `LC_MESSAGES` or `LANG`, names the language in its frames,
+  and the daemon remembers it per shell; `kintsu why` and the panel's
+  explanation come in French on a French machine. `[ui] language = "fr"`
+  fixes one whatever the locale, `"auto"` is the default; `C` and `POSIX`
+  are English. Commands, paths, code and the rules' own sentences stay as
+  they are. `kintsu doctor` shows the language and where it came from.
 
 ### Fixed
 
