@@ -13,6 +13,22 @@ pub struct Prompt {
     pub user: String,
     /// How long the answer may be.
     pub max_tokens: u32,
+    /// Prose, or one fix as a JSON object the gateway asks for in the
+    /// provider's own way.
+    pub shape: AnswerShape,
+}
+
+/// The shape of the answer the caller wants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AnswerShape {
+    /// Free text.
+    #[default]
+    Prose,
+    /// One corrected command line, or none, as the JSON object
+    /// `{"command", "confidence", "rationale"}`: a forced tool call where
+    /// the provider has tools, a JSON schema elsewhere. The text answer
+    /// stays a valid fallback.
+    Fix,
 }
 
 /// Why a model did not answer.
@@ -36,11 +52,23 @@ pub enum ModelError {
 }
 
 /// A whole answer and what the provider counted for it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Answer {
     pub text: String,
     /// Zero when the provider reported nothing.
     pub tokens: Tokens,
+    /// The fix the model proposed in the shape it was asked for, when it
+    /// did; the gateway reads the provider's structure, nobody else.
+    pub fix: Option<ProposedFix>,
+}
+
+/// `{"command", "confidence", "rationale"}` as a model wrote it: a null
+/// command is a model saying it has none.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ProposedFix {
+    pub command: Option<String>,
+    pub confidence: Option<f32>,
+    pub rationale: Option<String>,
 }
 
 /// Speaks to models.
@@ -64,6 +92,7 @@ pub trait ModelGateway {
         self.complete(spec, key, prompt).map(|text| Answer {
             text,
             tokens: Tokens::default(),
+            fix: None,
         })
     }
 

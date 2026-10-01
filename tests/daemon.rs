@@ -343,6 +343,62 @@ fn fake_anthropic(content: &'static str) -> (u16, Arc<Mutex<Vec<String>>>) {
     (port, seen)
 }
 
+/// Answers every Anthropic request with a `propose_fix` tool call for the
+/// given command, and records whether the request forced that tool.
+fn fake_anthropic_tool(command: &'static str) -> (u16, Arc<Mutex<Vec<bool>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = Arc::clone(&seen);
+    std::thread::spawn(move || {
+        for incoming in listener.incoming() {
+            let Ok(mut stream) = incoming else { continue };
+            let request = read_http_request(&mut stream);
+            recorded
+                .lock()
+                .unwrap()
+                .push(request.contains("\"tool_choice\""));
+            let body = format!(
+                r#"{{"content":[{{"type":"tool_use","id":"t1","name":"propose_fix","input":{{"command":"{command}","confidence":0.9,"rationale":"the release profile is what was wanted"}}}}],"usage":{{"input_tokens":12,"output_tokens":9}}}}"#
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+        }
+    });
+    (port, seen)
+}
+
+/// One HTTP request, headers and body, as text.
+fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+    let mut buf = vec![0u8; 65536];
+    let mut read = 0;
+    loop {
+        let n = stream.read(&mut buf[read..]).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        read += n;
+        let text = String::from_utf8_lossy(&buf[..read]).to_string();
+        if let Some(split) = text.find("\r\n\r\n") {
+            let length: usize = text
+                .lines()
+                .find_map(|l| {
+                    l.to_ascii_lowercase()
+                        .strip_prefix("content-length:")
+                        .map(|v| v.trim().parse().unwrap())
+                })
+                .unwrap_or(0);
+            if read >= split + 4 + length {
+                break;
+            }
+        }
+    }
+    String::from_utf8_lossy(&buf[..read]).to_string()
+}
+
 /// The first bubble the daemon has for the session, within ten seconds.
 fn wait_for_bubble(f: &Fixture, session: &str) -> String {
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -999,4 +1055,45 @@ fn the_shells_aliases_and_functions_are_known_to_the_rules_once_it_registered() 
         serde_json::Value::Null,
         "another shell's aliases are its own"
     );
+}
+
+#[test]
+fn a_structured_answer_becomes_the_fix_and_stats_counts_it_once_taken() {
+    let (port, forced) = fake_anthropic_tool("cargo build --release");
+    let config = format!(
+        "[models.cloud]\nprovider = \"anthropic\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\nkey = {{ literal = \"k\" }}\n[routing]\nquick_fix = [\"cloud\"]\n[ui]\neager_fix = true\n"
+    );
+    let mut f = Fixture::new("structured", &config);
+    f.start_daemon();
+    f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"s8","command":"make test","status":2,"cwd":"/"}"#,
+    );
+    let bubble = wait_for_bubble(&f, "s8");
+    assert!(bubble.contains("cargo build --release"), "{bubble}");
+    assert_eq!(
+        forced.lock().unwrap().as_slice(),
+        [true],
+        "asked as a forced tool call"
+    );
+    let (code, out, _) = f.run(&["fix", "--raw"], Some("s8"));
+    assert_eq!((code, out.as_str()), (0, "cargo build --release\n"));
+
+    // The proposal is run next and succeeds: taken.
+    f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"s8","command":"cargo build --release","status":0,"cwd":"/"}"#,
+    );
+    let (code, out, _) = f.run(&["stats"], None);
+    assert_eq!(code, 0, "{out}");
+    assert!(
+        out.contains("1 failure looked at, 1 fix offered, 1 taken"),
+        "{out}"
+    );
+    assert!(out.contains("model · cloud"), "{out}");
+    let (_, json, _) = f.run(&["stats", "--json"], None);
+    let v: serde_json::Value = serde_json::from_str(json.trim()).unwrap();
+    assert_eq!(v["sources"][0]["name"], "cloud");
+    assert_eq!(v["sources"][0]["kind"], "model");
+    assert_eq!(v["sources"][0]["taken"], 1);
+    assert_eq!(v["sources"][0]["rate"], 1.0);
+    assert_eq!(v["totals"]["failures"], 1);
 }

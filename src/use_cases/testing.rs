@@ -350,6 +350,7 @@ impl ModelGateway for ScriptedModels {
         Ok(Answer {
             text,
             tokens: self.usage.get(&spec.name).copied().unwrap_or_default(),
+            fix: None,
         })
     }
 }

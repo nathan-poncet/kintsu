@@ -80,7 +80,7 @@ pub fn ask_first(
     candidates: &[&ModelSpec],
     prompt: &Prompt,
     meter: &Meter<'_>,
-) -> Result<(String, String), Vec<(String, ModelError)>> {
+) -> Result<(String, Answer), Vec<(String, ModelError)>> {
     ask_in_order(secrets, candidates, meter, |spec, key| {
         models.answer(spec, key, prompt)
     })
@@ -105,8 +105,10 @@ pub fn ask_first_streaming(
             .map(|text| Answer {
                 text,
                 tokens: Tokens::default(),
+                fix: None,
             })
     })
+    .map(|(name, answer)| (name, answer.text))
 }
 
 #[allow(clippy::type_complexity)]
@@ -115,7 +117,7 @@ fn ask_in_order(
     candidates: &[&ModelSpec],
     meter: &Meter<'_>,
     mut ask: impl FnMut(&ModelSpec, Option<&str>) -> Result<Answer, ModelError>,
-) -> Result<(String, String), Vec<(String, ModelError)>> {
+) -> Result<(String, Answer), Vec<(String, ModelError)>> {
     let mut failures = Vec::new();
     for spec in candidates {
         let key = secrets.lookup(&spec.key);
@@ -125,7 +127,7 @@ fn ask_in_order(
                 // A ledger that cannot be written must not cost the user
                 // the answer it just paid for.
                 let _ = meter.ledger.record(&metered(spec, meter, started, &answer));
-                return Ok((spec.name.clone(), answer.text));
+                return Ok((spec.name.clone(), answer));
             }
             Ok(_) => failures.push((
                 spec.name.clone(),
@@ -173,6 +175,7 @@ fn metered(
 mod tests {
     use super::*;
     use crate::entities::{Duration, KeySource, Tier, Timestamp, Tokens};
+    use crate::use_cases::ports::AnswerShape;
     use crate::use_cases::testing::{
         FakeClock, MapSecrets, MemoryLedger, ScriptedModels, case, spec,
     };
@@ -200,6 +203,7 @@ mod tests {
             system: "s".into(),
             user: "u".into(),
             max_tokens: 10,
+            shape: AnswerShape::Prose,
         }
     }
 
@@ -307,7 +311,7 @@ mod tests {
             &meter(&ledger, &clock),
         )
         .unwrap();
-        assert_eq!((name.as_str(), answer.as_str()), ("local", "because"));
+        assert_eq!((name.as_str(), answer.text.as_str()), ("local", "because"));
         assert_eq!(models.asked(), vec!["cloud", "local"]);
         assert_eq!(models.calls.borrow()[0].1.as_deref(), Some("k-123"));
         assert_eq!(models.calls.borrow()[1].1, None);

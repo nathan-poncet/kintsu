@@ -119,7 +119,8 @@ impl Explain<'_> {
             &candidates,
             &explain_prompt(&case, self.settings.language()),
             &self.meter(),
-        );
+        )
+        .map(|(model, answer)| (model, answer.text));
         self.keep(case, answered)
     }
 

@@ -26,7 +26,7 @@ pub use environment::Environment;
 pub use ids::IdGenerator;
 pub use ignore_store::{IgnoreStore, IgnoreStoreError};
 pub use learned_fixes::{LearnedFixes, LearnedFixesError};
-pub use model_gateway::{Answer, ModelError, ModelGateway, Prompt};
+pub use model_gateway::{Answer, AnswerShape, ModelError, ModelGateway, Prompt, ProposedFix};
 pub use notifier::{Notifier, NotifyError};
 pub use output_source::OutputSource;
 pub use scoreboard::{Scoreboard, ScoreboardError};
