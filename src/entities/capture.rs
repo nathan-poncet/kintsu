@@ -82,6 +82,27 @@ fn is_kintsu_line(line: &str) -> bool {
 }
 
 #[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// A screen is whatever the terminal held: cutting the command's
+        /// output from it never panics, and never gives more lines than asked.
+        #[test]
+        fn any_screen_and_command_are_cut_without_panic(
+            screen in any::<String>(),
+            command in any::<String>(),
+            max_lines in 0usize..64,
+        ) {
+            if let Some(output) = output_after(&screen, &command, max_lines) {
+                prop_assert!(output.lines().count() <= max_lines.max(1));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

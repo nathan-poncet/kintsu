@@ -257,6 +257,27 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
 }
 
 #[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Lines shaped like frames: a known or unknown type, a few fields of
+    /// every JSON kind, sometimes a wrong version.
+    const FRAME_SHAPED: &str = r#"\{"v":[0-9],"type":"(command_finished|hello|subscribe|pending|explain|act|shutdown|session_new|[a-z_]{1,8})"(,"[a-z_]{1,10}":("[^"\\]{0,10}"|-?[0-9]{1,6}|true|false|null|\{\}|\{"[a-z]{1,4}":("[a-z]{0,4}"|[0-9])\}|\[(-?[0-9]{1,4},?){0,4}\]))*\}"#;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(400))]
+        /// Any line a local client sends is a frame or an error, never a panic.
+        #[test]
+        fn any_line_parses_or_is_refused_without_panic(
+            line in prop_oneof![any::<String>(), FRAME_SHAPED],
+        ) {
+            let _ = parse_frame(&line);
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
