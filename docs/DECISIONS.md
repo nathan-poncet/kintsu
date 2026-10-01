@@ -998,6 +998,30 @@ it is read now (default 40 ms, section 8 corrected) and the harness sets
 it to 2 s. Fixing the race itself, one case for one failure whichever
 side decided, is left open.
 
+## 41. Six failures seen every week, and what the rules know for them (2026-10-01)
+
+The maintainer picked six from the brainstorm of 2026-09-30. Five read the
+output (`entities/output_rules.rs`): pip's `externally-managed-environment`
+sends the install to the project's `.venv`, created first when there is
+none, and names `pipx` for tools in the rationale rather than guessing; a
+Docker daemon that is down is started the way this machine runs it,
+Docker Desktop (`open -a Docker`, not chained: it takes a while), colima,
+or systemd; git's "dubious ownership" takes the `safe.directory` line git
+prints, the path through `safe_token`; "Permission denied (publickey)"
+loads the default key with `ssh-add`, `--apple-use-keychain` on macOS, at
+0.6 because the key may not exist at all; a missing `cc` installs the
+build tools of the system, and a link that failed for a missing library
+is left alone. The sixth needs no output: a Python tool not found while
+`.venv/` is here runs from `.venv/bin/`, an instant rule placed before the
+typo guess, which would have offered `pip3` or `pipx` for `pip`. It fires
+on the quiet path, so in terminals without a readable pane too.
+
+Two facts were missing. The output rules now get the PATH whatever the
+status (`gather_output_facts`, off the quiet path, after the capture), and
+`Environment` answers one more question, whether `/Applications/Docker.app`
+exists, asked only when the output speaks of Docker. Every fix that guesses
+the user's intent stays under 0.8, so none is pre-typed.
+
 ## What is not built, by priority
 
 1. The pty harness in CI.

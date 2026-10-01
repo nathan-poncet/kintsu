@@ -101,6 +101,15 @@ All notable changes to kintsu are recorded here. The format follows
   skips remote models for the rest of the UTC day once reached; local
   ones keep answering, the shell is told once a day, and `kintsu doctor`
   shows the day's spend.
+- Six failures seen every week get a rule: pip's
+  `externally-managed-environment` sends the install to the project's
+  `.venv` (created first when there is none); a Docker daemon that is down
+  is started the way this machine runs it (Docker Desktop, colima or
+  systemd); git's "dubious ownership" takes the `safe.directory` line git
+  prints; "Permission denied (publickey)" loads the default key with
+  `ssh-add`; a missing `cc` linker installs the system's build tools; and a
+  Python tool not found while `.venv/` is here runs from `.venv/bin/`, on
+  the quiet path, before the typo guess.
 
 ### Fixed
 

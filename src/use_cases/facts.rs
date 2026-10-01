@@ -23,7 +23,26 @@ pub fn gather_facts(
             Vec::new()
         },
         cwd_entries: cwd.map(|dir| environment.entries(dir)).unwrap_or_default(),
+        docker_desktop: false,
     }
+}
+
+/// What the rules that read the output may know besides: the PATH whatever
+/// the status, since this runs after the capture, off the quiet path; and
+/// whether Docker Desktop is installed, asked only when the output speaks
+/// of Docker.
+pub fn gather_output_facts(
+    environment: &dyn Environment,
+    outcome: &CommandOutcome,
+    cwd: Option<&str>,
+    output: &str,
+) -> Facts {
+    let mut facts = gather_facts(environment, outcome, cwd);
+    if facts.executables.is_empty() {
+        facts.executables = environment.executables();
+    }
+    facts.docker_desktop = output.contains("Docker daemon") && environment.docker_desktop();
+    facts
 }
 
 /// What the rules know about a case: the line first, then its output
@@ -37,8 +56,10 @@ pub fn rule_fix(
     let facts = gather_facts(environment, case.outcome(), case.cwd());
     suggest_fix(case.outcome(), &facts)
         .or_else(|| {
-            case.output()
-                .and_then(|output| suggest_fix_from_output(case.outcome(), &facts, output))
+            case.output().and_then(|output| {
+                let facts = gather_output_facts(environment, case.outcome(), case.cwd(), output);
+                suggest_fix_from_output(case.outcome(), &facts, output)
+            })
         })
         .or_else(|| learned_fix(learned, case.outcome()))
 }
@@ -58,6 +79,32 @@ mod tests {
     use super::*;
     use crate::entities::{CommandLine, DirEntry, ExitStatus, Os, Timestamp};
     use crate::use_cases::testing::{FakeEnvironment, MemoryLearned, case, outcome};
+
+    #[test]
+    fn the_output_rules_get_the_path_and_ask_about_docker_only_when_the_output_says_so() {
+        let env = FakeEnvironment::with_executables(&["colima"]);
+        let plain = gather_output_facts(&env, &outcome("make", 2), None, "make: nothing");
+        assert_eq!(
+            plain.executables,
+            vec!["colima"],
+            "the PATH, whatever the status"
+        );
+        assert_eq!(env.path_reads.get(), 1);
+        assert!(!plain.docker_desktop);
+        assert_eq!(
+            env.docker_reads.get(),
+            0,
+            "no Docker in the output, no question"
+        );
+        let docker = gather_output_facts(
+            &env,
+            &outcome("docker ps", 1),
+            None,
+            "Cannot connect to the Docker daemon at unix:///var/run/docker.sock.",
+        );
+        assert_eq!(env.docker_reads.get(), 1);
+        assert!(!docker.docker_desktop, "the fake has none");
+    }
 
     #[test]
     fn the_line_is_tried_before_the_output_and_the_output_only_when_there_is_one() {

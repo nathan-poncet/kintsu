@@ -1,7 +1,7 @@
 //! The machine as the rules see it: system, PATH, a directory listing.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::entities::{DirEntry, Os};
 use crate::use_cases::ports::Environment;
@@ -17,12 +17,23 @@ const BUILTINS: &[&str] = &[
 
 pub struct FsEnvironment {
     path: String,
+    applications: PathBuf,
 }
 
 impl FsEnvironment {
     /// Over the given PATH value.
     pub fn new(path: impl Into<String>) -> Self {
-        Self { path: path.into() }
+        Self {
+            path: path.into(),
+            applications: PathBuf::from("/Applications"),
+        }
+    }
+
+    /// Where applications are installed, for tests: `/Applications` otherwise.
+    #[cfg(test)]
+    pub fn with_applications(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.applications = dir.into();
+        self
     }
 }
 
@@ -52,6 +63,10 @@ impl Environment for FsEnvironment {
         names.into_iter().collect()
     }
 
+    fn docker_desktop(&self) -> bool {
+        self.applications.join("Docker.app").is_dir()
+    }
+
     fn entries(&self, dir: &str) -> Vec<DirEntry> {
         let Ok(entries) = std::fs::read_dir(Path::new(dir)) else {
             return Vec::new();
@@ -70,6 +85,23 @@ impl Environment for FsEnvironment {
             .collect();
         out.sort_by(|a, b| a.name.cmp(&b.name));
         out
+    }
+}
+
+#[cfg(test)]
+mod docker_tests {
+    use super::*;
+
+    #[test]
+    fn docker_desktop_is_the_app_bundle_in_the_applications_folder() {
+        let dir = std::env::temp_dir().join(format!("kintsu-apps-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let env = FsEnvironment::new("/usr/bin").with_applications(&dir);
+        assert!(!env.docker_desktop());
+        std::fs::create_dir_all(dir.join("Docker.app")).unwrap();
+        assert!(env.docker_desktop());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
 

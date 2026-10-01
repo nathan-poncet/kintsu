@@ -38,23 +38,26 @@ pub struct Facts {
     pub executables: Vec<String>,
     /// The entries of the working directory.
     pub cwd_entries: Vec<DirEntry>,
+    /// Whether Docker Desktop is installed; asked only when the output
+    /// speaks of Docker.
+    pub docker_desktop: bool,
 }
 
 impl Facts {
-    fn has_program(&self, name: &str) -> bool {
+    pub(crate) fn has_program(&self, name: &str) -> bool {
         self.executables.iter().any(|e| e == name)
     }
 
-    fn entry(&self, name: &str) -> Option<&DirEntry> {
+    pub(crate) fn entry(&self, name: &str) -> Option<&DirEntry> {
         self.cwd_entries.iter().find(|e| e.name == name)
     }
 
-    fn is_dir_here(&self, name: &str) -> bool {
+    pub(crate) fn is_dir_here(&self, name: &str) -> bool {
         let name = name.strip_suffix('/').unwrap_or(name);
         self.entry(name).is_some_and(|e| e.is_dir)
     }
 
-    fn is_file_here(&self, name: &str) -> bool {
+    pub(crate) fn is_file_here(&self, name: &str) -> bool {
         self.entry(name).is_some_and(|e| !e.is_dir)
     }
 }
@@ -74,6 +77,7 @@ pub fn suggest_fix(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
         missing_space_before_subcommand,
         man_without_space,
         gradle_wrapper,
+        venv_here,
         command_typo,
         missing_dot_slash,
         script_without_interpreter,
@@ -307,6 +311,59 @@ fn script_without_interpreter(outcome: &CommandOutcome, facts: &Facts) -> Option
         0.9,
         "script without interpreter",
         format!("`{program}` is here but not executable; `{interpreter}` can run it."),
+    )
+}
+
+/// Python's usual tools, the ones a project installs in its own `.venv`.
+const VENV_TOOLS: &[&str] = &[
+    "alembic",
+    "black",
+    "celery",
+    "coverage",
+    "django-admin",
+    "flake8",
+    "flask",
+    "gunicorn",
+    "ipython",
+    "isort",
+    "jupyter",
+    "mkdocs",
+    "mypy",
+    "pip",
+    "pip3",
+    "pre-commit",
+    "pylint",
+    "pytest",
+    "python",
+    "python3",
+    "ruff",
+    "sphinx-build",
+    "tox",
+    "uvicorn",
+];
+
+/// `pytest` not found while `.venv/` is here: the project's own tool,
+/// not activated. Before the typo guess, which would offer `pip3` or
+/// `pipx` for `pip`.
+fn venv_here(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
+    if !outcome.status().is_command_not_found() {
+        return None;
+    }
+    let program = outcome.command().program();
+    if !VENV_TOOLS.contains(&program) || !facts.is_dir_here(".venv") {
+        return None;
+    }
+    fix(
+        outcome
+            .command()
+            .with_program(&format!(".venv/bin/{program}"))
+            .as_str()
+            .to_string(),
+        0.7,
+        "venv here",
+        format!(
+            "`{program}` is not on your PATH, but this project has a `.venv`: its `{program}` is in there."
+        ),
     )
 }
 
@@ -594,6 +651,7 @@ mod tests {
             os: Some(Os::Linux),
             executables: execs.iter().map(|s| s.to_string()).collect(),
             cwd_entries: vec![],
+            docker_desktop: false,
         }
     }
     fn entry(name: &str, is_dir: bool, is_executable: bool) -> DirEntry {
@@ -612,6 +670,27 @@ mod tests {
     }
     fn none(text: &str, code: i32, f: &Facts) -> bool {
         suggest_fix(&outcome(text, code), f).is_none()
+    }
+
+    #[test]
+    fn a_python_tool_missing_while_a_venv_is_here_runs_from_the_venv() {
+        let mut f = facts(&["pip3", "pipx", "python3"]);
+        f.cwd_entries = vec![entry(".venv", true, true), entry("app.py", false, false)];
+        let fix = suggest_fix(&outcome("pip install -r requirements.txt", 127), &f).unwrap();
+        assert_eq!(
+            fix.command().as_str(),
+            ".venv/bin/pip install -r requirements.txt"
+        );
+        assert!(!fix.is_ghostable(), "a guess about the project");
+        assert_eq!(fixed("pytest -x", 127, &f), ".venv/bin/pytest -x");
+        assert!(none("gti status", 127, &f), "not a Python tool");
+        let mut no_venv = facts(&["pip3", "python3"]);
+        no_venv.cwd_entries = vec![entry("app.py", false, false)];
+        assert_eq!(
+            fixed("pip install x", 127, &no_venv),
+            "pip3 install x",
+            "no venv: the typo guess"
+        );
     }
 
     #[test]
