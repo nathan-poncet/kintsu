@@ -1,0 +1,40 @@
+name: Fuzz
+
+# Every Sunday, a few minutes per target on nightly: the rules that read a
+# command's output, the instant rules, the capture, the redaction and the
+# frame parser must not panic on any bytes. A crash fails the run and its
+# input is kept with the corpus.
+on:
+  schedule:
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    name: no panic on any bytes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Every target, three minutes each
+        working-directory: fuzz
+        run: |
+          for target in $(cargo fuzz list); do
+            echo "::group::$target"
+            cargo fuzz run "$target" -- -max_total_time=180 -timeout=10
+            echo "::endgroup::"
+          done
+      - name: Keep the corpus, and any crash
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-corpus
+          path: |
+            fuzz/corpus
+            fuzz/artifacts
+          if-no-files-found: ignore

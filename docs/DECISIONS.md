@@ -1032,6 +1032,38 @@ know the PATH alone. The very first shell after a boot still registers
 by its first frame only (section 28), aliases included, so that shell
 gets the rule from its second prompt on.
 
+## 40. No panic on any bytes: property tests, and fuzzers on Sundays (2026-10-01)
+
+The output of a failed command is data from a program that may be hostile
+or merely odd, and the rules turn pieces of it into a command the user is
+invited to run; the socket frames come from any process of the user's.
+Nothing stated that `suggest_fix_from_output`, `suggest_fix`,
+`output_after`, `redact` and `parse_frame` survive arbitrary bytes, nor
+what a fix may carry from the output. Two layers now say it. In
+`cargo test`, `proptest` property tests next to each function: arbitrary
+strings and bytes, the real messages the rules read with their blanks
+filled by anything, frame-shaped lines with every JSON kind; they hold
+that no rule panics, that a word the rules put in a fix is one the user
+typed, a flag, the `&&` between two commands or a plain name (the
+character class `safe_token` admits: letters, digits, `._-/@:+~=,`), that
+a line break appears only when the user typed one, and that a
+`command_finished` frame the client encodes parses back to the same
+input: the client's frame became a pure function for that. The first
+drafts of the invariant were wrong twice, not the rules: `&&` is the
+rules' own, and a `\r` the user typed is kept as typed. Nothing found in
+the code. On Sundays, `fuzz.yml` runs `cargo-fuzz` on nightly, three
+minutes per target, on the same five functions through a `fuzz/` crate
+that includes the pure rings by `#[path]` (kintsu is one binary with no
+library to link against; only `src/entities`, `src/use_cases` and the
+frame controller are reached, so the Dependency Rule keeps them free of
+I/O); the corpus and any crash are kept as an artifact and a crash fails
+the run. `taiki-e/install-action` has no `cargo-fuzz` manifest, so the
+job installs it with `cargo install`. By hand:
+`cd fuzz && cargo fuzz run output_rules -- -max_total_time=60`; on this
+macOS the nightly AddressSanitizer runtime loops while mapping its shadow
+memory at start, so add `-s none` there (Linux, and the CI job, keep the
+sanitizer).
+
 ## 41. Six failures seen every week, and what the rules know for them (2026-10-01)
 
 The maintainer picked six from the brainstorm of 2026-09-30. Five read the

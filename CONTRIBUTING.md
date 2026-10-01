@@ -26,6 +26,7 @@ cargo build --release --locked
 bash -n shell/kintsu.bash && zsh -n shell/kintsu.zsh && fish -n shell/kintsu.fish
 cargo llvm-cov --all-targets --ignore-filename-regex 'src/main\.rs' --fail-under-lines 90   # cargo install cargo-llvm-cov
 cargo deny check                                                                           # cargo install cargo-deny
+(cd fuzz && cargo +nightly fuzz run -s none output_rules -- -max_total_time=60)           # cargo install cargo-fuzz; `-s none` on macOS; CI runs every target on Sundays
 ```
 
 The hooks draw above a live prompt, which no unit test can see. After a

@@ -1,0 +1,58 @@
+[package]
+name = "kintsu-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+description = "Fuzz targets for kintsu's pure rings: the rules, the capture, the redaction, the frame parser"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# What the included kintsu sources use, and nothing more.
+thiserror = "2"
+regex = "1"
+serde_json = "1"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "output_rules"
+path = "fuzz_targets/output_rules.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "line_rules"
+path = "fuzz_targets/line_rules.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "output_after"
+path = "fuzz_targets/output_after.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "redact"
+path = "fuzz_targets/redact.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_frame"
+path = "fuzz_targets/parse_frame.rs"
+test = false
+doc = false
+bench = false
+
+# Its own root: kintsu is one binary, not a workspace.
+[workspace]
+members = ["."]

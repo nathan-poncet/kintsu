@@ -124,6 +124,11 @@ All notable changes to kintsu are recorded here. The format follows
   an alias for `~/.dotnet/tools/hmz`, which is not there." A rule's
   explanation is the bubble's sentence, the panel opens on it and
   `kintsu why` answers it at once, no model asked.
+- Property tests state that the rules, the capture, the redaction and the
+  frame parser never panic on any bytes, that nothing from a command's
+  output becomes shell syntax in a proposed fix, and that the hook's frame
+  parses back to what it reports; a `fuzz/` crate runs the same five
+  functions under `cargo-fuzz` every Sunday.
 
 ### Fixed
 
