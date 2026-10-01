@@ -998,6 +998,40 @@ it is read now (default 40 ms, section 8 corrected) and the harness sets
 it to 2 s. Fixing the race itself, one case for one failure whichever
 side decided, is left open.
 
+## 39. The shell's aliases and functions are facts (2026-10-01)
+
+Seen in the maintainer's log: `hmz` exited 127 and no rule knew, though
+`hmz` is an alias in `config.fish` whose binary is gone. The rules knew
+the PATH and the builtins; a shell's aliases and functions were invisible
+to them, so an alias could be "not on your PATH" and a typo of one had no
+neighbour.
+
+The hook lists them once, at the first prompt rather than at init, since
+an rc file defines its aliases in whatever order it likes and the hook's
+line may come first: zsh's `${(k)aliases}` and `${(k)functions}`, fish's
+`alias` and `functions -n`, bash's `alias` and `declare -F`, piped into
+`kintsu session new` one per line, `name<TAB>expansion` for an alias.
+Refreshed at the next `session_new` only: an alias defined later in the
+session waits for the next shell. The daemon keeps them per session next
+to the PATH and the keys, bounded (5000 entries, 512 characters each),
+and builds the rules' environment with them: the session's names join
+the executables, so `hmz2` becomes `hmz` and `hmz` itself is never a
+typo; each alias's program, the first word of its expansion past
+`command`, `sudo` and the like, is looked up on the PATH, among the
+other aliases and functions, or on disk for a path (`~` is the user's
+home). Names starting with `_` are the shells' own helpers and skipped.
+
+A rule may now explain without fixing. `suggest_explanation` runs when no
+rule had a command: the alias rule says "`hmz` is an alias for
+`~/.dotnet/tools/hmz`, which is not there." The case keeps it as an
+`Explanation` signed `rule · alias`, so the bubble says it in place of
+the bare exit status, the panel opens on it, and `kintsu why` answers it
+at once with no model asked and none needed. The local path
+(`KINTSU_NO_DAEMON`) has no registry: nothing is listed there, the rules
+know the PATH alone. The very first shell after a boot still registers
+by its first frame only (section 28), aliases included, so that shell
+gets the rule from its second prompt on.
+
 ## 41. Six failures seen every week, and what the rules know for them (2026-10-01)
 
 The maintainer picked six from the brainstorm of 2026-09-30. Five read the

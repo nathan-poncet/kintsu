@@ -51,7 +51,8 @@ kintsu/
     │   ├── secret.rs                 SecretKey (a key on its way to the keychain; Debug redacted)
     │   ├── danger.rs                 Danger · classify_danger
     │   ├── distance.rs               edit distance, closest candidate with tie rules
-    │   ├── rules.rs                  Facts · Os · DirEntry · suggest_fix (the instant rules: what the line, the status, the PATH and the directory tell)
+    │   ├── rules.rs                  Facts · Os · DirEntry · AliasFact · suggest_fix · suggest_explanation (the instant rules: what the line, the status, the PATH, the directory and the shell's aliases tell)
+    │   ├── shell_commands.rs         ShellCommands · Alias (what a shell runs besides its PATH, as the hook lists them)
     │   ├── subcommands.rs            the subcommands of git, cargo, npm, docker, brew… for typos, `gitpush` and `git-push`
     │   ├── output_rules.rs           suggest_fix_from_output (the rules that read the output: git's own hints, did-you-mean, sudo, mkdir -p…)
     │   ├── redaction.rs              redact · Redacted · SecretKind
