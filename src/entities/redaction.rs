@@ -129,6 +129,24 @@ pub fn redact(text: &str) -> Redacted {
 }
 
 #[cfg(test)]
+mod properties {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Any text is redacted without panic, and a text with nothing to
+        /// find comes back byte for byte.
+        #[test]
+        fn any_text_is_redacted_without_panic(text in any::<String>()) {
+            let redacted = redact(&text);
+            if redacted.findings().is_empty() {
+                prop_assert_eq!(redacted.text(), text.as_str());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

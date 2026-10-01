@@ -1004,6 +1004,166 @@ fn with_sudo(outcome: &CommandOutcome, _: &Facts, output: &str) -> Option<Fix> {
 }
 
 #[cfg(test)]
+mod properties {
+    use super::*;
+    use crate::entities::{AliasFact, DirEntry, ExitStatus, Os};
+    use proptest::prelude::*;
+
+    /// The messages the rules read, with the place a tool would put a
+    /// name, a path or a branch filled by anything at all.
+    const TEMPLATES: &[&str] = &[
+        "error: pathspec '{}' did not match any file(s) known to git\nhint: Did you forget to 'git add'?",
+        "error: pathspec '{}' did not match any file(s) known to git",
+        "fatal: The current branch x has no upstream branch.\n    git push --set-upstream {} {}\n",
+        "There is no tracking information for the current branch.\n    git branch --set-upstream-to=<remote>/<branch> {}\n",
+        "fatal: a branch named '{}' already exists",
+        "ModuleNotFoundError: No module named '{}'",
+        "ImportError: No module named {}",
+        "mkdir: {}: No such file or directory",
+        "mv: rename x to {}: No such file or directory",
+        "Host key for {} has changed and you have requested strict checking.\nREMOTE HOST IDENTIFICATION HAS CHANGED",
+        "error: did you mean `{}` (with two dashes)",
+        "git: '{}' is not a git command. See 'git --help'.\n\nThe most similar command is\n\t{}",
+        "Unknown command: \"{}\"\n\nDid you mean this?\n    npm {} # run it",
+        "ERROR: unknown command \"{}\" - maybe you meant \"{}\"",
+        "hg: unknown command '{}'\n(did you mean one of {}, {}?)",
+        "touch: {}: Permission denied",
+        "{}",
+    ];
+
+    const COMMANDS: &[&str] = &[
+        "git push",
+        "git checkout x",
+        "git switch x",
+        "git commit -m x",
+        "git pull",
+        "git rm x",
+        "python3 app.py",
+        "pytest",
+        "pip3 install x",
+        "ssh deploy@host",
+        "npm isntall x",
+        "npm run tets",
+        "cp a b/c",
+        "mv a b/c",
+        "touch a/b",
+        "mkdir a/b",
+        "rm build",
+        "grep x src",
+        "cargo biuld",
+        "hg lgo",
+        "git commit -amend",
+        "mytool -h",
+        "sudo yay -S foo",
+        "make test",
+    ];
+
+    fn facts() -> impl Strategy<Value = Facts> {
+        (
+            prop::option::of(prop::sample::select(vec![Os::Mac, Os::Linux, Os::Other])),
+            prop::collection::vec("[a-z0-9._-]{1,8}", 0..6),
+            prop::collection::vec(("[A-Za-z0-9._-]{1,8}", any::<bool>(), any::<bool>()), 0..6),
+            any::<bool>(),
+            prop::collection::vec(
+                ("[a-z0-9_-]{1,8}", "[^\\x00\\n]{0,24}", any::<bool>()),
+                0..3,
+            ),
+        )
+            .prop_map(
+                |(os, executables, entries, docker_desktop, aliases)| Facts {
+                    os,
+                    executables,
+                    cwd_entries: entries
+                        .into_iter()
+                        .map(|(name, is_dir, is_executable)| DirEntry {
+                            name,
+                            is_dir,
+                            is_executable,
+                        })
+                        .collect(),
+                    docker_desktop,
+                    aliases: aliases
+                        .into_iter()
+                        .map(|(name, target, target_found)| AliasFact {
+                            name,
+                            target,
+                            target_found,
+                        })
+                        .collect(),
+                },
+            )
+    }
+
+    fn command() -> impl Strategy<Value = String> {
+        prop_oneof![
+            prop::sample::select(COMMANDS).prop_map(str::to_string),
+            "[^\\s][^\n]{0,60}",
+        ]
+    }
+
+    /// A real message with arbitrary words in its blanks, or arbitrary text.
+    fn output() -> impl Strategy<Value = String> {
+        prop_oneof![
+            (
+                prop::sample::select(TEMPLATES),
+                prop::collection::vec(any::<String>(), 3),
+            )
+                .prop_map(|(template, fills)| {
+                    let mut out = template.to_string();
+                    for fill in fills {
+                        out = out.replacen("{}", &fill, 1);
+                    }
+                    out
+                }),
+            any::<String>(),
+            prop::collection::vec(any::<u8>(), 0..300)
+                .prop_map(|bytes| String::from_utf8_lossy(&bytes).into_owned()),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(300))]
+        /// The output is data: whatever it says, no rule panics, and no
+        /// shell syntax travels from it into the command proposed.
+        #[test]
+        fn no_output_panics_a_rule_or_puts_its_syntax_in_the_fix(
+            command in command(),
+            status in any::<i32>(),
+            output in output(),
+            facts in facts(),
+        ) {
+            let outcome =
+                CommandOutcome::new(CommandLine::new(command).unwrap(), ExitStatus::new(status));
+            if let Some(fix) = suggest_fix_from_output(&outcome, &facts, &output) {
+                let proposed = fix.command().as_str();
+                // The line is kept as typed, a trailing newline included:
+                // only a break the user did not type is the output's doing.
+                prop_assert!(
+                    !proposed.contains(['\n', '\r'])
+                        || outcome.command().as_str().contains(['\n', '\r']),
+                    "a line break in `{proposed}`"
+                );
+                // A word the rules added is a flag, the `&&` between two
+                // commands, or a plain name taken from the output: nothing
+                // the shell would read as syntax.
+                let typed = outcome.command().words();
+                for word in fix.command().words() {
+                    if typed.contains(&word) || word == "&&" || word.starts_with('-') {
+                        continue;
+                    }
+                    prop_assert!(
+                        word.chars().all(|c| c.is_alphanumeric() || "._-/@:+~=,".contains(c)),
+                        "`{}` came from the output into `{}`",
+                        word,
+                        proposed
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::entities::{Danger, ExitStatus};

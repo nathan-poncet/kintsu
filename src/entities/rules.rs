@@ -691,6 +691,70 @@ fn package_manager(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
 }
 
 #[cfg(test)]
+mod properties {
+    use super::*;
+    use crate::entities::ExitStatus;
+    use proptest::prelude::*;
+
+    fn facts() -> impl Strategy<Value = Facts> {
+        (
+            prop::option::of(prop::sample::select(vec![Os::Mac, Os::Linux, Os::Other])),
+            prop::collection::vec("[a-z0-9._-]{1,8}", 0..8),
+            prop::collection::vec(("[A-Za-z0-9._-]{1,8}", any::<bool>(), any::<bool>()), 0..6),
+            any::<bool>(),
+            prop::collection::vec(
+                ("[a-z0-9_-]{1,8}", "[^\\x00\\n]{0,24}", any::<bool>()),
+                0..3,
+            ),
+        )
+            .prop_map(
+                |(os, executables, entries, docker_desktop, aliases)| Facts {
+                    os,
+                    executables,
+                    cwd_entries: entries
+                        .into_iter()
+                        .map(|(name, is_dir, is_executable)| DirEntry {
+                            name,
+                            is_dir,
+                            is_executable,
+                        })
+                        .collect(),
+                    docker_desktop,
+                    aliases: aliases
+                        .into_iter()
+                        .map(|(name, target, target_found)| AliasFact {
+                            name,
+                            target,
+                            target_found,
+                        })
+                        .collect(),
+                },
+            )
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(300))]
+        /// Any command line the shell ran, any status, any directory: the
+        /// instant rules answer or stay quiet, and never panic.
+        #[test]
+        fn no_command_line_panics_a_rule(
+            command in "[^\\s][^\n]{0,80}",
+            status in any::<i32>(),
+            facts in facts(),
+        ) {
+            let outcome =
+                CommandOutcome::new(CommandLine::new(command).unwrap(), ExitStatus::new(status));
+            if let Some(fix) = suggest_fix(&outcome, &facts) {
+                prop_assert!(!fix.command().as_str().contains('\n'));
+            }
+            if let Some(explanation) = suggest_explanation(&outcome, &facts) {
+                prop_assert!(!explanation.text().is_empty());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::entities::{Danger, ExitStatus};

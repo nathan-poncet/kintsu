@@ -46,3 +46,6 @@ assets = [
 lto = true
 strip = true
 codegen-units = 1
+
+[dev-dependencies]
+proptest = "1"

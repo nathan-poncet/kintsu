@@ -63,25 +63,8 @@ impl DaemonClient {
         let mut stream = self.connect_or_spawn().ok()?;
         stream.set_read_timeout(Some(budget)).ok()?;
         stream.set_write_timeout(Some(budget)).ok()?;
-        let frame = json!({
-            "v": 1,
-            "type": "command_finished",
-            "version": self.version,
-            "session": input.session.as_ref().map(|s| s.as_str()),
-            "command": input.outcome.command().as_str(),
-            "status": input.outcome.status().code(),
-            "pipestatus": input.outcome.pipestatus().iter().map(|s| s.code()).collect::<Vec<i32>>(),
-            "duration_ms": input.outcome.duration().map(|d| d.as_millis()),
-            "cwd": input.cwd,
-            "shell": input.shell.map(|s| s.name()),
-            "path": input.path,
-            "env": (!input.env.is_empty()).then(|| json!(input.env)),
-            "language": input.language.map(|l| l.code()),
-            "color": color,
-            "signal_pid": signal_pid,
-            "terminal": terminal_json(&input.terminal),
-        });
-        send_line(&mut stream, &frame.to_string()).ok()?;
+        let frame = command_finished_frame(self.version, input, color, signal_pid);
+        send_line(&mut stream, &frame).ok()?;
         let answer: Value = serde_json::from_str(&read_line(&mut stream).ok()?).ok()?;
         if answer["type"] != "decision" {
             return None;
@@ -359,6 +342,35 @@ fn commands_json(commands: &ShellCommands) -> Value {
 }
 
 /// The pane identity as the frames carry it.
+/// The `command_finished` frame as one line: what the hook reports, and
+/// how this terminal wants the answer rendered.
+pub(crate) fn command_finished_frame(
+    version: &str,
+    input: &TriageInput,
+    color: bool,
+    signal_pid: Option<u32>,
+) -> String {
+    json!({
+        "v": 1,
+        "type": "command_finished",
+        "version": version,
+        "session": input.session.as_ref().map(|s| s.as_str()),
+        "command": input.outcome.command().as_str(),
+        "status": input.outcome.status().code(),
+        "pipestatus": input.outcome.pipestatus().iter().map(|s| s.code()).collect::<Vec<i32>>(),
+        "duration_ms": input.outcome.duration().map(|d| d.as_millis()),
+        "cwd": input.cwd,
+        "shell": input.shell.map(|s| s.name()),
+        "path": input.path,
+        "env": (!input.env.is_empty()).then(|| json!(input.env)),
+        "language": input.language.map(|l| l.code()),
+        "color": color,
+        "signal_pid": signal_pid,
+        "terminal": terminal_json(&input.terminal),
+    })
+    .to_string()
+}
+
 fn terminal_json(terminal: &TerminalIdentity) -> Value {
     json!({
         "program": terminal.program,
@@ -396,6 +408,79 @@ fn texts(v: &Value) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapters::controllers::socket::{Request, parse_frame};
+    use crate::entities::{CommandLine, CommandOutcome, ExitStatus, Language, Shell};
+    use proptest::prelude::*;
+
+    fn shells() -> impl Strategy<Value = Option<Shell>> {
+        prop::option::of(prop::sample::select(vec![
+            Shell::Zsh,
+            Shell::Bash,
+            Shell::Fish,
+        ]))
+    }
+
+    fn languages() -> impl Strategy<Value = Option<Language>> {
+        let known: Vec<Language> = Language::codes().filter_map(Language::from_tag).collect();
+        prop::option::of(prop::sample::select(known))
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(200))]
+        /// Whatever the hook reports, the daemon reads back the same input:
+        /// the two ends of the protocol agree on every field.
+        #[test]
+        fn a_command_finished_frame_round_trips_through_the_daemons_parser(
+            command in "[^\\s][^\n]{0,40}",
+            status in any::<i32>(),
+            pipestatus in prop::collection::vec(any::<i32>(), 0..4),
+            duration in prop::option::of(any::<u64>()),
+            cwd in prop::option::of("[^\x00]{1,20}"),
+            session in prop::option::of("[a-z0-9]{1,8}"),
+            shell in shells(),
+            path in prop::option::of("[^\x00]{1,30}"),
+            env in prop::collection::btree_map("[A-Z_]{1,8}", "[^\x00]{0,12}", 0..3),
+            program in prop::option::of("[a-z]{1,8}"),
+            stderr_copy in prop::option::of("/[a-z/]{1,20}"),
+            language in languages(),
+            color in any::<bool>(),
+            signal_pid in prop::option::of(any::<u32>()),
+        ) {
+            let mut outcome = CommandOutcome::new(
+                CommandLine::new(command).unwrap(),
+                ExitStatus::new(status),
+            );
+            if let Some(ms) = duration {
+                outcome = outcome.lasting(crate::entities::Duration::from_millis(ms));
+            }
+            if !pipestatus.is_empty() {
+                outcome = outcome.in_pipeline(pipestatus.into_iter().map(ExitStatus::new).collect());
+            }
+            let input = TriageInput {
+                outcome,
+                cwd,
+                session: session.map(SessionId::new),
+                shell,
+                terminal: TerminalIdentity {
+                    program,
+                    stderr_copy,
+                    ..TerminalIdentity::default()
+                },
+                path,
+                env,
+                language,
+            };
+            let frame = command_finished_frame("0.0.0-test", &input, color, signal_pid);
+            let parsed = parse_frame(&frame).unwrap();
+            prop_assert_eq!(parsed.client_version.as_deref(), Some("0.0.0-test"));
+            let Request::CommandFinished { input: back, color: back_color, signal_pid: back_pid } = parsed.request else {
+                return Err(TestCaseError::fail("not a command_finished request"));
+            };
+            prop_assert_eq!(*back, input);
+            prop_assert_eq!(back_color, color);
+            prop_assert_eq!(back_pid, signal_pid);
+        }
+    }
 
     #[test]
     fn bubble_text_reads_bubbles_and_nothing_else() {
