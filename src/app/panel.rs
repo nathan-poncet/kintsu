@@ -39,6 +39,7 @@ pub(super) fn expand(
         environment,
         style,
         learned,
+        ledger,
     } = *local;
     let focus = Focus {
         sessions: state,
@@ -53,16 +54,16 @@ pub(super) fn expand(
         Err(e) => return failure(err, &e.to_string(), style, false),
     };
     let bubble = session.and_then(|s| HookNotes::new(&rt.state_dir).bubble(s).ok().flatten());
-    let ledger = JsonlLedger::new(&rt.state_dir);
     let fix_last = FixLast {
         settings,
         cases: state,
         environment,
         secrets: &EnvSecrets,
         models: &HttpModels,
-        ledger: &ledger,
+        ledger,
         clock: &SystemClock,
         learned,
+        scoreboard: ledger,
     };
     let known = fix_last.known(&case);
     let can_ask_fix = fix_last.candidate(&case).is_some();
@@ -200,6 +201,7 @@ impl Asker {
                         ledger: &ledger,
                         clock: &SystemClock,
                         learned: &JsonLearnedFixes::new(&state_dir),
+                        scoreboard: &ledger,
                     };
                     if let Ok(Some(case)) = state.last(session.as_ref())
                         && let Some(model) = fix_last.candidate(&case)

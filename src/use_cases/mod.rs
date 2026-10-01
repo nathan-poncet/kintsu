@@ -21,6 +21,7 @@ pub mod privacy;
 pub mod prompts;
 pub mod routing;
 pub mod setup;
+pub mod stats;
 #[cfg(test)]
 pub mod testing;
 pub mod triage;
@@ -39,4 +40,5 @@ pub use messages::Messages;
 pub use models::{KeyStatus, ListModels, ModelRow, Probe, ProbeModels, Reach};
 pub use privacy::Privacy;
 pub use setup::{Detect, compose};
+pub use stats::{Stats, StatsReport};
 pub use triage::{Triage, TriageInput};

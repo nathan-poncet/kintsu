@@ -208,7 +208,6 @@ impl Day {
         Self(at.as_millis() / MILLIS_PER_DAY)
     }
 
-    #[cfg(test)]
     pub const fn from_index(index: u64) -> Self {
         Self(index)
     }

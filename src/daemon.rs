@@ -340,6 +340,7 @@ fn on_command_finished(
         ignores: state,
         environment: &environment,
         learned: &daemon.learned,
+        scoreboard: &daemon.ledger,
     };
     let decision = match triage.run(input) {
         Ok(decision) => decision,
@@ -537,6 +538,7 @@ fn messages<'a>(
         sessions: state,
         ledger: &daemon.ledger,
         learned: &daemon.learned,
+        scoreboard: &daemon.ledger,
     }
 }
 

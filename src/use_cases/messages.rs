@@ -7,7 +7,8 @@
 use thiserror::Error;
 
 use crate::entities::{
-    CaseId, Day, FailureCase, Fix, Message, MessageBody, SessionId, Settings, Task,
+    CaseId, Day, FailureCase, Fix, FixEvent, FixEventKind, Message, MessageBody, SessionId,
+    Settings, Task,
 };
 use crate::use_cases::explain::{Explain, ExplainError};
 use crate::use_cases::facts::rule_fix;
@@ -15,7 +16,7 @@ use crate::use_cases::fix_last::{FixError, FixLast};
 use crate::use_cases::focus::{Focus, FocusError};
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, CostLedger, Environment, LearnedFixes, ModelError,
-    ModelGateway, Notifier, NotifyError, Secrets, SessionRegistry,
+    ModelGateway, Notifier, NotifyError, Scoreboard, Secrets, SessionRegistry,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{
@@ -60,6 +61,7 @@ pub struct Messages<'a> {
     pub sessions: &'a dyn SessionRegistry,
     pub ledger: &'a dyn CostLedger,
     pub learned: &'a dyn LearnedFixes,
+    pub scoreboard: &'a dyn Scoreboard,
 }
 
 impl Messages<'_> {
@@ -168,6 +170,10 @@ impl Messages<'_> {
             self.cases
                 .save(&case.clone().with_proposal(Some(fix.clone())))?;
         }
+        let _ = self.scoreboard.mark(&FixEvent {
+            at: self.clock.now(),
+            kind: FixEventKind::Offered(fix.source().clone()),
+        });
         let message = self.message(case, MessageBody::Fix(fix), in_focus);
         self.notifier.deliver(session, message.clone())?;
         Ok(message)
@@ -283,6 +289,7 @@ impl Messages<'_> {
             ledger: self.ledger,
             clock: self.clock,
             learned: self.learned,
+            scoreboard: self.scoreboard,
         };
         let proposal = fix_last.run(Some(session))?;
         let body = match proposal.fix {
@@ -341,6 +348,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let message = uc.fix(&case("npm run build", 1, Some("42"))).unwrap();
         assert!(!message.is_late(), "nothing ran since");
@@ -378,6 +386,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let environment = FakeEnvironment::with_executables(&[]);
         let silent = case("make test", 2, Some("42"));
@@ -437,6 +446,7 @@ mod tests {
             sessions: &sessions,
             ledger: &ledger,
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let failure = case("npm run build", 1, Some("42"));
         assert_eq!(uc.fix_candidate(&failure), None, "no asking… line");
@@ -479,6 +489,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let message = uc.fix(&old).unwrap();
         assert!(message.is_late(), "the shell looks at another failure");
@@ -517,6 +528,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let message = uc.fix(&failure).unwrap();
         assert!(message.is_late());
@@ -546,6 +558,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         assert_eq!(
             off.fix(&case("make", 2, Some("42"))).unwrap_err(),
@@ -690,6 +703,7 @@ mod tests {
             sessions: &sessions,
             ledger: &MemoryLedger::default(),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         assert_eq!(
             uc.explain_candidate(&SessionId::new("42")).unwrap(),

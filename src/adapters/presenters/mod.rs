@@ -8,6 +8,7 @@ pub mod models;
 pub mod panel;
 pub mod plain;
 pub mod shell_hook;
+pub mod stats;
 pub mod style;
 pub mod toast;
 
@@ -19,5 +20,6 @@ pub use plain::{
     learned_report, privacy_report, raw_fix,
 };
 pub use shell_hook::shell_hook;
+pub use stats::{stats_json, stats_report};
 pub use style::{Style, screen_rows};
 pub use toast::{message_toast, pending_line, toast};

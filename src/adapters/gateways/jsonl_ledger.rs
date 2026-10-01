@@ -1,5 +1,6 @@
-//! The cost ledger as a file: one JSON line per model call, appended, and
-//! a line per day the user was told the budget is spent.
+//! The cost ledger as a file: one JSON line per model call, appended, a
+//! line per day the user was told the budget is spent, and the scoreboard's
+//! lines, what was offered and what was taken, in the same file.
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -7,8 +8,10 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::entities::{Day, Duration, LedgerEntry, Money, Task, Timestamp, Tokens};
-use crate::use_cases::ports::{CostLedger, LedgerError};
+use crate::entities::{
+    Day, Duration, FixEvent, FixEventKind, FixSource, LedgerEntry, Money, Task, Timestamp, Tokens,
+};
+use crate::use_cases::ports::{CostLedger, LedgerError, Scoreboard, ScoreboardError};
 
 pub struct JsonlLedger {
     path: PathBuf,
@@ -65,6 +68,67 @@ fn entry_from(line: &Value) -> Option<LedgerEntry> {
     })
 }
 
+fn source_json(source: &FixSource) -> (&'static str, &str) {
+    match source {
+        FixSource::Rule(name) => ("rule", name),
+        FixSource::Model(name) => ("model", name),
+    }
+}
+
+fn source_from(line: &Value) -> Option<FixSource> {
+    let name = line["source"].as_str()?.to_string();
+    match line["source_kind"].as_str()? {
+        "rule" => Some(FixSource::Rule(name)),
+        "model" => Some(FixSource::Model(name)),
+        _ => None,
+    }
+}
+
+fn event_from(line: &Value) -> Option<FixEvent> {
+    let kind = match line["kind"].as_str()? {
+        "failure" => FixEventKind::Failure,
+        "offered" => FixEventKind::Offered(source_from(line)?),
+        "taken" => FixEventKind::Taken(source_from(line)?),
+        _ => return None,
+    };
+    Some(FixEvent {
+        at: Timestamp::from_millis(line["at"].as_u64()?),
+        kind,
+    })
+}
+
+impl Scoreboard for JsonlLedger {
+    fn mark(&self, event: &FixEvent) -> Result<(), ScoreboardError> {
+        let mut line = json!({"at": event.at.as_millis()});
+        match &event.kind {
+            FixEventKind::Failure => line["kind"] = json!("failure"),
+            FixEventKind::Offered(source) | FixEventKind::Taken(source) => {
+                let (kind, name) = source_json(source);
+                line["kind"] = json!(if matches!(event.kind, FixEventKind::Offered(_)) {
+                    "offered"
+                } else {
+                    "taken"
+                });
+                line["source_kind"] = json!(kind);
+                line["source"] = json!(name);
+            }
+        }
+        self.append(&line)
+            .map_err(|LedgerError::Io(text)| ScoreboardError::Io(text))
+    }
+
+    fn since(&self, from: Timestamp) -> Result<Vec<FixEvent>, ScoreboardError> {
+        let lines = self
+            .lines()
+            .map_err(|LedgerError::Io(text)| ScoreboardError::Io(text))?;
+        Ok(lines
+            .iter()
+            .filter_map(event_from)
+            .filter(|e| e.at >= from)
+            .collect())
+    }
+}
+
 impl CostLedger for JsonlLedger {
     fn record(&self, entry: &LedgerEntry) -> Result<(), LedgerError> {
         self.append(&json!({
@@ -103,7 +167,7 @@ impl CostLedger for JsonlLedger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::use_cases::testing::cost_ledger_contract;
+    use crate::use_cases::testing::{cost_ledger_contract, scoreboard_contract};
 
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("kintsu-ledger-{}-{name}", std::process::id()));
@@ -116,6 +180,38 @@ mod tests {
         let dir = scratch("contract");
         cost_ledger_contract(&JsonlLedger::new(&dir));
         assert!(dir.join("ledger.jsonl").is_file(), "created on first write");
+    }
+
+    #[test]
+    fn the_file_scoreboard_honours_the_contract_and_shares_the_ledgers_file() {
+        let dir = scratch("scoreboard");
+        let ledger = JsonlLedger::new(&dir);
+        scoreboard_contract(&ledger);
+        ledger
+            .record(&LedgerEntry {
+                at: Timestamp::from_millis(5),
+                model: "haiku".into(),
+                task: Task::Explain,
+                tokens: Tokens::new(1, 2),
+                cost: None,
+                latency: Duration::from_millis(9),
+            })
+            .unwrap();
+        assert_eq!(
+            CostLedger::since(&ledger, Timestamp::from_millis(0))
+                .unwrap()
+                .len(),
+            1,
+            "the ledger does not read the scoreboard's lines"
+        );
+        assert_eq!(
+            Scoreboard::since(&ledger, Timestamp::from_millis(0))
+                .unwrap()
+                .len(),
+            3,
+            "nor the scoreboard the ledger's"
+        );
+        assert!(dir.join("ledger.jsonl").is_file());
     }
 
     #[test]
@@ -138,7 +234,7 @@ mod tests {
             .unwrap();
         writeln!(file, "{{not json").unwrap();
         writeln!(file, "{{\"kind\":\"call\",\"at\":\"soon\"}}").unwrap();
-        let entries = ledger.since(Timestamp::from_millis(0)).unwrap();
+        let entries = CostLedger::since(&ledger, Timestamp::from_millis(0)).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].cost, None);
         assert_eq!(entries[0].task, Task::Explain);

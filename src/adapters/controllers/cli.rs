@@ -105,6 +105,9 @@ pub enum Command {
     Doctor,
     /// `kintsu costs [--json]`: what the models cost today and this month.
     Costs { json: bool },
+    /// `kintsu stats [--json]`: failures looked at, fixes offered and
+    /// taken per rule and model, explanations asked, over thirty days.
+    Stats { json: bool },
     /// `kintsu models [test] [--json]`: the configured models, their keys
     /// and their reach; `test` asks each one word.
     Models { test: bool, json: bool },
@@ -208,6 +211,9 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Command
         ["costs"] => Ok(Command::Costs { json: false }),
         ["costs", "--json"] => Ok(Command::Costs { json: true }),
         ["costs", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
+        ["stats"] => Ok(Command::Stats { json: false }),
+        ["stats", "--json"] => Ok(Command::Stats { json: true }),
+        ["stats", other, ..] => Err(CliError::UnknownFlag((*other).to_string())),
         ["models", rest @ ..] => parse_models(rest),
         ["login"] => Err(CliError::MissingValue("login <model>".into())),
         ["login", model, rest @ ..] => parse_login(model, rest),
@@ -879,6 +885,15 @@ mod tests {
         assert_eq!(
             parse_args(["costs", "--all"]),
             Err(CliError::UnknownFlag("--all".into()))
+        );
+        assert_eq!(parse_args(["stats"]), Ok(Command::Stats { json: false }));
+        assert_eq!(
+            parse_args(["stats", "--json"]),
+            Ok(Command::Stats { json: true })
+        );
+        assert_eq!(
+            parse_args(["stats", "--week"]),
+            Err(CliError::UnknownFlag("--week".into()))
         );
         assert_eq!(parse_args(["setup"]), Ok(Command::Setup { yes: false }));
         assert_eq!(

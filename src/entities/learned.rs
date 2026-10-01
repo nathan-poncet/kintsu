@@ -212,9 +212,16 @@ impl LearnedBook {
 /// learning count: harmless ones the built-in rules do not already
 /// pre-type, and learned ones getting surer.
 pub fn accepted_proposal<'a>(case: &'a FailureCase, next: &CommandOutcome) -> Option<&'a Fix> {
+    let fix = proposal_taken(case, next)?;
+    teaches(fix).then_some(fix)
+}
+
+/// The case's proposal, when `next` is that proposal run, word for word,
+/// and it succeeded: taken, whether or not it teaches anything.
+pub fn proposal_taken<'a>(case: &'a FailureCase, next: &CommandOutcome) -> Option<&'a Fix> {
     let fix = case.proposal()?;
     let taken = next.status().is_success() && next.command().words() == fix.command().words();
-    (taken && teaches(fix)).then_some(fix)
+    taken.then_some(fix)
 }
 
 fn teaches(fix: &Fix) -> bool {

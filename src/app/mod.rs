@@ -14,14 +14,15 @@ use crate::adapters::gateways::{
 use crate::adapters::presenters::doctor::Places;
 use crate::adapters::presenters::{
     Style, costs_json, costs_report, doctor_report, error_line, explanation, fix_report,
-    hand_off_notice, ignored, pending_line, privacy_report, raw_fix, shell_hook,
+    hand_off_notice, ignored, pending_line, privacy_report, raw_fix, shell_hook, stats_json,
+    stats_report,
 };
 use crate::daemon::{self, DaemonConfig};
 use crate::entities::{Hotkey, Language, SessionId, Settings, Shell, TerminalIdentity, UiMode};
 use crate::use_cases::ports::SessionRegistry;
 use crate::use_cases::{
     Check, Costs, Diagnose, Explain, FixLast, HandOff, Health, Ignore, IgnoreRequest, Privacy,
-    ScopeChoice,
+    ScopeChoice, Stats,
 };
 
 mod desktop;
@@ -64,6 +65,7 @@ Usage:
   kintsu setup [--yes]            three questions, then the configuration file
   kintsu doctor                   check the hook, the models, the keys
   kintsu costs [--json]           what the models cost today and over 30 days
+  kintsu stats [--json]           failures looked at, fixes offered and taken per rule and model, over 30 days
   kintsu models [test] [--json]   the configured models, their keys and their reach; test asks each one word
   kintsu login <model> [--write-config]
                                   put a model's key in the OS keychain, and point the configuration at it
@@ -296,6 +298,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 environment: &environment,
                 style: &style,
                 learned: &learned,
+                ledger: &ledger,
             },
             *input,
             signal_pid,
@@ -309,6 +312,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 environment: &environment,
                 style: &style,
                 learned: &learned,
+                ledger: &ledger,
             },
             session,
             above,
@@ -325,6 +329,7 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
                 ledger: &ledger,
                 clock: &SystemClock,
                 learned: &learned,
+                scoreboard: &ledger,
             };
             match fix_last.run(session) {
                 Ok(proposal) if raw => match raw_fix(&proposal) {
@@ -442,6 +447,27 @@ pub fn run(rt: &Runtime, out: &mut dyn Write, err: &mut dyn Write) -> ExitCode {
             out,
             err,
         ),
+        Command::Stats { json } => {
+            let stats = Stats {
+                scoreboard: &ledger,
+                ledger: &ledger,
+                clock: &SystemClock,
+            };
+            match stats.run() {
+                Ok(report) if json => {
+                    let _ = writeln!(out, "{}", stats_json(&report));
+                    ExitCode::SUCCESS
+                }
+                Ok(report) => {
+                    let _ = writeln!(out, "{}", stats_report(&report, &style));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    let _ = writeln!(err, "{}", error_line(&e.to_string(), &style));
+                    ExitCode::from(1)
+                }
+            }
+        }
         Command::Costs { json } => {
             let costs = Costs {
                 settings: &settings,
@@ -539,6 +565,7 @@ pub(super) struct Local<'a> {
     pub(super) environment: &'a FsEnvironment,
     pub(super) style: &'a Style,
     pub(super) learned: &'a JsonLearnedFixes,
+    pub(super) ledger: &'a JsonlLedger,
 }
 
 fn silence(
