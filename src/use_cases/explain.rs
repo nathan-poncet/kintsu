@@ -61,11 +61,30 @@ impl Explain<'_> {
         session: Option<&SessionId>,
     ) -> Result<(FailureCase, Vec<&ModelSpec>), ExplainError> {
         let case = self.cases.last(session)?.ok_or(ExplainError::NoCase)?;
+        self.candidates(&case).map(|candidates| (case, candidates))
+    }
+
+    /// What a rule already said about the last case: answered at once, no
+    /// model asked, no model needed.
+    fn known(&self, session: Option<&SessionId>) -> Result<Option<Explained>, ExplainError> {
+        let case = self.cases.last(session)?.ok_or(ExplainError::NoCase)?;
+        Ok(case
+            .explanation()
+            .filter(|explanation| explanation.is_from_rule())
+            .map(|explanation| Explained {
+                model: explanation.model().to_string(),
+                text: explanation.text().to_string(),
+                redactions: case_document(&case).redactions,
+                case: case.clone(),
+            }))
+    }
+
+    fn candidates(&self, case: &FailureCase) -> Result<Vec<&ModelSpec>, ExplainError> {
         let names = &self.settings.routing.explain;
         let over = over_budget(self.settings, self.ledger, self.clock);
-        let candidates = model_candidates(self.settings, names, &case, over);
+        let candidates = model_candidates(self.settings, names, case, over);
         if candidates.is_empty() {
-            return Err(if excluded_for_sensitivity(self.settings, names, &case) {
+            return Err(if excluded_for_sensitivity(self.settings, names, case) {
                 ExplainError::SensitiveWithoutLocalModel
             } else if excluded_for_budget(self.settings, names, over) {
                 ExplainError::BudgetReached
@@ -73,12 +92,16 @@ impl Explain<'_> {
                 ExplainError::NoModel
             });
         }
-        Ok((case, candidates))
+        Ok(candidates)
     }
 
     /// The model that would be asked first, without asking it: what the
-    /// "asking…" line names. Errors are the ones `run` would give at once.
+    /// "asking…" line names; a rule's name when a rule already answered.
+    /// Errors are the ones `run` would give at once.
     pub fn candidate(&self, session: Option<&SessionId>) -> Result<String, ExplainError> {
+        if let Some(known) = self.known(session)? {
+            return Ok(known.model);
+        }
         let (_, candidates) = self.prepare(session)?;
         Ok(candidates[0].name.clone())
     }
@@ -86,6 +109,9 @@ impl Explain<'_> {
     /// Asks, and keeps the answer with the case while the case is still the
     /// shell's last, so the panel shows it again instead of asking again.
     pub fn run(&self, session: Option<&SessionId>) -> Result<Explained, ExplainError> {
+        if let Some(known) = self.known(session)? {
+            return Ok(known);
+        }
         let (case, candidates) = self.prepare(session)?;
         let answered = ask_first(
             self.models,
@@ -105,6 +131,10 @@ impl Explain<'_> {
         session: Option<&SessionId>,
         on_chunk: &mut dyn FnMut(&str, &str),
     ) -> Result<Explained, ExplainError> {
+        if let Some(known) = self.known(session)? {
+            on_chunk(&known.model, &known.text);
+            return Ok(known);
+        }
         let (case, candidates) = self.prepare(session)?;
         let answered = ask_first_streaming(
             self.models,
@@ -246,6 +276,48 @@ mod tests {
         assert_eq!(
             kept.explanation(),
             Some(&Explanation::new("local", "The target is missing."))
+        );
+    }
+
+    #[test]
+    fn what_a_rule_already_said_is_answered_at_once_and_needs_no_model() {
+        let cases = MemoryCases::default();
+        cases
+            .save(
+                &case("hmz", 127, Some("42")).with_explanation(Explanation::from_rule(
+                    "alias",
+                    "`hmz` is an alias for `~/x/hmz`, which is not there.",
+                )),
+            )
+            .unwrap();
+        let models = ScriptedModels::default();
+        let uc = Explain {
+            settings: &settings(&[]),
+            cases: &cases,
+            secrets: &MapSecrets::with(&[]),
+            models: &models,
+            ledger: &MemoryLedger::default(),
+            clock: &FakeClock::at(0),
+        };
+        let session = SessionId::new("42");
+        assert_eq!(uc.candidate(Some(&session)).unwrap(), "rule · alias");
+        let e = uc.run(Some(&session)).unwrap();
+        assert_eq!(
+            (e.model.as_str(), e.text.as_str()),
+            (
+                "rule · alias",
+                "`hmz` is an alias for `~/x/hmz`, which is not there."
+            )
+        );
+        let mut pieces = Vec::new();
+        uc.run_streaming(Some(&session), &mut |model, chunk| {
+            pieces.push(format!("{model}:{chunk}"))
+        })
+        .unwrap();
+        assert_eq!(pieces.len(), 1, "the whole answer, in one piece");
+        assert!(
+            models.asked().is_empty(),
+            "no model configured, none needed"
         );
     }
 

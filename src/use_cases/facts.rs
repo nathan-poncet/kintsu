@@ -24,6 +24,11 @@ pub fn gather_facts(
         },
         cwd_entries: cwd.map(|dir| environment.entries(dir)).unwrap_or_default(),
         docker_desktop: false,
+        aliases: if needs_path {
+            environment.aliases()
+        } else {
+            Vec::new()
+        },
     }
 }
 
@@ -170,6 +175,25 @@ mod tests {
         assert_eq!(facts.executables, vec!["git"]);
         assert_eq!(env.path_reads.get(), 1);
         assert_eq!(facts.os, Some(Os::Linux));
+    }
+
+    #[test]
+    fn the_shells_aliases_come_with_the_path_and_only_then() {
+        let mut env = FakeEnvironment::with_executables(&["git"]);
+        env.aliases = vec![crate::entities::AliasFact {
+            name: "hmz".into(),
+            target: "~/nowhere/hmz".into(),
+            target_found: false,
+        }];
+        assert!(
+            gather_facts(&env, &outcome("make", 2), None)
+                .aliases
+                .is_empty()
+        );
+        assert_eq!(
+            gather_facts(&env, &outcome("hmz", 127), None).aliases,
+            env.aliases
+        );
     }
 
     #[test]

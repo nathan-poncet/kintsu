@@ -17,11 +17,24 @@ if [[ $- == *i* ]]; then
   __kintsu_last_history_number=""
   __kintsu_bubble_file="__KINTSU_STATE_DIR__/sessions/$$.bubble"
   __kintsu_asking_file="__KINTSU_STATE_DIR__/sessions/$$.asking"
-  # Once, at start: what this shell is, so the daemon knows it before its
-  # first failure. Nothing waits on the answer.
-  if [[ -z "${KINTSU_DISABLE:-}" ]]; then
-    command kintsu session new --shell bash --pid $$ >/dev/null 2>&1
-  fi
+  __kintsu_registered=""
+  # Once, at the first prompt, when the rc files have finished defining
+  # things: what this shell is and what it can run besides its PATH, its
+  # aliases (name, expansion) and functions, so the daemon knows it before
+  # its first failure. Nothing waits on the answer.
+  __kintsu_register() {
+    __kintsu_registered=1
+    [[ -n "${KINTSU_DISABLE:-}" ]] && return 0
+    {
+      local line name
+      while IFS= read -r line; do
+        line=${line#alias }
+        printf '%s\t%s\n' "${line%%=*}" "${line#*=}"
+      done < <(alias 2>/dev/null)
+      while IFS=' ' read -r _ _ name; do printf '%s\n' "$name"; done < <(declare -F 2>/dev/null)
+    } 2>/dev/null | command kintsu session new --shell bash --pid $$ --tty "$(tty 2>/dev/null)" >/dev/null 2>&1
+    return 0
+  }
   __kintsu_stderr_tee="__KINTSU_STDERR_TEE__"
   __kintsu_stderr_file="__KINTSU_STATE_DIR__/sessions/$$.stderr"
   __kintsu_stderr_saved=""
@@ -45,6 +58,7 @@ if [[ $- == *i* ]]; then
     local __kintsu_status=$? __kintsu_pipe="${PIPESTATUS[*]}"
     local __kintsu_history_number __kintsu_command
     __kintsu_tee_stop
+    [[ -z "$__kintsu_registered" ]] && __kintsu_register
     [[ -n "${KINTSU_DISABLE:-}" ]] && return $__kintsu_status
     __kintsu_read_history || return $__kintsu_status
     if [[ "$__kintsu_history_number" == "$__kintsu_last_history_number" ]]; then

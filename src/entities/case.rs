@@ -19,7 +19,10 @@ impl CaseId {
     }
 }
 
-/// What a model said about a case, and which model said it.
+/// How a rule's explanation names its author, where a model's names the model.
+const RULE_PREFIX: &str = "rule · ";
+
+/// What a model, or a rule, said about a case, and which said it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Explanation {
     model: String,
@@ -34,9 +37,19 @@ impl Explanation {
         }
     }
 
-    /// The model that answered.
+    /// What a rule, not a model, says about a case: the bubble says it in
+    /// place of the bare exit status and `kintsu why` answers it at once.
+    pub fn from_rule(rule: &str, text: impl Into<String>) -> Self {
+        Self::new(format!("{RULE_PREFIX}{rule}"), text)
+    }
+
+    /// The model that answered, or `rule · <name>` when a rule did.
     pub fn model(&self) -> &str {
         &self.model
+    }
+
+    pub fn is_from_rule(&self) -> bool {
+        self.model.starts_with(RULE_PREFIX)
     }
 
     /// What it said.

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::entities::{CommandOutcome, Language, Shell, TerminalIdentity};
+use crate::entities::{CommandOutcome, Language, Shell, ShellCommands, TerminalIdentity};
 
 /// The identity of one interactive shell, chosen by its hook.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -39,6 +39,8 @@ pub struct SessionDetails {
     pub env: BTreeMap<String, String>,
     /// The language the shell's locale names.
     pub language: Option<Language>,
+    /// The aliases and functions the shell's configuration defined.
+    pub commands: ShellCommands,
 }
 
 /// A shell session: which shell, and its last command lines, newest last.

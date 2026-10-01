@@ -8,7 +8,8 @@ use thiserror::Error;
 
 use crate::entities::{
     CommandLine, CommandOutcome, FailureCase, FailureShape, Language, QuietReason, Session,
-    SessionId, Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal, suggest_fix,
+    SessionId, Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal,
+    suggest_explanation, suggest_fix,
 };
 use crate::use_cases::facts::{gather_facts, learned_fix};
 use crate::use_cases::ports::{
@@ -114,7 +115,12 @@ impl Triage<'_> {
         let facts = gather_facts(self.environment, case.outcome(), case.cwd());
         let fix = suggest_fix(case.outcome(), &facts)
             .or_else(|| learned_fix(self.learned, case.outcome()));
-        let case = case.with_proposal(fix.clone());
+        let mut case = case.with_proposal(fix.clone());
+        if fix.is_none()
+            && let Some(explanation) = suggest_explanation(case.outcome(), &facts)
+        {
+            case = case.with_explanation(explanation);
+        }
         self.cases.save(&case)?;
         Ok(TriageDecision::Offer {
             case: Box::new(case),

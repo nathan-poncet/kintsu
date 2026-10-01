@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::entities::TerminalIdentity;
 use crate::entities::{
-    Action, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, Language, SessionDetails,
-    SessionId, Shell,
+    Action, Alias, CaseId, CommandLine, CommandOutcome, Duration, ExitStatus, Language,
+    SessionDetails, SessionId, Shell, ShellCommands,
 };
 use crate::use_cases::TriageInput;
 
@@ -18,6 +18,41 @@ pub const PROTOCOL_VERSION: u64 = 1;
 
 /// The `env` object of a hook's frame: variable names to values, strings
 /// only; anything else is left out.
+/// `{"functions": [...], "aliases": {"name": "expansion"}}`: strings only,
+/// bounded by the entity, so no client can make the daemon keep a novel.
+fn shell_commands(value: Option<&Value>) -> ShellCommands {
+    let Some(object) = value.and_then(Value::as_object) else {
+        return ShellCommands::default();
+    };
+    let functions = object
+        .get("functions")
+        .and_then(Value::as_array)
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    let aliases = object
+        .get("aliases")
+        .and_then(Value::as_object)
+        .map(|pairs| {
+            pairs
+                .iter()
+                .filter_map(|(name, expansion)| {
+                    Some(Alias {
+                        name: name.clone(),
+                        expansion: expansion.as_str()?.to_string(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    ShellCommands::new(functions, aliases)
+}
+
 fn forwarded_env(value: Option<&Value>) -> BTreeMap<String, String> {
     value
         .and_then(Value::as_object)
@@ -154,6 +189,7 @@ fn parse_request(v: &Value) -> Result<Request, FrameError> {
                 path: optional("path"),
                 env: forwarded_env(v.get("env")),
                 language: optional("language").and_then(|tag| Language::from_tag(&tag)),
+                commands: shell_commands(v.get("commands")),
             }),
         }),
         "command_finished" => {
@@ -247,7 +283,7 @@ mod tests {
 
     #[test]
     fn a_shell_that_starts_registers_what_it_is() {
-        let line = r#"{"v":1,"type":"session_new","version":"0.2.0","session":"4242","shell":"fish","pid":4242,"tty":"/dev/ttys004","path":"/w/bin","env":{"K":"v"},"language":"fr","terminal":{"program":"ghostty","kitty_window":"7"}}"#;
+        let line = r#"{"v":1,"type":"session_new","version":"0.2.0","session":"4242","shell":"fish","pid":4242,"tty":"/dev/ttys004","path":"/w/bin","env":{"K":"v"},"language":"fr","terminal":{"program":"ghostty","kitty_window":"7"},"commands":{"functions":["mkcd","_private",7],"aliases":{"hmz":"~/x/hmz","odd":3}}}"#;
         let Request::SessionNew { session, details } = parse_frame(line).unwrap() else {
             panic!()
         };
@@ -259,6 +295,15 @@ mod tests {
         assert_eq!(details.env.get("K").map(String::as_str), Some("v"));
         assert_eq!(details.language, Some(Language::French));
         assert_eq!(details.terminal.kitty_window.as_deref(), Some("7"));
+        assert_eq!(details.commands.functions, vec!["mkcd"]);
+        assert_eq!(
+            details.commands.aliases,
+            vec![Alias {
+                name: "hmz".into(),
+                expansion: "~/x/hmz".into()
+            }],
+            "strings only"
+        );
         let bare = parse_frame(r#"{"v":1,"type":"session_new","session":"1"}"#).unwrap();
         let Request::SessionNew { details, .. } = bare else {
             panic!()

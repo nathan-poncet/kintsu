@@ -3,7 +3,7 @@
 //! zsh child that waits for messages.
 
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::process::ExitCode;
 
@@ -11,7 +11,9 @@ use crate::adapters::gateways::{
     DaemonClient, EnvSecrets, HookNotes, RandomIds, SystemClock, TerminalOutput, unix,
 };
 use crate::adapters::presenters::{error_line, toast};
-use crate::entities::{KeySource, SessionDetails, SessionId, Settings, Shell, TriageDecision};
+use crate::entities::{
+    KeySource, SessionDetails, SessionId, Settings, Shell, ShellCommands, TriageDecision,
+};
 use crate::use_cases::ports::Secrets;
 use crate::use_cases::{CaptureOutput, Triage, TriageInput};
 
@@ -153,14 +155,28 @@ pub(super) fn session_new(
     if !rt.daemon {
         return ExitCode::SUCCESS;
     }
+    // The hook pipes the shell's aliases and functions in; a tty on stdin
+    // means nothing was piped and the shell itself is the tty.
+    let stdin = std::io::stdin();
+    let (tty, commands) = if unix::is_tty(&stdin) {
+        (
+            tty.or_else(|| unix::tty_name(stdin.as_raw_fd())),
+            ShellCommands::default(),
+        )
+    } else {
+        let mut listed = String::new();
+        let _ = stdin.lock().read_to_string(&mut listed);
+        (tty, ShellCommands::parse(&listed))
+    };
     let details = SessionDetails {
         shell,
         pid,
-        tty: tty.or_else(|| unix::tty_name(std::io::stdin().as_raw_fd())),
+        tty,
         terminal: rt.terminal.clone(),
         path: Some(rt.path_var.clone()),
         env: keys_the_models_read(settings),
         language: rt.machine_language(),
+        commands,
     };
     let _ = rt
         .client()
