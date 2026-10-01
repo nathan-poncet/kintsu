@@ -7,14 +7,14 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 use crate::entities::{
-    CommandLine, CommandOutcome, FailureCase, FailureShape, Language, QuietReason, Session,
-    SessionId, Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal,
-    suggest_explanation, suggest_fix,
+    CommandLine, CommandOutcome, FailureCase, FailureShape, FixEvent, FixEventKind, Language,
+    QuietReason, Session, SessionId, Settings, Shell, TerminalIdentity, TriageDecision,
+    accepted_proposal, proposal_taken, suggest_explanation, suggest_fix,
 };
 use crate::use_cases::facts::{gather_facts, learned_fix};
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, Environment, IdGenerator, IgnoreStore, IgnoreStoreError,
-    LearnedFixes, RegistryError, SessionRegistry,
+    LearnedFixes, RegistryError, Scoreboard, SessionRegistry,
 };
 
 /// What the hook reports.
@@ -65,6 +65,7 @@ pub struct Triage<'a> {
     pub ignores: &'a dyn IgnoreStore,
     pub environment: &'a dyn Environment,
     pub learned: &'a dyn LearnedFixes,
+    pub scoreboard: &'a dyn Scoreboard,
 }
 
 impl Triage<'_> {
@@ -122,6 +123,17 @@ impl Triage<'_> {
             case = case.with_explanation(explanation);
         }
         self.cases.save(&case)?;
+        // The scoreboard is a tally, never a reason to fail the decision.
+        let _ = self.scoreboard.mark(&FixEvent {
+            at: now,
+            kind: FixEventKind::Failure,
+        });
+        if let Some(fix) = &fix {
+            let _ = self.scoreboard.mark(&FixEvent {
+                at: now,
+                kind: FixEventKind::Offered(fix.source().clone()),
+            });
+        }
         Ok(TriageDecision::Offer {
             case: Box::new(case),
             fix,
@@ -139,6 +151,13 @@ impl Triage<'_> {
         if case.outcome().fingerprint() != failed.fingerprint() {
             return;
         }
+        let Some(taken) = proposal_taken(&case, &input.outcome) else {
+            return;
+        };
+        let _ = self.scoreboard.mark(&FixEvent {
+            at: self.clock.now(),
+            kind: FixEventKind::Taken(taken.source().clone()),
+        });
         if let Some(fix) = accepted_proposal(&case, &input.outcome) {
             let _ = self.learned.accept(
                 &FailureShape::of(case.outcome()),
@@ -195,6 +214,7 @@ mod tests {
         ignores: MemoryIgnores,
         environment: FakeEnvironment,
         learned: MemoryLearned,
+        scoreboard: MemoryScoreboard,
     }
 
     impl World {
@@ -208,6 +228,7 @@ mod tests {
                 ignores: MemoryIgnores::default(),
                 environment: FakeEnvironment::with_executables(&["git", "make", "cargo"]),
                 learned: MemoryLearned::default(),
+                scoreboard: MemoryScoreboard::default(),
             }
         }
 
@@ -221,6 +242,7 @@ mod tests {
                 ignores: &self.ignores,
                 environment: &self.environment,
                 learned: &self.learned,
+                scoreboard: &self.scoreboard,
             }
         }
 
@@ -369,6 +391,32 @@ mod tests {
             FixSource::Model("local".into()),
             "",
         )
+    }
+
+    #[test]
+    fn the_scoreboard_sees_every_failure_every_offer_and_every_fix_taken() {
+        let w = World::new();
+        w.run("gti status", 127);
+        w.run("git status", 0);
+        w.run("make", 2);
+        w.run("make", 2);
+        let kinds: Vec<FixEventKind> = w
+            .scoreboard
+            .events
+            .borrow()
+            .iter()
+            .map(|e| e.kind.clone())
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                FixEventKind::Failure,
+                FixEventKind::Offered(FixSource::Rule("command typo".into())),
+                FixEventKind::Taken(FixSource::Rule("command typo".into())),
+                FixEventKind::Failure,
+            ],
+            "the duplicate `make` is quiet: not looked at twice"
+        );
     }
 
     #[test]

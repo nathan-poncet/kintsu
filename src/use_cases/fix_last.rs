@@ -3,11 +3,11 @@
 
 use thiserror::Error;
 
-use crate::entities::{FailureCase, Fix, SessionId, Settings, Task};
+use crate::entities::{FailureCase, Fix, FixEvent, FixEventKind, SessionId, Settings, Task};
 use crate::use_cases::facts::rule_fix;
 use crate::use_cases::ports::{
     CaseStore, CaseStoreError, Clock, CostLedger, Environment, LearnedFixes, ModelError,
-    ModelGateway, Secrets,
+    ModelGateway, Scoreboard, Secrets,
 };
 use crate::use_cases::prompts::{parse_quick_fix, quick_fix_prompt};
 use crate::use_cases::routing::{
@@ -44,6 +44,7 @@ pub struct FixLast<'a> {
     pub ledger: &'a dyn CostLedger,
     pub clock: &'a dyn Clock,
     pub learned: &'a dyn LearnedFixes,
+    pub scoreboard: &'a dyn Scoreboard,
 }
 
 impl FixLast<'_> {
@@ -51,7 +52,22 @@ impl FixLast<'_> {
     /// then the proposal a model already left: what is known without
     /// asking anyone.
     pub fn known(&self, case: &FailureCase) -> Option<Fix> {
-        rule_fix(self.environment, self.learned, case).or_else(|| case.proposal().cloned())
+        let fix = rule_fix(self.environment, self.learned, case);
+        if let Some(fix) = &fix
+            && case.proposal().is_none()
+        {
+            self.offered(fix);
+        }
+        fix.or_else(|| case.proposal().cloned())
+    }
+
+    /// A fix the case had not seen yet: one more offer on the scoreboard,
+    /// which is a tally, never a reason to fail.
+    fn offered(&self, fix: &Fix) {
+        let _ = self.scoreboard.mark(&FixEvent {
+            at: self.clock.now(),
+            kind: FixEventKind::Offered(fix.source().clone()),
+        });
     }
 
     /// The quick-fix model that would be asked first, if one is routed and
@@ -99,6 +115,9 @@ impl FixLast<'_> {
         ) {
             Ok((name, answer)) => {
                 let fix = parse_quick_fix(&answer, &name, case.outcome().command());
+                if let Some(fix) = &fix {
+                    self.offered(fix);
+                }
                 if fix.is_some() && self.cases.still_current(&case)? {
                     self.cases.save(&case.clone().with_proposal(fix.clone()))?;
                 }
@@ -156,6 +175,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let typo = case("gti status", 127, Some("42"));
         assert_eq!(uc.known(&typo).unwrap().command().as_str(), "git status");
@@ -194,6 +214,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "sudo touch /etc/hosts.new");
@@ -215,6 +236,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let proposal = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix.unwrap().command().as_str(), "git status");
@@ -235,6 +257,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let fix = uc.run(Some(&SessionId::new("42"))).unwrap().fix.unwrap();
         assert_eq!(fix.command().as_str(), "npm test -- --runInBand");
@@ -259,6 +282,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         assert_eq!(none.run(Some(&SessionId::new("42"))).unwrap().fix, None);
         let down = FixLast {
@@ -270,6 +294,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let proposal = down.run(Some(&SessionId::new("42"))).unwrap();
         assert_eq!(proposal.fix, None);
@@ -299,6 +324,7 @@ mod tests {
             ledger: &ledger,
             clock: &FakeClock::at(1_790_637_207_000),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         let first = uc.run(Some(&SessionId::new("42"))).unwrap();
         assert!(first.fix.is_some());
@@ -350,6 +376,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap().fix,
@@ -373,6 +400,7 @@ mod tests {
             ledger: &MemoryLedger::default(),
             clock: &FakeClock::at(0),
             learned: &MemoryLearned::default(),
+            scoreboard: &MemoryScoreboard::default(),
         };
         assert_eq!(
             uc.run(Some(&SessionId::new("42"))).unwrap_err(),

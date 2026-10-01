@@ -34,6 +34,7 @@ pub(super) fn triage(
         environment,
         style,
         learned,
+        ledger,
     } = *local;
     input.terminal = rt.terminal.clone();
     input.path = Some(rt.path_var.clone());
@@ -85,6 +86,7 @@ pub(super) fn triage(
         ignores: state,
         environment,
         learned,
+        scoreboard: ledger,
     };
     let ghost_shell = input.shell.is_some_and(Shell::supports_ghost_text);
     let session = input.session.clone();

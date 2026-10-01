@@ -177,6 +177,7 @@ The commands, all about the last failure of the current shell:
 | `kintsu learned [--json]`, `learned forget <program>|--all` | the fixes you took twice for the same failure, now instant rules; and unlearning them |
 | `kintsu setup`, `doctor`, `default-config`, `config path` | configure in three questions, check, print the defaults, show where the files are |
 | `kintsu costs [--json]` | what the models cost today and over the last thirty days, per model, against `max_daily_cost` |
+| `kintsu stats [--json]` | the last thirty days: failures looked at per day, fixes offered and taken by each rule and model with its acceptance rate, explanations asked |
 | `kintsu models [test] [--json]` | every configured model: provider, tier, whether its key is found and where, whether its server answers; `test` asks each one word and times it |
 | `kintsu login <model> [--write-config]` | type a model's key once, without echo; it goes to the macOS Keychain or Linux secret-service, and the configuration reads it from there |
 | `kintsu daemon status`, `daemon stop` | the resident process; the hooks start it on their own |

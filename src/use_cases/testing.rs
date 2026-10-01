@@ -387,6 +387,69 @@ impl CostLedger for MemoryLedger {
     }
 }
 
+/// Every event kept in memory.
+#[derive(Default)]
+pub struct MemoryScoreboard {
+    pub events: RefCell<Vec<FixEvent>>,
+}
+
+impl Scoreboard for MemoryScoreboard {
+    fn mark(&self, event: &FixEvent) -> Result<(), ScoreboardError> {
+        self.events.borrow_mut().push(event.clone());
+        Ok(())
+    }
+
+    fn since(&self, from: Timestamp) -> Result<Vec<FixEvent>, ScoreboardError> {
+        Ok(self
+            .events
+            .borrow()
+            .iter()
+            .filter(|e| e.at >= from)
+            .cloned()
+            .collect())
+    }
+}
+
+/// What every `Scoreboard` must do, run against an empty one.
+pub fn scoreboard_contract(board: &dyn Scoreboard) {
+    let event = |at: u64, kind: FixEventKind| FixEvent {
+        at: Timestamp::from_millis(at),
+        kind,
+    };
+    assert!(board.since(Timestamp::from_millis(0)).unwrap().is_empty());
+    board.mark(&event(1_000, FixEventKind::Failure)).unwrap();
+    board
+        .mark(&event(
+            1_000,
+            FixEventKind::Offered(FixSource::Rule("command typo".into())),
+        ))
+        .unwrap();
+    board
+        .mark(&event(
+            2_000,
+            FixEventKind::Taken(FixSource::Model("local".into())),
+        ))
+        .unwrap();
+    let all = board.since(Timestamp::from_millis(0)).unwrap();
+    assert_eq!(
+        all,
+        vec![
+            event(1_000, FixEventKind::Failure),
+            event(
+                1_000,
+                FixEventKind::Offered(FixSource::Rule("command typo".into()))
+            ),
+            event(2_000, FixEventKind::Taken(FixSource::Model("local".into()))),
+        ],
+        "oldest first, every field kept"
+    );
+    assert_eq!(
+        board.since(Timestamp::from_millis(2_000)).unwrap().len(),
+        1,
+        "from is inclusive"
+    );
+}
+
 /// What every `CostLedger` must do, run against an empty one.
 pub fn cost_ledger_contract(ledger: &dyn CostLedger) {
     let entry = |at: u64, model: &str| LedgerEntry {
