@@ -1022,6 +1022,30 @@ status (`gather_output_facts`, off the quiet path, after the capture), and
 exists, asked only when the output speaks of Docker. Every fix that guesses
 the user's intent stays under 0.8, so none is pre-typed.
 
+## 43. The models answer in the machine's language (2026-10-01)
+
+The vision wanted explanations in the user's language, French first. The
+hook's process, which runs in the shell's environment, reads `LC_ALL`,
+`LC_MESSAGES` then `LANG`, the first one set, and names the language it
+finds in `session_new` and `command_finished` as an ISO 639-1 code
+(`language: "fr"`); the daemon remembers it per shell next to the PATH and
+the keys, and falls back to its own locale, which under launchd or systemd
+names nothing. `[ui] language` is `auto` by default and can fix one
+language whatever the locale; the configuration refuses a code kintsu does
+not know, with the list. The entity knows twelve languages; `C`, `POSIX`
+and an empty locale are English, and a locale naming a language outside
+the list is English too, which `kintsu doctor` says.
+
+`auto` is settled at the edge: the composition roots call
+`Settings::with_machine_language`, so the use cases read one
+`Settings::language()` and the three structs that ask models kept their
+shape. The explain prompt asks for the prose in that language and leaves
+commands, paths and code as they are; the quick-fix prompt only reminds
+the model that a command line has no language, so that French in the
+captured output does not turn its one-line answer into French prose. Rule
+rationales and the doctor's lines stay English: they are code, versioned
+and tested as such.
+
 ## What is not built, by priority
 
 1. The pty harness in CI.
