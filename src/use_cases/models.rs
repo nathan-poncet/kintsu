@@ -3,7 +3,9 @@
 //! test`, one word asked of each model. Keys are looked up, never shown.
 
 use crate::entities::{Duration, KeySource, ModelSpec, Provider, Settings, Tier};
-use crate::use_cases::ports::{Clock, Environment, ModelError, ModelGateway, Prompt, Secrets};
+use crate::use_cases::ports::{
+    AnswerShape, Clock, Environment, ModelError, ModelGateway, Prompt, Secrets,
+};
 
 /// Whether a model's key is there, without the key.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +117,7 @@ fn probe_prompt() -> Prompt {
         system: "Answer with the single word: ok".into(),
         user: "Say ok.".into(),
         max_tokens: 8,
+        shape: AnswerShape::Prose,
     }
 }
 

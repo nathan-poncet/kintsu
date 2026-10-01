@@ -9,7 +9,7 @@ use std::time::Duration as StdDuration;
 use serde_json::{Value, json};
 
 use crate::entities::{ModelSpec, Provider, Tokens};
-use crate::use_cases::ports::{Answer, ModelError, ModelGateway, Prompt};
+use crate::use_cases::ports::{Answer, AnswerShape, ModelError, ModelGateway, Prompt, ProposedFix};
 
 /// Wait this long when the model has no timeout of its own.
 const DEFAULT_TIMEOUT_SECS: u64 = 45;
@@ -61,12 +61,20 @@ fn build_request_with(
         {"role": "system", "content": prompt.system},
         {"role": "user", "content": prompt.user},
     ]);
+    // A streamed answer comes as text; the shape is asked for whole answers.
+    let structured = prompt.shape == AnswerShape::Fix && !streaming;
     Ok(match spec.provider {
-        Provider::Ollama => Request {
-            url: format!("{base}/api/chat"),
-            headers: vec![],
-            body: json!({"model": spec.model, "messages": messages, "stream": streaming, "options": {"num_predict": max_tokens}}),
-        },
+        Provider::Ollama => {
+            let mut body = json!({"model": spec.model, "messages": messages, "stream": streaming, "options": {"num_predict": max_tokens}});
+            if structured {
+                body["format"] = fix_schema();
+            }
+            Request {
+                url: format!("{base}/api/chat"),
+                headers: vec![],
+                body,
+            }
+        }
         Provider::OpenAiCompatible => {
             let mut headers = vec![("content-type".to_string(), "application/json".to_string())];
             match key {
@@ -78,6 +86,12 @@ fn build_request_with(
             body[output_limit_field(base)] = json!(max_tokens);
             if streaming {
                 body["stream"] = json!(true);
+            }
+            if structured {
+                body["response_format"] = json!({
+                    "type": "json_schema",
+                    "json_schema": {"name": FIX_TOOL, "strict": true, "schema": fix_schema()},
+                });
             }
             Request {
                 url: format!("{base}/chat/completions"),
@@ -96,6 +110,14 @@ fn build_request_with(
             if streaming {
                 body["stream"] = json!(true);
             }
+            if structured {
+                body["tools"] = json!([{
+                    "name": FIX_TOOL,
+                    "description": "The one corrected command line to run instead of the failed one, or none.",
+                    "input_schema": fix_schema(),
+                }]);
+                body["tool_choice"] = json!({"type": "tool", "name": FIX_TOOL});
+            }
             Request {
                 url: format!("{base}/v1/messages"),
                 headers: vec![
@@ -112,6 +134,92 @@ fn build_request_with(
                 spec.name
             )));
         }
+    })
+}
+
+/// The tool a fix is asked through, and the schema every provider gets.
+const FIX_TOOL: &str = "propose_fix";
+
+/// `{"command", "confidence", "rationale"}`, every key present and the
+/// command null when there is none: the strictest providers want it so.
+fn fix_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "command": {"type": ["string", "null"], "description": "The corrected command line, or null when no single command line would help."},
+            "confidence": {"type": ["number", "null"], "description": "From 0 to 1."},
+            "rationale": {"type": ["string", "null"], "description": "One short sentence."},
+        },
+        "required": ["command", "confidence", "rationale"],
+        "additionalProperties": false,
+    })
+}
+
+/// The keys a structured request adds; a server that knows none of them
+/// refuses the request, and is asked again without them.
+const STRUCTURE_KEYS: [&str; 4] = ["format", "response_format", "tools", "tool_choice"];
+
+/// A refusal about the structure gets the request sent once more as plain
+/// text: older Ollama servers, compatible endpoints without JSON schemas.
+fn without_structure(request: &Request, refusal: &str) -> Option<Request> {
+    let fields = request.body.as_object()?;
+    if !STRUCTURE_KEYS.iter().any(|key| fields.contains_key(*key)) {
+        return None;
+    }
+    let lower = refusal.to_lowercase();
+    let about_structure = [
+        "format",
+        "schema",
+        "tool",
+        "unknown field",
+        "unrecognized",
+        "unsupported parameter",
+        "not supported",
+    ]
+    .iter()
+    .any(|word| lower.contains(word));
+    if !about_structure {
+        return None;
+    }
+    let mut body = request.body.clone();
+    let fields = body.as_object_mut()?;
+    for key in STRUCTURE_KEYS {
+        fields.remove(key);
+    }
+    Some(Request {
+        url: request.url.clone(),
+        headers: request.headers.clone(),
+        body,
+    })
+}
+
+/// The fix a model wrote as the JSON object it was asked for, from a tool
+/// call's input or from the text itself, fences stripped; nothing when the
+/// text is not that object, so the plain line is read instead.
+pub fn proposed_fix(text: &str) -> Option<ProposedFix> {
+    let text = text.trim();
+    let text = text
+        .strip_prefix("```json")
+        .or_else(|| text.strip_prefix("```"))
+        .map_or(text, |t| t.trim_end_matches("```").trim());
+    if !text.starts_with('{') {
+        return None;
+    }
+    let object: Value = serde_json::from_str(text).ok()?;
+    let object = object.as_object()?;
+    Some(ProposedFix {
+        command: object
+            .get("command")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        confidence: object
+            .get("confidence")
+            .and_then(Value::as_f64)
+            .map(|c| c as f32),
+        rationale: object
+            .get("rationale")
+            .and_then(Value::as_str)
+            .map(str::to_string),
     })
 }
 
@@ -137,14 +245,26 @@ pub fn parse_answer(provider: Provider, status: u16, body: &Value) -> Result<Str
         Provider::OpenAiCompatible => body
             .pointer("/choices/0/message/content")
             .and_then(Value::as_str),
-        Provider::Anthropic => body
-            .get("content")
-            .and_then(Value::as_array)
-            .and_then(|parts| {
+        Provider::Anthropic => {
+            let parts = body.get("content").and_then(Value::as_array);
+            // A forced tool call answers in the tool's input, not in text.
+            let tool_input = parts.and_then(|parts| {
+                parts
+                    .iter()
+                    .filter(|p| p.get("type").and_then(Value::as_str) == Some("tool_use"))
+                    .find_map(|p| p.get("input"))
+                    .filter(|input| input.is_object())
+                    .map(Value::to_string)
+            });
+            if tool_input.is_some() {
+                return Ok(tool_input.unwrap_or_default());
+            }
+            parts.and_then(|parts| {
                 parts
                     .iter()
                     .find_map(|p| p.get("text").and_then(Value::as_str))
-            }),
+            })
+        }
         Provider::CliAgent => None,
     };
     text.map(|t| t.trim().to_string())
@@ -382,16 +502,21 @@ impl ModelGateway for HttpModels {
         let (status, body) = post(&agent, &request)?;
         let answer = parse_answer(spec.provider, status, &body);
         let with_tokens = |text: String, body: &Value| Answer {
+            fix: (prompt.shape == AnswerShape::Fix)
+                .then(|| proposed_fix(&text))
+                .flatten(),
             text,
             tokens: parse_usage(spec.provider, body),
         };
         let Err(ModelError::Refused(refusal)) = &answer else {
             return answer.map(|text| with_tokens(text, &body));
         };
-        let Some(renamed) = renamed_output_limit(&request, refusal) else {
+        let Some(again) = renamed_output_limit(&request, refusal)
+            .or_else(|| without_structure(&request, refusal))
+        else {
             return answer.map(|text| with_tokens(text, &body));
         };
-        let (status, body) = post(&agent, &renamed)?;
+        let (status, body) = post(&agent, &again)?;
         parse_answer(spec.provider, status, &body).map(|text| with_tokens(text, &body))
     }
 
@@ -438,7 +563,125 @@ mod tests {
             system: "sys".into(),
             user: "usr".into(),
             max_tokens: 400,
+            shape: AnswerShape::Prose,
         }
+    }
+
+    fn fix_prompt() -> Prompt {
+        Prompt {
+            shape: AnswerShape::Fix,
+            ..prompt()
+        }
+    }
+
+    #[test]
+    fn a_fix_is_asked_as_a_forced_tool_a_json_schema_or_a_format_and_never_when_streamed() {
+        let anthropic = build_request(
+            &spec(Provider::Anthropic, "https://api.anthropic.com"),
+            Some("k"),
+            &fix_prompt(),
+        )
+        .unwrap();
+        assert_eq!(anthropic.body["tool_choice"]["name"], "propose_fix");
+        assert_eq!(
+            anthropic.body["tools"][0]["input_schema"]["required"][0],
+            "command"
+        );
+        let openai = build_request(
+            &spec(Provider::OpenAiCompatible, "https://api.openai.com/v1"),
+            Some("k"),
+            &fix_prompt(),
+        )
+        .unwrap();
+        assert_eq!(openai.body["response_format"]["type"], "json_schema");
+        assert_eq!(
+            openai.body["response_format"]["json_schema"]["strict"],
+            true
+        );
+        let ollama = build_request(
+            &spec(Provider::Ollama, "http://127.0.0.1:11434"),
+            None,
+            &fix_prompt(),
+        )
+        .unwrap();
+        assert_eq!(ollama.body["format"]["type"], "object");
+        let prose = build_request(
+            &spec(Provider::Ollama, "http://127.0.0.1:11434"),
+            None,
+            &prompt(),
+        )
+        .unwrap();
+        assert!(prose.body.get("format").is_none());
+        let streamed = build_stream_request(
+            &spec(Provider::Anthropic, "https://api.anthropic.com"),
+            Some("k"),
+            &fix_prompt(),
+        )
+        .unwrap();
+        assert!(streamed.body.get("tools").is_none(), "streams are text");
+    }
+
+    #[test]
+    fn a_tool_call_is_read_as_the_answer_and_text_still_is() {
+        let tool = json!({"content": [
+            {"type": "text", "text": "Here you go."},
+            {"type": "tool_use", "name": "propose_fix", "input": {"command": "git status", "confidence": 0.9, "rationale": "typo"}}
+        ]});
+        let answer = parse_answer(Provider::Anthropic, 200, &tool).unwrap();
+        let fix = proposed_fix(&answer).unwrap();
+        assert_eq!(fix.command.as_deref(), Some("git status"));
+        assert_eq!(fix.confidence, Some(0.9));
+        assert_eq!(fix.rationale.as_deref(), Some("typo"));
+        assert_eq!(
+            proposed_fix(
+                "```json\n{\"command\": null, \"confidence\": 0, \"rationale\": \"no\"}\n```"
+            ),
+            Some(ProposedFix {
+                command: None,
+                confidence: Some(0.0),
+                rationale: Some("no".into())
+            }),
+            "fenced, with a null command"
+        );
+        assert_eq!(
+            proposed_fix("git status"),
+            None,
+            "a plain line is not the object"
+        );
+        assert_eq!(proposed_fix("{not json"), None);
+        let text = json!({"content": [{"type": "text", "text": "git status"}]});
+        assert_eq!(
+            parse_answer(Provider::Anthropic, 200, &text).unwrap(),
+            "git status"
+        );
+    }
+
+    #[test]
+    fn a_refusal_about_the_structure_gets_the_request_sent_plain_once() {
+        let request = build_request(
+            &spec(Provider::Ollama, "http://127.0.0.1:11434"),
+            None,
+            &fix_prompt(),
+        )
+        .unwrap();
+        let plain =
+            without_structure(&request, "HTTP 400 invalid format: expected string").unwrap();
+        assert!(plain.body.get("format").is_none());
+        assert_eq!(plain.body["model"], "model-id");
+        assert!(
+            without_structure(&request, "HTTP 401 invalid api key").is_none(),
+            "a refusal about something else is final"
+        );
+        let prose = build_request(
+            &spec(Provider::Ollama, "http://127.0.0.1:11434"),
+            None,
+            &prompt(),
+        )
+        .unwrap();
+        assert!(
+            without_structure(&prose, "HTTP 400 unknown field format").is_none(),
+            "nothing to remove"
+        );
     }
 
     #[test]
