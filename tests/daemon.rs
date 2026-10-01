@@ -148,6 +148,31 @@ impl Fixture {
             String::from_utf8_lossy(&out.stderr).into(),
         )
     }
+
+    /// Like `run`, with text on stdin: what a hook pipes in.
+    fn run_with_stdin(&self, args: &[&str], session: Option<&str>, stdin: &str) -> (i32, String) {
+        let mut cmd = kintsu();
+        cmd.args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        self.env(&mut cmd);
+        if let Some(s) = session {
+            cmd.env("KINTSU_SESSION", s);
+        }
+        let mut child = cmd.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(stdin.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        (
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stderr).into(),
+        )
+    }
 }
 
 impl Drop for Fixture {
@@ -920,5 +945,58 @@ fn a_fix_taken_twice_becomes_an_instant_rule_and_the_model_is_not_asked_again() 
     assert_eq!(
         (code, out.as_str()),
         (0, "▎ Forgot 1 learned fix for make.\n")
+    );
+}
+
+#[test]
+fn the_shells_aliases_and_functions_are_known_to_the_rules_once_it_registered() {
+    let mut f = Fixture::new("aliases", "[ui]\neager_fix = false\n");
+    f.start_daemon();
+    // What the fish hook pipes in at its first prompt: an alias whose
+    // program is gone, a function, and the shell's own helpers.
+    let pid = std::process::id().to_string();
+    let (code, err) = f.run_with_stdin(
+        &["session", "new", "--shell", "fish", "--pid", &pid],
+        Some("sa"),
+        "hmz\t'~/definitely/not/here/hmz'\nmkcd\n__fish_helper\n",
+    );
+    assert_eq!((code, err.as_str()), (0, ""));
+
+    let gone = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sa","command":"hmz","status":127,"cwd":"/","shell":"fish"}"#,
+    );
+    assert_eq!(gone[0]["offer"]["fix"], serde_json::Value::Null);
+    let toast = gone[0]["toast"].as_str().unwrap_or("");
+    assert!(
+        toast.contains("`hmz` is an alias for `~/definitely/not/here/hmz`, which is not there."),
+        "{toast}"
+    );
+    // `kintsu why` on it: the rule's words come back as the bubble, no model.
+    let (code, _, err) = f.run(&["why"], Some("sa"));
+    assert_eq!(code, 0, "{err}");
+    let why = wait_for_bubble(&f, "sa");
+    assert!(
+        why.contains("is an alias for") && why.contains("— rule · alias"),
+        "{why}"
+    );
+
+    let typo = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sa","command":"hmz2 --help","status":127,"cwd":"/","shell":"fish"}"#,
+    );
+    assert_eq!(
+        typo[0]["offer"]["fix"], "hmz --help",
+        "the alias is a program the typo rule knows"
+    );
+    let function = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sa","command":"mkcdd src","status":127,"cwd":"/","shell":"fish"}"#,
+    );
+    assert_eq!(function[0]["offer"]["fix"], "mkcd src");
+    let other_shell = f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"sb","command":"hmz2","status":127,"cwd":"/","shell":"fish"}"#,
+    );
+    assert_eq!(
+        other_shell[0]["offer"]["fix"],
+        serde_json::Value::Null,
+        "another shell's aliases are its own"
     );
 }

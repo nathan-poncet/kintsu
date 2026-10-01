@@ -326,7 +326,11 @@ fn on_command_finished(
     };
     let secrets = daemon.secrets_for(session.as_ref());
     let state = daemon.state();
-    let environment = FsEnvironment::new(path.clone());
+    let commands = session
+        .as_ref()
+        .map(|s| daemon.sessions.commands_of(s))
+        .unwrap_or_default();
+    let environment = FsEnvironment::new(path.clone()).with_shell_commands(commands.clone());
     let triage = Triage {
         settings: &settings,
         clock: &SystemClock,
@@ -400,7 +404,8 @@ fn on_command_finished(
                 return;
             }
             let messages = messages(&daemon, &settings, state, &secrets);
-            match messages.fix_from_output(&case, &FsEnvironment::new(path)) {
+            let environment = FsEnvironment::new(path).with_shell_commands(commands);
+            match messages.fix_from_output(&case, &environment) {
                 Some(Ok(_)) => return,
                 Some(Err(e)) => log(&format!("fix for {}: {e}", case.outcome().command())),
                 None => {}
@@ -463,7 +468,8 @@ fn on_act(daemon: &Arc<Daemon>, stream: &mut UnixStream, case: CaseId, action: A
                     .sessions
                     .path_of(&session)
                     .unwrap_or_else(|| daemon.cfg.path_var.clone());
-                let environment = FsEnvironment::new(path);
+                let environment = FsEnvironment::new(path)
+                    .with_shell_commands(daemon.sessions.commands_of(&session));
                 messages.fix_now(&session, &environment).map(|_| ())
             }
             Action::Ignore => {

@@ -19,13 +19,19 @@ pub fn toast(decision: &TriageDecision, style: &Style, ghost: bool) -> Option<St
     }
     let outcome = case.outcome();
     let echo = style.abbreviate(outcome.command().as_str(), ECHO_WIDTH);
-    let sentence = match fix {
-        Some(fix) => format!(
+    let said_by_a_rule = case
+        .explanation()
+        .filter(|explanation| explanation.is_from_rule());
+    let sentence = match (fix, said_by_a_rule) {
+        (Some(fix), _) => format!(
             "Did you mean {}?{}",
             style.bold(fix.command().as_str()),
             danger_note(fix, style)
         ),
-        None => {
+        // No command to type, but a rule knows what happened: that beats
+        // the bare exit status.
+        (None, Some(explanation)) => explanation.text().to_string(),
+        (None, None) => {
             let after = outcome
                 .duration()
                 .filter(|d| d.as_millis() >= 1_000)
@@ -262,6 +268,36 @@ mod tests {
         assert!(
             quick.starts_with("| make exited 2.\n"),
             "sub-second durations are noise: {quick}"
+        );
+    }
+
+    #[test]
+    fn what_a_rule_says_replaces_the_bare_exit_status_when_there_is_no_fix() {
+        use crate::entities::{
+            CaseId, CommandLine, CommandOutcome, ExitStatus, Explanation, FailureCase, Timestamp,
+        };
+        let case = FailureCase::new(
+            CaseId::new("c"),
+            Timestamp::from_millis(0),
+            CommandOutcome::new(CommandLine::new("hmz").unwrap(), ExitStatus::new(127)),
+            None,
+        )
+        .with_explanation(Explanation::from_rule(
+            "alias",
+            "`hmz` is an alias for `~/.dotnet/tools/hmz`, which is not there.",
+        ));
+        let text = toast(
+            &TriageDecision::Offer {
+                case: Box::new(case),
+                fix: None,
+            },
+            &Style::PLAIN,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            text,
+            "| `hmz` is an alias for `~/.dotnet/tools/hmz`, which is not there.\n| kintsu fix - kintsu why - kintsu agent - kintsu ignore - ^K more"
         );
     }
 

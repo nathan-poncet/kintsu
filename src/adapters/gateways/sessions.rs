@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::adapters::gateways::ndjson::send_line;
 use crate::adapters::gateways::unix;
 use crate::entities::{
-    CaseId, Language, Message, SessionDetails, SessionId, Shell, TerminalIdentity,
+    CaseId, Language, Message, SessionDetails, SessionId, Shell, ShellCommands, TerminalIdentity,
 };
 use crate::use_cases::ports::{Notifier, NotifyError};
 
@@ -32,6 +32,8 @@ struct SessionState {
     path: Option<String>,
     env: BTreeMap<String, String>,
     language: Option<Language>,
+    /// The aliases and functions the shell listed at its start.
+    commands: ShellCommands,
 }
 
 impl SessionState {
@@ -47,6 +49,7 @@ impl SessionState {
             path: None,
             env: BTreeMap::new(),
             language: None,
+            commands: ShellCommands::default(),
         }
     }
 }
@@ -131,7 +134,17 @@ impl Sessions {
                 state.env = details.env;
             }
             state.language = details.language.or(state.language);
+            if !details.commands.is_empty() {
+                state.commands = details.commands;
+            }
         });
+    }
+
+    /// What the shell said it can run besides its PATH, for the rules that
+    /// look up a program the way the shell would.
+    pub fn commands_of(&self, id: &SessionId) -> ShellCommands {
+        self.peek(id, |state| state.commands.clone())
+            .unwrap_or_default()
     }
 
     /// One line about a registered session, for the log.
@@ -324,11 +337,17 @@ mod tests {
                 path: Some("/a/bin".into()),
                 env: BTreeMap::from([("K".to_string(), "v".to_string())]),
                 language: Some(Language::French),
+                commands: ShellCommands::parse("hmz\t~/x/hmz\nmkcd\n"),
             },
         );
         assert_eq!(s.language_of(&id), Some(Language::French));
         assert_eq!(s.path_of(&id).as_deref(), Some("/a/bin"));
         assert_eq!(s.env_of(&id).get("K").map(String::as_str), Some("v"));
+        assert_eq!(s.commands_of(&id).functions, vec!["mkcd"]);
+        assert_eq!(
+            s.commands_of(&id).aliases[0].expansion,
+            "~/x/hmz".to_string()
+        );
         assert_eq!(
             s.terminal_of(&id).and_then(|t| t.tmux_pane),
             Some("%1".to_string())
@@ -340,6 +359,8 @@ mod tests {
         s.register(&id, SessionDetails::default());
         assert_eq!(s.path_of(&id).as_deref(), Some("/a/bin"), "kept");
         assert!(s.terminal_of(&id).is_some(), "kept");
+        assert_eq!(s.commands_of(&id).functions, vec!["mkcd"], "kept");
+        assert!(s.commands_of(&SessionId::new("43")).is_empty());
         assert_eq!(
             s.describe(&id),
             "session 42 registered: zsh pid 42 on /dev/ttys003",

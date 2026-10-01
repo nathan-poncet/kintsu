@@ -21,11 +21,22 @@ if [[ -o interactive ]]; then
   typeset -gi __kintsu_seq=0 __kintsu_pending_seq=-1
   typeset -g __kintsu_ghost_file="__KINTSU_STATE_DIR__/sessions/$$.ghost"
   typeset -g __kintsu_bubble_file="__KINTSU_STATE_DIR__/sessions/$$.bubble"
-  # Once, at start: what this shell is, so the daemon knows it before its
-  # first failure. Nothing waits on the answer.
-  if [[ -z "${KINTSU_DISABLE:-}" ]]; then
-    command kintsu session new --shell zsh --pid $$ >/dev/null 2>&1
-  fi
+  # Once, at the first prompt, when the rc files have finished defining
+  # things: what this shell is and what it can run besides its PATH, its
+  # aliases (name, expansion) and functions, so the daemon knows it before
+  # its first failure. Nothing waits on the answer.
+  __kintsu_register() {
+    local __kintsu_status=$?
+    add-zsh-hook -d precmd __kintsu_register
+    [[ -n "${KINTSU_DISABLE:-}" ]] && return $__kintsu_status
+    zmodload zsh/parameter 2>/dev/null
+    {
+      local name
+      for name in "${(@k)aliases}"; do print -r -- "$name"$'\t'"${aliases[$name]}"; done
+      print -rl -- "${(@k)functions}"
+    } 2>/dev/null | command kintsu session new --shell zsh --pid $$ --tty "${TTY:-}" >/dev/null 2>&1
+    return $__kintsu_status
+  }
   typeset -g __kintsu_stderr_tee="__KINTSU_STDERR_TEE__"
   typeset -g __kintsu_stderr_file="__KINTSU_STATE_DIR__/sessions/$$.stderr" __kintsu_stderr_saved=""
 
@@ -219,6 +230,7 @@ if [[ -o interactive ]]; then
 
   add-zsh-hook preexec __kintsu_preexec
   add-zsh-hook precmd __kintsu_precmd
+  add-zsh-hook precmd __kintsu_register
   zle -N __kintsu_panel_widget
   bindkey '__KINTSU_HOTKEY__' __kintsu_panel_widget
 fi

@@ -25,6 +25,7 @@ pub mod secret;
 pub mod session;
 pub mod settings;
 pub mod shell;
+pub mod shell_commands;
 pub mod subcommands;
 pub mod time;
 pub mod triage;
@@ -47,7 +48,7 @@ pub use message::{Message, MessageBody};
 pub use outcome::CommandOutcome;
 pub use output_rules::suggest_fix_from_output;
 pub use redaction::redact;
-pub use rules::{DirEntry, Facts, Os, suggest_fix};
+pub use rules::{AliasFact, DirEntry, Facts, Os, suggest_explanation, suggest_fix};
 pub use secret::SecretKey;
 pub use session::{Session, SessionDetails, SessionId};
 pub use settings::{
@@ -55,5 +56,6 @@ pub use settings::{
     ModelSpec, Provider, QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
 };
 pub use shell::Shell;
+pub use shell_commands::{Alias, ShellCommands};
 pub use time::{Duration, Timestamp};
 pub use triage::{QuietReason, TriageDecision};

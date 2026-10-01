@@ -14,6 +14,7 @@ binary (cargo build). Run it after touching shell/*; CI runs `--check`.
     python3 scripts/shell-harness.py ghost      # a typo, the pre-typed fix, Tab, Enter
     python3 scripts/shell-harness.py panel      # ^K, the panel, Enter, w, Esc (fish, zsh, bash)
     python3 scripts/shell-harness.py tee        # capture.stderr_tee: a refused touch, the sudo fix, kintsu privacy (zsh, bash)
+    python3 scripts/shell-harness.py defined    # what the shell defined: an alias whose program is gone, a typo of an alias (fish, zsh)
     DELAY=1.5 …                                 # slow the fake model down
 
 Environment: BIN (directory of the kintsu binary, default target/debug),
@@ -105,7 +106,22 @@ def fresh_start():
         try: os.remove(f"{ROOT}/{f}")
         except FileNotFoundError: pass
 
-def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False, record=None):
+def alias_steps(send, screen, record):
+    """An alias whose program is gone, then a typo of it: the rule explains
+    the first and corrects the second, because the shell listed its aliases
+    when it registered."""
+    send("hmz\n", 1.0)
+    gone = [l.rstrip() for l in screen.display if l.strip()]
+    send("clear\n", 0.5)
+    send("hmz2\n", 1.0)
+    typo = [l.rstrip() for l in screen.display if l.strip()]
+    if record is not None:
+        record["alias gone"] = gone; record["alias typo"] = typo
+    else:
+        print("   alias gone:", " | ".join(gone[-3:]))
+        print("   alias typo:", " | ".join(typo[-3:]))
+
+def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False, alias_rule=False, record=None):
     fresh_start()
     pid, fd = pty.fork()
     if pid == 0:
@@ -127,11 +143,23 @@ def run(variant_fn, typed=None, wait=4.0, enter_first=False, why=False, ghost=Fa
     drain(1.5)
     send(f"set -gx PATH {BIN} {ROOT}/bin /usr/bin /bin\n", 0.5)
     send("function fish_prompt; printf '\\n~\\n❯ '; end\n", 0.5)
+    if alias_rule:
+        # The alias exists before the hook, as in a config.fish; the daemon is
+        # up before the hook's first prompt registers the shell with it.
+        send("alias hmz '~/nowhere/hmz'\n", 0.3)
+        send("kintsu triage --status 0 --command warm --session warm >/dev/null 2>&1\n", 1.5)
     send("kintsu init fish | source\n", 0.8)
     if variant_fn: send(variant_fn + "\n", 0.5)
     send("clear\n", 0.5)
     send("true\n", 1.5)       # starts the daemon, out of the way of the timing
     send("clear\n", 0.5)
+    if alias_rule:
+        alias_steps(send, screen, record)
+        os.write(fd, b"kintsu daemon stop\n"); drain(0.6)
+        os.write(fd, b"exit\n"); drain(0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen, raw
     if ghost:
         send("gti status\n", 1.0)          # a rule fix: the next prompt pre-types it (fish: Tab takes it)
         snapshot = [l.rstrip() for l in screen.display if l.strip()]
@@ -194,7 +222,7 @@ end''',
     commandline -f repaint
 end''',
 }
-def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False, tee=False, record=None):
+def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, panel=False, tee=False, alias_rule=False, record=None):
     fresh_start()
     zenv = dict(env); zenv.pop("ZDOTDIR", None)
     pid, fd = pty.fork()
@@ -215,9 +243,20 @@ def run_zsh(typed=None, wait=4.0, enter_first=False, why=False, ghost=False, pan
     drain(1.0)
     send(f"export PATH={SHELL_PATH}\n", 0.4)
     send("PROMPT=$'\\n~\\n❯ '\n", 0.4)
+    if alias_rule:
+        # Quoted, or zsh expands `~` into the alias text at definition time.
+        send("alias hmz='~/nowhere/hmz'\n", 0.3)
+        send("kintsu triage --status 0 --command warm --session warm >/dev/null 2>&1\n", 1.5)
     send('eval "$(kintsu init zsh)"\n', 0.8)
     send("true\n", 1.5)
     send("clear\n", 0.5)
+    if alias_rule:
+        alias_steps(send, screen, record)
+        send("kintsu daemon stop\n", 0.6)
+        send("exit\n", 0.4)
+        try: os.close(fd)
+        except OSError: pass
+        return screen
     if tee:
         send("touch /etc/kintsu-harness-denied\n", 1.5)   # stderr copied by the hook; the rule that reads it answers
         drain(2.5)
@@ -447,7 +486,21 @@ def check_tee(shell):
     expect(f"{shell}: stderr copied by the hook", screen.display,
            ["## Output", "kintsu-harness-denied", "Permission denied"])
 
+ALIAS_GONE = "▎ `hmz` is an alias for `~/nowhere/hmz`, which is not there."
+ALIAS_TYPO = "▎ Did you mean hmz?"
+
+def check_alias(shell):
+    """The shell listed its aliases when it registered: an alias whose
+    program is gone is explained, a typo of an alias is corrected."""
+    rec = {}
+    if shell == "zsh": run_zsh(alias_rule=True, record=rec)
+    else: run(None, alias_rule=True, record=rec)
+    expect(f"{shell}: an alias whose program is gone is explained", rec["alias gone"],
+           [ALIAS_GONE, "kintsu why · kintsu agent · kintsu ignore"], ["exited 127"])
+    expect(f"{shell}: a typo of an alias is corrected", rec["alias typo"], [ALIAS_TYPO], ["exited 127"])
+
 CHECKS = {
+    "defined": lambda: [check_alias(s) for s in ("fish", "zsh")],
     "fish": lambda: check_shell_messages("fish"),
     "zsh": lambda: check_shell_messages("zsh"),
     "why": lambda: [check_why(s) for s in ("fish", "zsh")],
@@ -466,6 +519,11 @@ if "--check" in sys.argv:
     srv.shutdown(); sys.exit(0)
 
 which = sys.argv[1:] or list(variants)
+if which == ["defined"]:
+    screen, raw = run(None, alias_rule=True)
+    show("fish, an alias whose program is gone, then a typo of it", screen)
+    show("zsh, the same", run_zsh(alias_rule=True))
+    srv.shutdown(); sys.exit(0)
 if which == ["tee"]:
     show("zsh, stderr copied by the hook", run_zsh(tee=True))
     show("bash, stderr copied by the hook", run_bash(tee=True))

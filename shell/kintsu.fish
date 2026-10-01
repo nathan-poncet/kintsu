@@ -15,10 +15,20 @@ if status is-interactive
     set -g __kintsu_seq 0
     set -g __kintsu_pending_seq -1
     set -g __kintsu_prompt_shown 0
-    # Once, at start: what this shell is, so the daemon knows it before its
-    # first failure. Nothing waits on the answer.
-    if not set -q KINTSU_DISABLE
-        command kintsu session new --shell fish --pid $fish_pid >/dev/null 2>&1
+    # Once, at the first prompt, when config.fish has finished defining
+    # things: what this shell is and what it can run besides its PATH, its
+    # aliases (name, expansion) and functions, so the daemon knows it
+    # before its first failure. Nothing waits on the answer.
+    function __kintsu_register --on-event fish_prompt
+        set -l kintsu_status $status
+        functions -e __kintsu_register
+        if not set -q KINTSU_DISABLE
+            begin
+                alias | string replace -r '^alias (\S+) (.*)$' '$1'\t'$2'
+                functions -n | string split ,
+            end 2>/dev/null | command kintsu session new --shell fish --pid $fish_pid --tty (tty 2>/dev/null) >/dev/null 2>&1
+        end
+        return $kintsu_status
     end
 
     function __kintsu_count_prompt --on-event fish_prompt

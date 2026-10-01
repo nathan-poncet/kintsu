@@ -11,7 +11,7 @@ use std::time::{Duration, Instant, SystemTime};
 use serde_json::{Value, json};
 
 use crate::adapters::gateways::ndjson::{read_line, send_line};
-use crate::entities::{Action, CaseId, SessionDetails, SessionId, TerminalIdentity};
+use crate::entities::{Action, CaseId, SessionDetails, SessionId, ShellCommands, TerminalIdentity};
 use crate::use_cases::TriageInput;
 
 /// What the daemon decided, already rendered for this terminal.
@@ -127,6 +127,7 @@ impl DaemonClient {
             "env": (!details.env.is_empty()).then(|| json!(details.env)),
             "language": details.language.map(|l| l.code()),
             "terminal": terminal_json(&details.terminal),
+            "commands": (!details.commands.is_empty()).then(|| commands_json(&details.commands)),
         });
         send_line(&mut stream, &frame.to_string())?;
         let answer: Value =
@@ -345,6 +346,16 @@ impl DaemonClient {
             .spawn()
             .map(|_| ())
     }
+}
+
+/// The shell's aliases and functions as the registration carries them.
+fn commands_json(commands: &ShellCommands) -> Value {
+    let aliases: serde_json::Map<String, Value> = commands
+        .aliases
+        .iter()
+        .map(|a| (a.name.clone(), Value::String(a.expansion.clone())))
+        .collect();
+    json!({ "functions": commands.functions, "aliases": aliases })
 }
 
 /// The pane identity as the frames carry it.

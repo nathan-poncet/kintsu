@@ -5,7 +5,9 @@
 //! of thefuck (MIT), redone for what the hook knows at that moment.
 
 use crate::entities::subcommands::{GIT_LONG_OPTIONS, programs_with_subcommands, subcommands_of};
-use crate::entities::{CommandLine, CommandOutcome, Confidence, Fix, FixSource, distance::closest};
+use crate::entities::{
+    CommandLine, CommandOutcome, Confidence, Explanation, Fix, FixSource, distance::closest,
+};
 
 /// Which family of operating system the shell runs on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,23 +31,41 @@ pub struct DirEntry {
     pub is_executable: bool,
 }
 
+/// An alias of the shell, and whether the program it runs is there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AliasFact {
+    pub name: String,
+    /// The first word of the expansion, past `command`, `sudo` and the like.
+    pub target: String,
+    /// Whether the target is a program on the PATH, another alias or
+    /// function, or an existing file.
+    pub target_found: bool,
+}
+
 /// What the rules may know about the machine, gathered by a port.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Facts {
     /// The operating system family.
     pub os: Option<Os>,
-    /// Every program name on the PATH, plus shell builtins and aliases.
+    /// Every program name on the PATH, plus shell builtins, and the
+    /// shell's aliases and functions when it said what they are.
     pub executables: Vec<String>,
     /// The entries of the working directory.
     pub cwd_entries: Vec<DirEntry>,
     /// Whether Docker Desktop is installed; asked only when the output
     /// speaks of Docker.
     pub docker_desktop: bool,
+    /// The shell's aliases, with their targets looked up.
+    pub aliases: Vec<AliasFact>,
 }
 
 impl Facts {
     pub(crate) fn has_program(&self, name: &str) -> bool {
         self.executables.iter().any(|e| e == name)
+    }
+
+    fn alias(&self, name: &str) -> Option<&AliasFact> {
+        self.aliases.iter().find(|a| a.name == name)
     }
 
     pub(crate) fn entry(&self, name: &str) -> Option<&DirEntry> {
@@ -93,6 +113,38 @@ pub fn suggest_fix(outcome: &CommandOutcome, facts: &Facts) -> Option<Fix> {
         package_manager,
     ];
     rules.iter().find_map(|rule| rule(outcome, facts))
+}
+
+/// What a rule can say when no rule can fix: the bubble says it in place
+/// of the bare exit status, and `kintsu why` answers it without a model.
+pub fn suggest_explanation(outcome: &CommandOutcome, facts: &Facts) -> Option<Explanation> {
+    alias_without_its_program(outcome, facts)
+}
+
+/// `hmz` is an alias for `~/.dotnet/tools/hmz`, and that is no longer
+/// there: the shell says "command not found" about the alias, which is
+/// right there in the configuration, so the rule names the real absentee.
+fn alias_without_its_program(outcome: &CommandOutcome, facts: &Facts) -> Option<Explanation> {
+    if !outcome.status().is_command_not_found() {
+        return None;
+    }
+    let program = outcome.command().program();
+    let alias = facts.alias(program)?;
+    if alias.target_found {
+        return None;
+    }
+    let where_not = if alias.target.contains('/') {
+        "which is not there"
+    } else {
+        "which is not on your PATH either"
+    };
+    Some(Explanation::from_rule(
+        "alias",
+        format!(
+            "`{program}` is an alias for `{}`, {where_not}.",
+            alias.target
+        ),
+    ))
 }
 
 fn fix(command: String, confidence: f32, rule: &str, rationale: String) -> Option<Fix> {
@@ -652,6 +704,14 @@ mod tests {
             executables: execs.iter().map(|s| s.to_string()).collect(),
             cwd_entries: vec![],
             docker_desktop: false,
+            aliases: vec![],
+        }
+    }
+    fn alias(name: &str, target: &str, target_found: bool) -> AliasFact {
+        AliasFact {
+            name: name.into(),
+            target: target.into(),
+            target_found,
         }
     }
     fn entry(name: &str, is_dir: bool, is_executable: bool) -> DirEntry {
@@ -990,6 +1050,47 @@ mod tests {
         assert!(
             none("mkdir a/b/c", 1, &f),
             "`a` exists: something else failed"
+        );
+    }
+
+    #[test]
+    fn a_typo_of_an_alias_or_a_function_is_corrected_like_a_programs() {
+        // The gateway lists the shell's names among the executables.
+        let f = facts(&["git", "hmz", "gst", "mkcd"]);
+        assert_eq!(fixed("hmz2 --help", 127, &f), "hmz --help");
+        assert_eq!(fixed("gts", 127, &f), "gst");
+        assert!(none("hmz", 127, &f), "an alias is never not on the PATH");
+    }
+
+    #[test]
+    fn an_alias_whose_program_is_gone_is_explained_not_fixed() {
+        let mut f = facts(&["git", "hmz", "ll"]);
+        f.aliases = vec![
+            alias("hmz", "~/.dotnet/tools/hmz", false),
+            alias("ll", "ls", true),
+            alias("gone", "frobnicate", false),
+        ];
+        let explained = suggest_explanation(&outcome("hmz", 127), &f).unwrap();
+        assert_eq!(
+            explained.text(),
+            "`hmz` is an alias for `~/.dotnet/tools/hmz`, which is not there."
+        );
+        assert_eq!(explained.model(), "rule · alias");
+        assert!(explained.is_from_rule());
+        assert_eq!(
+            suggest_explanation(&outcome("gone --now", 127), &f)
+                .unwrap()
+                .text(),
+            "`gone` is an alias for `frobnicate`, which is not on your PATH either."
+        );
+        assert!(none("hmz", 127, &f), "nothing to type instead");
+        assert!(
+            suggest_explanation(&outcome("ll", 127), &f).is_none(),
+            "its program is there: 127 is something else"
+        );
+        assert!(
+            suggest_explanation(&outcome("hmz", 1), &f).is_none(),
+            "the alias ran and failed on its own"
         );
     }
 }
