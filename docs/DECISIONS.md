@@ -1056,6 +1056,45 @@ status (`gather_output_facts`, off the quiet path, after the capture), and
 exists, asked only when the output speaks of Docker. Every fix that guesses
 the user's intent stays under 0.8, so none is pre-typed.
 
+## 42. A structured quick fix, and the score of every source (2026-10-01)
+
+The daemon's log said "the model had no fix" for most eager fixes. The
+answer was free text read by `parse_quick_fix`; now the prompt asks for
+`{"command", "confidence", "rationale"}` and the gateway asks for that
+shape the way each provider has: a forced `propose_fix` tool call at
+Anthropic, read from the `tool_use` block; a strict JSON-schema
+`response_format` at OpenAI-compatible endpoints; `format` with the same
+schema at Ollama. Every key is required and the command is `null` when
+there is none, because the strictest servers want every property listed.
+A server that refuses the shape is asked once more without it, like the
+output limit under its other name; a streamed answer is never asked for
+a shape; and a model that answers with the command line alone is still
+read, so the fakes and the smaller models keep working. The gateway reads
+the provider's structure, tool input or JSON text, into a typed
+`ProposedFix` on the port's `Answer`; the use cases never see JSON, the
+dependency rule says so, and `parse_quick_fix` reads the typed fix first,
+the line after. The model's own
+confidence is kept under 0.75: a guess about a guess, never pre-typed
+(section 18). Its danger is classified from the command, as for every
+fix; the design's `danger` field would have been the model's word for
+it. The prompt carries two examples, a fix and a refusal, and tells the
+model to fix the cause the output shows.
+
+Nothing measured which fixes were taken. The learned fixes (section 35)
+already saw a proposal run next and succeed, but only when it taught
+something; a pre-typed rule fix taken teaches nothing and still counts.
+So a `Scoreboard` port, apart from the `CostLedger` whose contract is
+about money: `mark` and `since`, with the in-memory fake and the contract
+suite, and three events: a failure looked at (every bubble), a fix
+offered (by a rule at triage, by a model or an output rule when the
+daemon delivers it, by `kintsu fix` when it finds one the case had not
+seen), a fix taken. The JSON-lines gateway keeps both in
+`<state>/ledger.jsonl`, each trait reading only its own kinds; one file,
+one place to look. The scoreboard is a tally, never a reason to fail a
+decision. `kintsu stats` tallies the last thirty days: failures per day,
+offered and taken per source with the rate, and the explanations asked,
+counted from the ledger's `explain` calls.
+
 ## 43. The models answer in the machine's language (2026-10-01)
 
 The vision wanted explanations in the user's language, French first. The

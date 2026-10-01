@@ -58,6 +58,7 @@ kintsu/
     │   ├── redaction.rs              redact · Redacted · SecretKind
     │   ├── ignore.rs                 IgnoreEntry · IgnoreTarget · IgnoreScope
     │   ├── learned.rs                FailureShape · LearnedFix · LearnedBook · accepted_proposal (a fix taken twice is a rule)
+    │   ├── score.rs                  FixEvent · Scorecard · SourceScore · score (failures looked at, fixes offered and taken)
     │   ├── settings.rs               Settings · ModelSpec · Provider · Tier · KeySource · Routing · QuietSettings · UiSettings
     │   ├── brief.rs                  case_document · hand_off_brief (output fenced as data)
     │   ├── capture.rs                TerminalIdentity · output_after (the command's output cut from a screen)
@@ -79,6 +80,7 @@ kintsu/
     │   ├── privacy.rs                what would be sent
     │   ├── diagnose.rs               doctor's checks
     │   ├── costs.rs                  today and the last thirty days, per model, against the cap
+    │   ├── stats.rs                  the scoreboard tallied: failures per day, acceptance per rule and model, explanations asked
     │   ├── models.rs                 the models table (key found or not, reach), the one-word probe
     │   ├── login.rs                  a key into the keychain under the model's name
     │   ├── facts.rs · prompts.rs · routing.rs
@@ -87,7 +89,7 @@ kintsu/
     │   └── ports/                    one trait per file, role nouns, each owning its error type
     │       ├── clock.rs · ids.rs · environment.rs · session_registry.rs · case_store.rs
     │       ├── ignore_store.rs · secrets.rs · secret_store.rs · model_gateway.rs · agent_launcher.rs · notifier.rs
-    │       ├── output_source.rs · cost_ledger.rs · learned_fixes.rs
+    │       ├── output_source.rs · cost_ledger.rs · learned_fixes.rs · scoreboard.rs
     │       └── (planned)             RuleBook
     │
     └── adapters/                 depends on the entities and the use cases
@@ -95,7 +97,7 @@ kintsu/
         │                             socket.rs (daemon frames → Request) · url_scheme.rs (kintsu://act) ·
         │                             setup_prompts.rs (the three questions) · panel_keys.rs (crossterm → panel keys)
         ├── presenters/               style.rs (the seam) · toast.rs (toast, message_toast) · plain.rs ·
-        │   │                         doctor.rs · costs.rs (text and JSON) · models.rs (the models table, probes, the login notice; plain and JSON) ·
+        │   │                         doctor.rs · costs.rs · stats.rs (text and JSON) · models.rs (the models table, probes, the login notice; plain and JSON) ·
         │   │                         shell_hook.rs · frames.rs (daemon → client frames) ·
         │   │                         panel.rs (the panel's view model, drawn by ratatui)
         │   └── (planned)             json.rs
@@ -111,7 +113,7 @@ kintsu/
             │                         toml_settings.rs · http_models.rs (Ollama, OpenAI-compatible, Anthropic; whole or streamed) ·
             │                         shell_agents.rs (CLI agents via sh) · fs_environment.rs ·
             │                         env_secrets.rs (env, command, keychain) · keychain.rs (SecretStore: security, secret-tool) ·
-            │                         system_clock.rs · random_ids.rs · jsonl_ledger.rs (CostLedger: one JSON line per call)
+            │                         system_clock.rs · random_ids.rs · jsonl_ledger.rs (CostLedger and Scoreboard: one JSON line per call, per failure, per offer, per take)
             └── (planned)             output_sources/{tmux,herdr,wezterm,kitty,iterm2}.rs ·
                                       store/sqlite.rs · notify/{zle_fd,signal,next_prompt}.rs
 ```
