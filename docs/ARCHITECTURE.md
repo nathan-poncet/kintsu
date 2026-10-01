@@ -28,6 +28,7 @@ kintsu/
 ├── shell/                        kintsu.zsh · kintsu.bash · kintsu.fish   (the hooks, plain assets)
 ├── tests/
 │   └── dependency_rule.rs        the rings may only reach inward; the inner two do no I/O
+├── fuzz/                         cargo-fuzz targets over the pure rings, included by path (weekly in CI)
 ├── docs/                         the design documents, DECISIONS.md, and the website
 │
 └── src/
