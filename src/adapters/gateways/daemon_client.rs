@@ -76,6 +76,7 @@ impl DaemonClient {
             "shell": input.shell.map(|s| s.name()),
             "path": input.path,
             "env": (!input.env.is_empty()).then(|| json!(input.env)),
+            "language": input.language.map(|l| l.code()),
             "color": color,
             "signal_pid": signal_pid,
             "terminal": terminal_json(&input.terminal),
@@ -124,6 +125,7 @@ impl DaemonClient {
             "tty": details.tty,
             "path": details.path,
             "env": (!details.env.is_empty()).then(|| json!(details.env)),
+            "language": details.language.map(|l| l.code()),
             "terminal": terminal_json(&details.terminal),
         });
         send_line(&mut stream, &frame.to_string())?;

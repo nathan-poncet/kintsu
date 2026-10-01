@@ -264,6 +264,7 @@ fn parse_triage(flags: &[&str]) -> Result<Command, CliError> {
             terminal: TerminalIdentity::default(),
             path: None,
             env: BTreeMap::new(),
+            language: None,
         }),
         signal_pid,
     })

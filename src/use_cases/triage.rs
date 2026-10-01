@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 use crate::entities::{
-    CommandLine, CommandOutcome, FailureCase, FailureShape, QuietReason, Session, SessionId,
-    Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal, suggest_fix,
+    CommandLine, CommandOutcome, FailureCase, FailureShape, Language, QuietReason, Session,
+    SessionId, Settings, Shell, TerminalIdentity, TriageDecision, accepted_proposal, suggest_fix,
 };
 use crate::use_cases::facts::{gather_facts, learned_fix};
 use crate::use_cases::ports::{
@@ -36,6 +36,8 @@ pub struct TriageInput {
     /// from, as the shell sees them: a daemon started by launchd or
     /// systemd has none of them.
     pub env: BTreeMap<String, String>,
+    /// The language the shell's locale names, for the models' answers.
+    pub language: Option<Language>,
 }
 
 /// Why triage could not finish.
@@ -238,6 +240,7 @@ mod tests {
                     terminal: TerminalIdentity::default(),
                     path: None,
                     env: BTreeMap::new(),
+                    language: None,
                 })
                 .unwrap()
         }
@@ -510,6 +513,7 @@ mod tests {
                 terminal: TerminalIdentity::default(),
                 path: None,
                 env: BTreeMap::new(),
+                language: None,
             })
             .unwrap();
         let TriageDecision::Offer { case, .. } = decision else {

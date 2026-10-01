@@ -94,7 +94,7 @@ impl FixLast<'_> {
             self.models,
             self.secrets,
             &candidates,
-            &quick_fix_prompt(&case),
+            &quick_fix_prompt(&case, self.settings.language()),
             &meter,
         ) {
             Ok((name, answer)) => {

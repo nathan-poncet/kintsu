@@ -8,8 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::entities::{
-    CaptureSettings, DaemonSettings, Duration, EagerFix, Hotkey, KeySource, ModelSpec, Money,
-    Provider, QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
+    CaptureSettings, DaemonSettings, Duration, EagerFix, Hotkey, KeySource, LanguageSetting,
+    ModelSpec, Money, Provider, QuietSettings, Routing, Settings, Tier, UiMode, UiSettings,
 };
 
 /// The commented default file, also printed by `kintsu default-config`.
@@ -100,6 +100,13 @@ pub fn render_settings(settings: &Settings) -> String {
         }
     ));
     out.push_str(&format!("hotkey    = \"{}\"\n", settings.ui.hotkey));
+    out.push_str(&format!(
+        "language  = \"{}\"\n",
+        match settings.ui.language {
+            LanguageSetting::Auto => "auto",
+            LanguageSetting::Fixed(language) => language.code(),
+        }
+    ));
     out.push_str(&format!("ascii     = {}\n", settings.ui.ascii));
     out.push_str(&format!("links     = {}\n", settings.ui.links));
     out.push_str(&format!(
@@ -252,6 +259,7 @@ struct UiDto {
     ascii: Option<bool>,
     eager_fix: Option<EagerDto>,
     links: Option<bool>,
+    language: Option<String>,
 }
 
 /// `eager_fix = true`, `false`, or `"auto"`.
@@ -358,6 +366,11 @@ pub fn parse_settings(text: &str, home: Option<&str>) -> Result<Settings, Settin
             None => Hotkey::DEFAULT,
             Some(text) => Hotkey::parse(&text)
                 .map_err(|e| SettingsError::Invalid(format!("ui.hotkey: {e}")))?,
+        },
+        language: match file.ui.language {
+            None => LanguageSetting::Auto,
+            Some(text) => LanguageSetting::parse(&text)
+                .map_err(|e| SettingsError::Invalid(format!("ui.language: {e}")))?,
         },
         eager_fix: match file.ui.eager_fix {
             None => EagerFix::Auto,
@@ -554,6 +567,7 @@ fn expand_dir(dir: &str, home: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::entities::Language;
 
     #[test]
     fn what_setup_renders_parses_back_to_the_same_settings() {
@@ -782,8 +796,34 @@ eager_fix = true
                 eager_fix: EagerFix::On,
                 links: true,
                 hotkey: Hotkey::parse("^O").unwrap(),
+                language: LanguageSetting::Auto,
             }
         );
+    }
+
+    #[test]
+    fn the_language_is_auto_a_code_or_a_mistake_named_precisely() {
+        assert_eq!(
+            parse_settings("[ui]\nlanguage = \"fr\"", None)
+                .unwrap()
+                .ui
+                .language,
+            LanguageSetting::Fixed(Language::French)
+        );
+        assert_eq!(
+            parse_settings("[ui]\nlanguage = \"auto\"", None)
+                .unwrap()
+                .ui
+                .language,
+            LanguageSetting::Auto
+        );
+        let err = parse_settings("[ui]\nlanguage = \"xx\"", None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("ui.language") && err.contains("fr"), "{err}");
+        let mut settings = Settings::default();
+        settings.ui.language = LanguageSetting::Fixed(Language::German);
+        assert!(render_settings(&settings).contains("language  = \"de\""));
     }
 
     #[test]

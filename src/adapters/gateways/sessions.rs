@@ -11,7 +11,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::adapters::gateways::ndjson::send_line;
 use crate::adapters::gateways::unix;
-use crate::entities::{CaseId, Message, SessionDetails, SessionId, Shell, TerminalIdentity};
+use crate::entities::{
+    CaseId, Language, Message, SessionDetails, SessionId, Shell, TerminalIdentity,
+};
 use crate::use_cases::ports::{Notifier, NotifyError};
 
 /// Renders a message into the frame line a subscriber receives; the bool
@@ -29,6 +31,7 @@ struct SessionState {
     terminal: Option<TerminalIdentity>,
     path: Option<String>,
     env: BTreeMap<String, String>,
+    language: Option<Language>,
 }
 
 impl SessionState {
@@ -43,6 +46,7 @@ impl SessionState {
             terminal: None,
             path: None,
             env: BTreeMap::new(),
+            language: None,
         }
     }
 }
@@ -126,6 +130,7 @@ impl Sessions {
             if !details.env.is_empty() {
                 state.env = details.env;
             }
+            state.language = details.language.or(state.language);
         });
     }
 
@@ -204,6 +209,16 @@ impl Sessions {
 
     pub fn env_of(&self, id: &SessionId) -> BTreeMap<String, String> {
         self.peek(id, |state| state.env.clone()).unwrap_or_default()
+    }
+
+    /// The language the shell's locale named last, for the models the
+    /// daemon asks on its behalf.
+    pub fn remember_language(&self, id: &SessionId, language: Language) {
+        self.with(id, |state, _| state.language = Some(language));
+    }
+
+    pub fn language_of(&self, id: &SessionId) -> Option<Language> {
+        self.peek(id, |state| state.language).flatten()
     }
 
     /// The messages not yet seen, oldest first, and forgotten.
@@ -308,8 +323,10 @@ mod tests {
                 },
                 path: Some("/a/bin".into()),
                 env: BTreeMap::from([("K".to_string(), "v".to_string())]),
+                language: Some(Language::French),
             },
         );
+        assert_eq!(s.language_of(&id), Some(Language::French));
         assert_eq!(s.path_of(&id).as_deref(), Some("/a/bin"));
         assert_eq!(s.env_of(&id).get("K").map(String::as_str), Some("v"));
         assert_eq!(
@@ -391,6 +408,22 @@ mod tests {
         s.remember_env(&id, BTreeMap::from([("K".to_string(), "new".to_string())]));
         assert_eq!(s.env_of(&id).get("K").map(String::as_str), Some("new"));
         assert!(s.env_of(&SessionId::new("43")).is_empty());
+    }
+
+    #[test]
+    fn a_session_remembers_the_language_its_shell_named_last() {
+        let s = sessions();
+        let id = SessionId::new("42");
+        assert_eq!(s.language_of(&id), None);
+        s.remember_language(&id, Language::French);
+        s.remember_language(&id, Language::German);
+        assert_eq!(s.language_of(&id), Some(Language::German));
+        s.register(&id, SessionDetails::default());
+        assert_eq!(
+            s.language_of(&id),
+            Some(Language::German),
+            "a registration that says nothing keeps what was known"
+        );
     }
 
     #[test]

@@ -36,6 +36,7 @@ pub(super) fn triage(
     input.terminal = rt.terminal.clone();
     input.path = Some(rt.path_var.clone());
     input.env = keys_the_models_read(settings);
+    input.language = rt.machine_language();
     if let Some(session) = &input.session {
         input.terminal.stderr_copy = HookNotes::new(&rt.state_dir).stderr_copy(session);
     }
@@ -159,6 +160,7 @@ pub(super) fn session_new(
         terminal: rt.terminal.clone(),
         path: Some(rt.path_var.clone()),
         env: keys_the_models_read(settings),
+        language: rt.machine_language(),
     };
     let _ = rt
         .client()

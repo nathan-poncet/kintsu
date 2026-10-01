@@ -44,7 +44,10 @@ impl Fixture {
             .env_remove("KINTSU_SESSION")
             .env_remove("KINTSU_NO_DAEMON")
             .env_remove("KINTSU_DISABLE")
-            .env_remove("KINTSU_TEST_KEY");
+            .env_remove("KINTSU_TEST_KEY")
+            .env_remove("LC_ALL")
+            .env_remove("LC_MESSAGES")
+            .env_remove("LANG");
         // The hook client would otherwise read the pane the tests run in.
         for identity in [
             "TERM_PROGRAM",
@@ -208,6 +211,58 @@ fn fake_ollama(content: &'static str) -> u16 {
         }
     });
     port
+}
+
+/// An Ollama-shaped endpoint that records the body of every request and
+/// answers with `content`, for what the prompt asked.
+fn fake_ollama_recording(content: &'static str) -> (u16, Arc<Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let recorded = Arc::clone(&seen);
+    std::thread::spawn(move || {
+        for incoming in listener.incoming() {
+            let Ok(mut stream) = incoming else { continue };
+            let mut buf = vec![0u8; 65536];
+            let mut read = 0;
+            loop {
+                let n = stream.read(&mut buf[read..]).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                read += n;
+                let text = String::from_utf8_lossy(&buf[..read]).to_string();
+                if let Some(split) = text.find("\r\n\r\n") {
+                    let length: usize = text
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if read >= split + 4 + length {
+                        break;
+                    }
+                }
+            }
+            let text = String::from_utf8_lossy(&buf[..read]).to_string();
+            let body = text
+                .split_once("\r\n\r\n")
+                .map(|(_, b)| b.to_string())
+                .unwrap_or_default();
+            recorded.lock().unwrap().push(body);
+            let body = format!(
+                r#"{{"message":{{"role":"assistant","content":"{content}"}},"done":true}}"#
+            );
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+        }
+    });
+    (port, seen)
 }
 
 /// An Anthropic-shaped endpoint that records the `x-api-key` header of
@@ -650,6 +705,56 @@ fn a_key_the_shell_sees_reaches_the_model_through_a_daemon_that_has_none() {
     let fixed = wait_for_bubble(&f, "s7");
     assert!(fixed.contains("cargo build --release"), "{fixed}");
     assert_eq!(seen.lock().unwrap().as_slice(), ["sk-from-shell"]);
+}
+
+#[test]
+fn the_shells_language_reaches_the_models_prompt_and_a_silent_shell_gets_english() {
+    let (port, bodies) = fake_ollama_recording("make -j4 test");
+    let config = format!(
+        "[models.local]\nprovider = \"ollama\"\nmodel = \"m\"\nbase_url = \"http://127.0.0.1:{port}\"\n[routing]\nquick_fix = [\"local\"]\n[ui]\neager_fix = true\n"
+    );
+    let mut f = Fixture::new("language", &config);
+    f.start_daemon();
+    // The hook's process reads its locale and names the language in the frame.
+    let (code, _, err) = f.run_env(
+        &[
+            "triage",
+            "--status",
+            "2",
+            "--command",
+            "make test",
+            "--session",
+            "s9",
+        ],
+        None,
+        &[("LANG", "fr_FR.UTF-8")],
+    );
+    assert_eq!(code, 0, "{err}");
+    let fixed = wait_for_bubble(&f, "s9");
+    assert!(fixed.contains("make -j4 test"), "{fixed}");
+    // The reachability probe has no body; the chat request has the prompt.
+    let chats = |from: usize| -> Vec<String> {
+        bodies.lock().unwrap()[from..]
+            .iter()
+            .filter(|b| b.contains("\"messages\""))
+            .cloned()
+            .collect()
+    };
+    let first = chats(0);
+    assert!(
+        first.iter().any(|b| b.contains("The user reads French")),
+        "{first:?}"
+    );
+    let seen = bodies.lock().unwrap().len();
+    // A frame naming no language, from a shell that registered none: the
+    // daemon's own locale, which the fixture leaves empty: English.
+    f.exchange(
+        r#"{"v":1,"type":"command_finished","session":"s10","command":"make test","status":2,"cwd":"/"}"#,
+    );
+    wait_for_bubble(&f, "s10");
+    let second = chats(seen);
+    assert!(!second.is_empty(), "the model was asked again");
+    assert!(second.iter().all(|b| !b.contains("French")), "{second:?}");
 }
 
 #[test]
